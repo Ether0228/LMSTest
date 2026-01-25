@@ -104,6 +104,13 @@ def process_core_logic(df_subs, df_roster_raw, df_assign):
 
 # --- 3. 页面主程序 ---
 def main():
+    # --- 简易密码保护 ---
+    password = st.text_input("请输入访问密码：", type="password")
+    if password != "Gia0228":  # 这里设置你的暗号
+        if password:
+            st.error("密码错误！")
+        st.stop()  # 密码不对就停止运行下面的代码
+    # ...
     st.set_page_config(page_title="作业提交追踪", layout="wide", page_icon="🎓")
     st.title("🎓 Schoology 作业提交追踪系统")
 
