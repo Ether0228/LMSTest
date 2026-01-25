@@ -13,9 +13,14 @@ CREDENTIALS_FILE = "credentials.json"
 # --- 1. 数据加载与缓存 ---
 @st.cache_data(ttl=60)
 def load_and_process_data():
-    # 连接 Google Sheets
     scope = ['https://spreadsheets.google.com/feeds','https://www.googleapis.com/auth/drive']
-    creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_FILE, scope)
+    
+    # === 核心修改：优先从 Streamlit Secrets 读取 ===
+    # Streamlit 会自动把 secrets 里的配置转换成字典
+    creds_dict = st.secrets["gcp_service_account"]
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    # ==========================================
+    
     client = gspread.authorize(creds)
     sh = client.open(SHEET_NAME)
     
