@@ -63,14 +63,19 @@ def start_cloud_scraper():
                 pass
         
         # 4. 访问通知页
-        driver.get("https://queenscanada.schoology.com/home/notifications")
-        time.sleep(5)
+        print(f">>> [Step 4] 正在获取通知: {NOTIFICATION_URL}")
+        driver.get(NOTIFICATION_URL)
+        time.sleep(7) # 增加一点等待时间
 
-        # 验证是否成功登录 (检查是否有内容)
-        if "login" in driver.current_url.lower():
-            print("ERROR: Cookie 已失效，请更新 GitHub Secrets！")
+        # --- 新增调试信息 ---
+        print(f"DEBUG: 当前页面标题为: {driver.title}")
+        print(f"DEBUG: 当前页面地址为: {driver.current_url}")
+        driver.save_screenshot("debug_view.png") # 拍一张云端运行的截图
+        # ------------------
+
+        if "login" in driver.current_url.lower() or "signin" in driver.current_url.lower():
+            print("!!! ERROR: Cookie 可能已失效，被重定向到了登录页!")
             return
-
         # 5. 抓取逻辑 (与之前相同)
         elements = driver.find_elements(By.XPATH, "//div[contains(@class, 's-edge-feed')]//div[contains(@class, 'feed-body')]")
         new_rows = []
