@@ -155,4 +155,4 @@ def start_cloud_scraper():
         print(">>> 流程结束。")
 
 if __name__ == "__main__":
-    start_scraper()
+    start_cloud_scraper()  # 确保这里的名字和上面定义的 def 名字一致
