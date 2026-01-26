@@ -11,12 +11,21 @@ from selenium.webdriver.common.by import By
 
 # 从 GitHub Secrets 读取配置
 def get_env_config():
-    # Google 密钥
     g_json = os.environ.get("GDRIVE_JSON")
-    # Schoology Cookies
     s_cookies = os.environ.get("SCHOOLOGY_COOKIES")
-    return json.loads(g_json), json.loads(s_cookies)
-
+    
+    # 调试诊断
+    if not g_json:
+        raise ValueError("错误：环境变量 GDRIVE_JSON 为空！请检查 GitHub Secrets 设置。")
+    if not s_cookies:
+        raise ValueError("错误：环境变量 SCHOOLOGY_COOKIES 为空！请检查 GitHub Secrets 设置。")
+        
+    try:
+        return json.loads(g_json), json.loads(s_cookies)
+    except json.JSONDecodeError as e:
+        print("JSON 解析失败，请检查 Secret 内容是否完整且格式正确。")
+        raise e
+        
 def start_cloud_scraper():
     print(">>> 启动云端爬虫流程...")
     g_creds, s_cookies = get_env_config()
