@@ -1,8 +1,8 @@
 name: Schoology Auto Scraper
-
 on:
   schedule:
-    - cron: '0 * * * *'  # 每小时运行一次
+    - cron: '*/15 * * * *'
+    
   workflow_dispatch:      # 允许手动点击运行
 
 jobs:
