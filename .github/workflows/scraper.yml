@@ -1,0 +1,28 @@
+name: Schoology Auto Scraper
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # 每小时运行一次
+  workflow_dispatch:      # 允许手动点击运行
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          pip install selenium webdriver-manager gspread oauth2client
+
+      - name: Run Scraper
+        env:
+          GDRIVE_JSON: ${{ secrets.GDRIVE_JSON }}
+          SCHOOLOGY_COOKIES: ${{ secrets.SCHOOLOGY_COOKIES }}
+        run: python scraper_cloud.py
