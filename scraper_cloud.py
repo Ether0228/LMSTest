@@ -1,37 +1,161 @@
-for item in potential_items:
+import os
+import json
+import time
+import gspread
+from datetime import datetime, timedelta
+from oauth2client.service_account import ServiceAccountCredentials
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.common.by import By
+
+# ================= 配置区域 =================
+LOGIN_URL = "https://queenscanada.schoology.com"
+NOTIFICATION_URL = "https://queenscanada.schoology.com/home/notifications"
+# ===========================================
+
+def get_env_config():
+    g_json = os.environ.get("GDRIVE_JSON")
+    s_cookies = os.environ.get("SCHOOLOGY_COOKIES")
+    if not g_json or not s_cookies:
+        raise ValueError("GitHub Secrets 缺失")
+    return json.loads(g_json), json.loads(s_cookies)
+
+def normalize_text(text):
+    return " ".join(text.split()).strip()
+
+def start_cloud_scraper():
+    print(">>> 启动云端爬虫流程...")
+    try:
+        g_creds, s_cookies = get_env_config()
+    except Exception as e:
+        print(f"配置读取失败: {e}")
+        return
+
+    # 1. 连接 Google Sheets
+    print(">>> [Step 1] 连接数据库...")
+    try:
+        scope = ['https://spreadsheets.google.com/feeds','https://www.googleapis.com/auth/drive']
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(g_creds, scope)
+        client = gspread.authorize(creds)
+        sh = client.open("Schoology_Data")
+        try:
+            sheet = sh.worksheet("Submissions")
+        except:
+            sheet = sh.sheet1
+        existing_set = {normalize_text(t) for t in sheet.col_values(2)}
+        print(f">>> 数据库就绪，已有记录: {len(existing_set)}")
+    except Exception as e:
+        print(f"数据库连接失败: {e}")
+        return
+
+    # 2. 启动浏览器
+    print(">>> [Step 2] 启动浏览器...")
+    chrome_options = Options()
+    chrome_options.add_argument("--headless=new")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--window-size=1920,1080")
+    chrome_options.add_argument("user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+
+    try:
+        # 3. 注入 Cookie
+        print(">>> [Step 3] 注入凭证...")
+        driver.get(LOGIN_URL)
+        time.sleep(5)
+        for cookie in s_cookies:
+            if 'sameSite' in cookie: del cookie['sameSite']
+            if 'storeId' in cookie: del cookie['storeId']
+            try: driver.add_cookie(cookie)
+            except: pass
+        
+        # 4. 访问通知页
+        print(f">>> [Step 4] 访问通知页...")
+        driver.get(NOTIFICATION_URL)
+        time.sleep(10) 
+
+        if "login" in driver.current_url.lower():
+            print("!!! 错误: Cookie 可能失效")
+            return
+
+        # 5. 加载更多
+        for i in range(2):
+            try:
+                more_btns = driver.find_elements(By.CSS_SELECTOR, "li.notif-more a")
+                if more_btns:
+                    print(f">>> 点击更多 (第 {i+1} 次)...")
+                    driver.execute_script("arguments[0].click();", more_btns[0])
+                    time.sleep(5)
+                else:
+                    break
+            except:
+                break
+
+        # 6. 抓取逻辑
+        print(">>> [Step 6] 扫描内容...")
+        # 重新定义并获取 potential_items
+        potential_items = driver.find_elements(By.XPATH, "//div[contains(@class, 'feed')] | //li[contains(@class, 'item')]")
+        
+        if len(potential_items) < 5:
+            potential_items = driver.find_elements(By.TAG_NAME, "li")
+
+        print(f">>> 找到潜在条目数: {len(potential_items)}")
+        
+        new_rows = []
+        keywords = ["submitted", "resubmitted", "submission"]
+
+        for item in potential_items:
             try:
                 raw_text = item.text
                 if not raw_text: continue
                 
                 norm_text = normalize_text(raw_text)
                 
-                # 匹配关键词：提交、重新提交等
-                if any(kw in norm_text.lower() for kw in keywords):
-                    if norm_text not in existing_set:
-                        
-                        # === 精准提取作业链接逻辑开始 ===
-                        extracted_assignment_link = ""
-                        try:
-                            # 找到该条目内所有的链接
-                            all_links = item.find_elements(By.TAG_NAME, "a")
-                            for l in all_links:
-                                href = l.get_attribute("href")
-                                if href:
-                                    # 过滤掉 user 链接，只保留作业相关链接
-                                    # 增加对不同作业类型的支持 (assignment, assessment, discussion)
-                                    target_patterns = ["/assignment/", "/assessment/", "/discussion/"]
-                                    if any(pattern in href.lower() for pattern in target_patterns):
-                                        extracted_assignment_link = href
-                                        break # 找到作业链接后立即跳出当前链接循环
-                        except Exception as e:
-                            print(f"提取链接时出错: {e}")
-                        # === 精准提取作业链接逻辑结束 ===
-                        
-                        # 如果没找到作业链接，我们宁愿留空，也不要填 user 链接
-                        print(f"发现新数据: {norm_text[:40]}... | Link: {extracted_assignment_link}")
-                        
-                        current_time = time.strftime("%Y-%m-%d %H:%M:%S")
-                        new_rows.append([current_time, raw_text.replace("\n", " "), extracted_assignment_link])
-                        existing_set.add(norm_text)
-            except Exception as e:
+                # 检查关键词和是否已存在
+                if any(kw in norm_text.lower() for kw in keywords) and (norm_text not in existing_set):
+                    
+                    # === 精准提取作业链接 (过滤 user 链接) ===
+                    extracted_assignment_link = ""
+                    try:
+                        all_links = item.find_elements(By.TAG_NAME, "a")
+                        for l in all_links:
+                            href = l.get_attribute("href")
+                            if href:
+                                # 只保留作业相关的链接
+                                targets = ["/assignment/", "/assessment/", "/discussion/"]
+                                if any(t in href.lower() for t in targets):
+                                    extracted_assignment_link = href
+                                    break 
+                    except:
+                        pass
+                    
+                    # === 修正时间为北京时间 (UTC+8) ===
+                    # GitHub Actions 默认是 UTC，我们手动加 8 小时
+                    beijing_now = datetime.utcnow() + timedelta(hours=8)
+                    current_time_str = beijing_now.strftime("%Y-%m-%d %H:%M:%S")
+
+                    print(f"发现新数据: {norm_text[:40]}... | Time: {current_time_str}")
+                    new_rows.append([current_time_str, raw_text.replace("\n", " "), extracted_assignment_link])
+                    existing_set.add(norm_text)
+            except:
                 continue
+
+        # 7. 写入
+        if new_rows:
+            print(f">>> 写入 {len(new_rows)} 条数据...")
+            sheet.append_rows(new_rows)
+            print(">>> 完成！数据已同步到 Google Sheets。")
+        else:
+            print(">>> 未发现新通知。")
+
+    except Exception as e:
+        print(f"运行异常: {e}")
+        driver.save_screenshot("debug_view.png")
+    finally:
+        driver.quit()
+
+if __name__ == "__main__":
+    start_cloud_scraper()
