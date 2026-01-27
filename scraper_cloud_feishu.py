@@ -25,15 +25,20 @@ def get_env_config():
     table_id = os.environ.get("FEISHU_TABLE_ID", "").strip()
     s_cookies = os.environ.get("SCHOOLOGY_COOKIES")
     
+    # 1. 定义默认日期（北京时间昨天）
     default_date = (datetime.utcnow() + timedelta(hours=8) - timedelta(days=1)).strftime("%Y-%m-%d")
-    target_date = os.environ.get("TARGET_DATE", default_date)
-    # 先读取环境变量
-    max_pages_env = os.environ.get("MAX_PAGES", "2")
-    # 增加判断：如果环境变量是空字符串，则使用默认值 2
-    max_pages = int(max_pages_env) if max_pages_env and max_pages_env.strip() else 2
+    
+    # 2. 安全读取 TARGET_DATE（处理 GitHub 定时任务传回空字符串的情况）
+    target_date_raw = os.environ.get("TARGET_DATE", "").strip()
+    target_date = target_date_raw if target_date_raw else default_date
+    
+    # 3. 安全读取 MAX_PAGES
+    max_pages_raw = os.environ.get("MAX_PAGES", "").strip()
+    max_pages = int(max_pages_raw) if max_pages_raw else 2
     
     if not all([app_id, app_secret, app_token, table_id, s_cookies]):
         raise ValueError("GitHub Secrets 配置不完整")
+        
     return app_id, app_secret, app_token, table_id, json.loads(s_cookies), target_date, max_pages
 
 def get_feishu_token(app_id, app_secret):
