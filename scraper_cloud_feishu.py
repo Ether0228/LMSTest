@@ -25,14 +25,12 @@ def get_env_config():
     table_id = os.environ.get("FEISHU_TABLE_ID", "").strip()
     s_cookies = os.environ.get("SCHOOLOGY_COOKIES")
     
-    # 获取动态参数 (手动运行手动指定日期，定时任务默认回溯1天)
     default_date = (datetime.utcnow() + timedelta(hours=8) - timedelta(days=1)).strftime("%Y-%m-%d")
     target_date = os.environ.get("TARGET_DATE", default_date)
     max_pages = int(os.environ.get("MAX_PAGES", "2"))
     
     if not all([app_id, app_secret, app_token, table_id, s_cookies]):
         raise ValueError("GitHub Secrets 配置不完整")
-        
     return app_id, app_secret, app_token, table_id, json.loads(s_cookies), target_date, max_pages
 
 def get_feishu_token(app_id, app_secret):
@@ -43,87 +41,58 @@ def get_feishu_token(app_id, app_secret):
     else:
         raise Exception(f"获取飞书Token失败: {resp.text}")
 
-def parse_time_to_str(text):
-    """
-    将 Jan 5 at 8:53 am 转换为字符串 2026/01/05 08:53
-    不进行时区偏移，直接字面转换
-    """
-    pattern = r" ((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}(?:,\s+\d{4})?|Today|Yesterday)\s+at\s+(\d{1,2}:\d{2}\s+(?:am|pm))$"
-    match = re.search(pattern, text, re.IGNORECASE)
-    
-    if not match:
-        return (datetime.utcnow() + timedelta(hours=8)).strftime("%Y/%m/%d %H:%M")
-
-    try:
-        beijing_now = datetime.utcnow() + timedelta(hours=8)
-        date_part = match.group(1)
-        time_part = match.group(2)
-        full_time_str = f"{date_part} {time_part}"
-        
-        dt_val = None
-        if "Today" in date_part:
-            t = datetime.strptime(time_part, "%I:%M %p").time()
-            dt_val = datetime.combine(beijing_now.date(), t)
-        elif "Yesterday" in date_part:
-            t = datetime.strptime(time_part, "%I:%M %p").time()
-            dt_val = datetime.combine(beijing_now.date() - timedelta(days=1), t)
-        else:
-            try:
-                # 尝试带年份
-                dt_val = datetime.strptime(full_time_str, "%b %d, %Y %I:%M %p")
-            except:
-                # 默认今年
-                dt_val = datetime.strptime(full_time_str, "%b %d %I:%M %p")
-                dt_val = dt_val.replace(year=beijing_now.year)
-                if beijing_now.month == 1 and dt_val.month == 12:
-                    dt_val = dt_val.replace(year=beijing_now.year - 1)
-        
-        return dt_val.strftime("%Y/%m/%d %H:%M")
-    except:
-        return text
-
-def parse_notification_simple(text):
-    time_str = parse_time_to_str(text)
-    
-    # 寻找时间后缀的位置并截断
-    clean_text_end = len(text)
-    match = re.search(r" ((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|Today|Yesterday).*)$", text, re.IGNORECASE)
-    if match:
-        clean_text_end = match.start()
-
-    main_text = text[:clean_text_end].strip()
-    name_pattern = r"^(.*?) (submitted|resubmitted) an item to (.*)$"
-    m = re.search(name_pattern, main_text, re.IGNORECASE)
-    
-    if m:
-        return m.group(1).strip(), m.group(3).strip(), m.group(2).capitalize(), time_str
-    else:
-        return main_text, "Unknown", "Unknown", time_str
-
 def clean_schoology_url(url):
     """
     清洗链接，只保留到 ID 为止
     例如: https://.../assignment/123456/info -> https://.../assignment/123456
     """
     if not url: return ""
-    # 匹配 /assignment/数字 或 /assessment/数字
     match = re.search(r'(https://.*?/(?:assignment|assessment|discussion)/\d+)', url)
     if match:
         return match.group(1)
     return url
 
+def parse_time_to_str(text):
+    pattern = r" ((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}(?:,\s+\d{4})?|Today|Yesterday)\s+at\s+(\d{1,2}:\d{2}\s+(?:am|pm))$"
+    match = re.search(pattern, text, re.IGNORECASE)
+    if not match:
+        return (datetime.utcnow() + timedelta(hours=8)).strftime("%Y/%m/%d %H:%M")
+    try:
+        beijing_now = datetime.utcnow() + timedelta(hours=8)
+        date_part, time_part = match.group(1), match.group(2)
+        full_time_str = f"{date_part} {time_part}"
+        dt_val = None
+        if "Today" in date_part:
+            dt_val = datetime.combine(beijing_now.date(), datetime.strptime(time_part, "%I:%M %p").time())
+        elif "Yesterday" in date_part:
+            dt_val = datetime.combine(beijing_now.date() - timedelta(days=1), datetime.strptime(time_part, "%I:%M %p").time())
+        else:
+            try:
+                dt_val = datetime.strptime(full_time_str, "%b %d, %Y %I:%M %p")
+            except:
+                dt_val = datetime.strptime(full_time_str, "%b %d %I:%M %p").replace(year=beijing_now.year)
+                if beijing_now.month == 1 and dt_val.month == 12:
+                    dt_val = dt_val.replace(year=beijing_now.year - 1)
+        return dt_val.strftime("%Y/%m/%d %H:%M")
+    except: return text
+
+def parse_notification_simple(text):
+    time_str = parse_time_to_str(text)
+    clean_text_end = len(text)
+    match = re.search(r" ((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|Today|Yesterday).*)$", text, re.IGNORECASE)
+    if match: clean_text_end = match.start()
+    main_text = text[:clean_text_end].strip()
+    m = re.search(r"^(.*?) (submitted|resubmitted) an item to (.*)$", main_text, re.IGNORECASE)
+    if m: return m.group(1).strip(), m.group(3).strip(), m.group(2).capitalize(), time_str
+    else: return main_text, "Unknown", "Unknown", time_str
+
 def save_to_feishu(token, app_token, table_id, records):
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}/records/batch_create"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=utf-8"}
-    
-    batch_size = 100
-    for i in range(0, len(records), batch_size):
-        batch = records[i:i + batch_size]
+    for i in range(0, len(records), 100):
+        batch = records[i:i + 100]
         feishu_records = []
         for row in batch:
-            # 确保链接是清洗过的标准链接
-            clean_link = clean_schoology_url(row['link'])
-            
             feishu_records.append({
                 "fields": {
                     "学生姓名": row['student'],
@@ -131,31 +100,11 @@ def save_to_feishu(token, app_token, table_id, records):
                     "提交状态": row['status'],
                     "原始通知": row['raw_text'],
                     "提交时间": row['time_str'],
-                    
-                    # === 关键修改 ===
-                    # 直接把清洗后的链接写入“作业链接”列
-                    # 这一列既用来点击跳转，也用来作为关联的主键
-                    "作业链接": {
-                        "text": "查看作业", # 飞书里显示的文字
-                        "link": clean_link  # 实际的 URL (用于比对)
-                    },
+                    "作业链接": {"text": "查看作业", "link": row['link']}, # 这里已经是清洗过的
                     "唯一ID": row['unique_id']
                 }
             })
         requests.post(url, json={"records": feishu_records}, headers=headers)
-
-# ... (start_cloud_scraper 里的抓取循环部分) ...
-# 在提取链接时：
-                link_url = ""
-                try:
-                    lks = item.find_elements(By.TAG_NAME, "a")
-                    for l in lks:
-                        h = l.get_attribute("href")
-                        if h and ("/assignment/" in h or "/assessment/" in h):
-                            # 在这里直接清洗一下也可以
-                            link_url = clean_schoology_url(h)
-                            break
-                except: pass
 
 def get_existing_ids(token, app_token, table_id):
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}/records"
@@ -176,11 +125,10 @@ def get_existing_ids(token, app_token, table_id):
     return ids
 
 def start_cloud_scraper():
-    print(">>> 启动文字时间版爬虫...")
+    print(">>> 启动完整清洗版爬虫...")
     try:
         app_id, app_secret, app_token, table_id, s_cookies, target_date, max_pages = get_env_config()
         target_dt = datetime.strptime(target_date, "%Y-%m-%d")
-        
         token = get_feishu_token(app_id, app_secret)
         existing_ids = get_existing_ids(token, app_token, table_id)
         print(f">>> 飞书已有记录: {len(existing_ids)}")
@@ -208,44 +156,38 @@ def start_cloud_scraper():
         driver.get(NOTIFICATION_URL)
         time.sleep(8)
 
-        # 翻页
         for i in range(max_pages):
             try:
                 btn = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "li.notif-more a")))
                 driver.execute_script("arguments[0].click();", btn)
-                time.sleep(4)
+                time.sleep(5)
             except: break
 
-        # 抓取
         items = driver.find_elements(By.CSS_SELECTOR, ".s-edge-feed-item")
         if not items: items = driver.find_elements(By.TAG_NAME, "li")
         
         new_records = []
-        keywords = ["submitted", "resubmitted", "submission"]
-
         for item in items:
             try:
                 raw_text = item.text.strip().replace("\n", " ")
-                if not any(k in raw_text.lower() for k in keywords): continue
+                if not any(k in raw_text.lower() for k in ["submitted", "submission"]): continue
                 
-                # MD5 唯一ID
                 unique_id = hashlib.md5(raw_text.encode('utf-8')).hexdigest()
                 if unique_id in existing_ids: continue
 
-                # 获取链接
+                # 寻找并清洗链接
                 link = ""
                 try:
-                    lks = item.find_elements(By.TAG_NAME, "a")
-                    for l in lks:
-                        h = l.get_attribute("href")
-                        if h and "/assignment/" in h:
-                            link = h
+                    all_links = item.find_elements(By.TAG_NAME, "a")
+                    for l in all_links:
+                        href = l.get_attribute("href")
+                        if href and ("/assignment/" in href or "/assessment/" in href):
+                            link = clean_schoology_url(href)
                             break
                 except: pass
 
                 student, assign, status, time_str = parse_notification_simple(raw_text)
                 
-                # 时间过滤：文字转回日期做比较
                 item_dt = datetime.strptime(time_str, "%Y/%m/%d %H:%M")
                 if item_dt < target_dt: continue
 
@@ -254,7 +196,7 @@ def start_cloud_scraper():
                     "student": student, "assignment": assign, "status": status,
                     "raw_text": raw_text, "link": link, "unique_id": unique_id, "time_str": time_str
                 })
-                existing_ids.add(unique_id) # 修正了之前的错误变量名
+                existing_ids.add(unique_id)
             except: continue
 
         if new_records:
