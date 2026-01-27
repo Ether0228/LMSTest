@@ -38,10 +38,6 @@ def get_env_config():
     
     return app_id, app_secret, app_token, table_id, json.loads(s_cookies), target_date_str, max_clicks
 
-# ... (中间的 get_feishu_token, parse_time_from_text, parse_notification_full, save_to_feishu, get_existing_ids 函数保持不变，直接复制之前的即可) ...
-# 为了篇幅，我这里省略中间辅助函数，请务必保留原有的这些函数！
-# ... (中间函数省略) ...
-
 # === 必须要复制保留的中间函数 (与上一版相同) ===
 def get_feishu_token(app_id, app_secret):
     url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
@@ -50,37 +46,88 @@ def get_feishu_token(app_id, app_secret):
     else: raise Exception(f"获取Token失败: {resp.text}")
 
 def parse_time_from_text(text):
+    """
+    仅提取时间，返回 datetime 对象
+    修正逻辑：以北京时间为基准计算 Today/Yesterday
+    """
     time_pattern = r" ((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}(?:,\s+\d{4})?|Today|Yesterday)\s+at\s+(\d{1,2}:\d{2}\s+(?:am|pm))$"
     match_time = re.search(time_pattern, text, re.IGNORECASE)
-    if not match_time: return None
+    
+    if not match_time:
+        return None
+
     try:
-        now = datetime.now()
-        date_part, time_part = match_time.group(1), match_time.group(2)
+        # 1. 获取当前的【北京时间】作为基准，而不是服务器时间
+        # GitHub 服务器是 UTC，北京是 UTC+8
+        beijing_now = datetime.utcnow() + timedelta(hours=8)
+        
+        date_part = match_time.group(1)
+        time_part = match_time.group(2)
         full_time_str = f"{date_part} {time_part}"
+        dt_obj = None
+        
+        # 2. 基于北京时间解析 Today/Yesterday
         if "Today" in date_part:
-            dt_obj = datetime.combine(now.date(), datetime.strptime(time_part, "%I:%M %p").time())
+            # 这里的 beijing_now.date() 确保了“今天”是中国的今天
+            time_obj = datetime.strptime(time_part, "%I:%M %p")
+            dt_obj = datetime.combine(beijing_now.date(), time_obj.time())
+            
         elif "Yesterday" in date_part:
-            dt_obj = datetime.combine(now.date() - timedelta(days=1), datetime.strptime(time_part, "%I:%M %p").time())
+            time_obj = datetime.strptime(time_part, "%I:%M %p")
+            dt_obj = datetime.combine(beijing_now.date() - timedelta(days=1), time_obj.time())
+            
         else:
-            try: dt_obj = datetime.strptime(full_time_str, "%b %d, %Y %I:%M %p")
-            except: 
-                dt_obj = datetime.strptime(full_time_str, "%b %d %I:%M %p").replace(year=now.year)
-                if now.month == 1 and dt_obj.month == 12: dt_obj = dt_obj.replace(year=now.year - 1)
+            # 解析具体日期 (Jan 5 at 8:53 am)
+            try:
+                dt_obj = datetime.strptime(full_time_str, "%b %d, %Y %I:%M %p")
+            except:
+                dt_obj = datetime.strptime(full_time_str, "%b %d %I:%M %p")
+                dt_obj = dt_obj.replace(year=beijing_now.year)
+                # 跨年修正 (基于北京时间判断)
+                if beijing_now.month == 1 and dt_obj.month == 12:
+                    dt_obj = dt_obj.replace(year=beijing_now.year - 1)
+        
         return dt_obj
-    except: return None
+    except Exception as e:
+        print(f"时间解析错误: {e}")
+        return None
 
 def parse_notification_full(text):
-    timestamp_ms = int(datetime.now().timestamp() * 1000)
-    dt_obj = parse_time_from_text(text)
+    """解析全部信息，并进行时区回拨"""
+    
+    # 默认时间也设为北京时间
+    beijing_now = datetime.utcnow() + timedelta(hours=8)
+    # 如果没解析出来，暂时用当前时间
+    # 注意：timestamp() 在 UTC 服务器上默认当做 UTC 处理，所以这里不用减8
+    timestamp_ms = int(beijing_now.timestamp() * 1000) 
+    
+    dt_obj_beijing = parse_time_from_text(text)
+    
     clean_text_end = len(text)
-    if dt_obj:
-        timestamp_ms = int(dt_obj.timestamp() * 1000)
+    
+    if dt_obj_beijing:
+        # 关键修正步骤！！！
+        # dt_obj_beijing 代表的是 "2026-01-05 08:53:00" (北京字面时间)
+        # 但 GitHub 服务器认为它是 UTC。
+        # 为了得到正确的时间戳，我们需要把它“回拨” 8小时，变成真正的 UTC 时间
+        # 即：2026-01-05 08:53 (CN) -> 2026-01-05 00:53 (UTC)
+        
+        dt_obj_utc = dt_obj_beijing - timedelta(hours=8)
+        timestamp_ms = int(dt_obj_utc.timestamp() * 1000)
+        
+        # 截断文本逻辑不变
         match = re.search(r" ((?:Jan|Feb|Today|Yesterday).*)$", text, re.IGNORECASE)
-        if match: clean_text_end = match.start()
+        if match:
+            clean_text_end = match.start()
+
     main_text = text[:clean_text_end].strip()
-    match_body = re.search(r"^(.*?) (submitted|resubmitted) an item to (.*)$", main_text, re.IGNORECASE)
-    if match_body: return match_body.group(1).strip(), match_body.group(3).strip(), match_body.group(2).capitalize(), timestamp_ms
-    else: return main_text, "Unknown", "Unknown", timestamp_ms
+    name_pattern = r"^(.*?) (submitted|resubmitted) an item to (.*)$"
+    match_body = re.search(name_pattern, main_text, re.IGNORECASE)
+    
+    if match_body:
+        return match_body.group(1).strip(), match_body.group(3).strip(), match_body.group(2).capitalize(), timestamp_ms
+    else:
+        return main_text, "Unknown", "Unknown", timestamp_ms
 
 def save_to_feishu(token, app_token, table_id, records):
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}/records/batch_create"
