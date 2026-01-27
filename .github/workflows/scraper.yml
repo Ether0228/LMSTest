@@ -1,24 +1,37 @@
-name: Schoology Auto Scraper
+name: Schoology Smart Scraper
+
 on:
+  # 定时任务 (默认走轻量模式)
   schedule:
     - cron: '*/30 * * * *'
-  workflow_dispatch:      # 允许手动点击运行
+  
+  # 手动触发 (允许输入参数)
+  workflow_dispatch:
+    inputs:
+      target_date:
+        description: '回溯截止日期 (YYYY-MM-DD)'
+        required: true
+        default: '2026-01-26'  # 默认填昨天或今天的日期
+      max_pages:
+        description: '最大翻页数'
+        required: true
+        default: '50'  # 手动运行时默认翻多点
 
 jobs:
-  build:
+  run-scraper:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: 检出代码
         uses: actions/checkout@v3
 
-      - name: Set up Python
+      - name: 设置 Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: '3.10'
 
-      - name: Install dependencies
+      - name: 安装依赖
         run: |
-          pip install selenium webdriver-manager gspread oauth2client
+          pip install requests selenium webdriver-manager
 
       - name: 执行爬虫
         env:
@@ -28,11 +41,11 @@ jobs:
           FEISHU_TABLE_ID: ${{ secrets.FEISHU_TABLE_ID }}
           SCHOOLOGY_COOKIES: ${{ secrets.SCHOOLOGY_COOKIES }}
           TZ: Asia/Shanghai
-        run: python scraper_cloud_feishu.py  # feishu
-        
-      - name: 上传调试截图
-        if: always() # 无论成功失败都执行
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug-screenshots
-          path: debug_view.png
+          
+          # === 关键：注入参数 ===
+          # 如果是定时任务，github.event.inputs 为空，我们让 Python 脚本自己去处理默认值
+          # 如果是手动触发，这里会把输入的值传进去
+          TARGET_DATE: ${{ github.event.inputs.target_date }}
+          MAX_PAGES: ${{ github.event.inputs.max_pages }}
+          
+        run: python scraper_cloud_feishu.py
