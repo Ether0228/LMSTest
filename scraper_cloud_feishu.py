@@ -100,6 +100,18 @@ def parse_notification_simple(text):
     else:
         return main_text, "Unknown", "Unknown", time_str
 
+def clean_schoology_url(url):
+    """
+    清洗链接，只保留到 ID 为止
+    例如: https://.../assignment/123456/info -> https://.../assignment/123456
+    """
+    if not url: return ""
+    # 匹配 /assignment/数字 或 /assessment/数字
+    match = re.search(r'(https://.*?/(?:assignment|assessment|discussion)/\d+)', url)
+    if match:
+        return match.group(1)
+    return url
+
 def save_to_feishu(token, app_token, table_id, records):
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}/records/batch_create"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=utf-8"}
@@ -109,18 +121,41 @@ def save_to_feishu(token, app_token, table_id, records):
         batch = records[i:i + batch_size]
         feishu_records = []
         for row in batch:
+            # 确保链接是清洗过的标准链接
+            clean_link = clean_schoology_url(row['link'])
+            
             feishu_records.append({
                 "fields": {
                     "学生姓名": row['student'],
                     "作业名称": row['assignment'],
                     "提交状态": row['status'],
                     "原始通知": row['raw_text'],
-                    "提交时间": row['time_str'], # 文字格式发送
-                    "作业链接": {"text": "查看作业", "link": row['link']},
+                    "提交时间": row['time_str'],
+                    
+                    # === 关键修改 ===
+                    # 直接把清洗后的链接写入“作业链接”列
+                    # 这一列既用来点击跳转，也用来作为关联的主键
+                    "作业链接": {
+                        "text": "查看作业", # 飞书里显示的文字
+                        "link": clean_link  # 实际的 URL (用于比对)
+                    },
                     "唯一ID": row['unique_id']
                 }
             })
         requests.post(url, json={"records": feishu_records}, headers=headers)
+
+# ... (start_cloud_scraper 里的抓取循环部分) ...
+# 在提取链接时：
+                link_url = ""
+                try:
+                    lks = item.find_elements(By.TAG_NAME, "a")
+                    for l in lks:
+                        h = l.get_attribute("href")
+                        if h and ("/assignment/" in h or "/assessment/" in h):
+                            # 在这里直接清洗一下也可以
+                            link_url = clean_schoology_url(h)
+                            break
+                except: pass
 
 def get_existing_ids(token, app_token, table_id):
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}/records"
