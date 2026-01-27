@@ -1,3 +1,4 @@
+import hashlib
 import os
 import json
 import time
@@ -204,7 +205,7 @@ def start_cloud_scraper():
                 if not raw_text or not any(k in raw_text.lower() for k in keywords): continue
 
                 # 生成ID
-                unique_id = str(hash(raw_text))
+                unique_id = hashlib.md5(raw_text.encode('utf-8')).hexdigest()
                 if unique_id in existing_ids: continue
 
                 # 提取链接
