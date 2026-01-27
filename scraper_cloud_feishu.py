@@ -27,7 +27,10 @@ def get_env_config():
     
     default_date = (datetime.utcnow() + timedelta(hours=8) - timedelta(days=1)).strftime("%Y-%m-%d")
     target_date = os.environ.get("TARGET_DATE", default_date)
-    max_pages = int(os.environ.get("MAX_PAGES", "2"))
+    # 先读取环境变量
+    max_pages_env = os.environ.get("MAX_PAGES", "2")
+    # 增加判断：如果环境变量是空字符串，则使用默认值 2
+    max_pages = int(max_pages_env) if max_pages_env and max_pages_env.strip() else 2
     
     if not all([app_id, app_secret, app_token, table_id, s_cookies]):
         raise ValueError("GitHub Secrets 配置不完整")
