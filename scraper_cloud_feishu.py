@@ -50,11 +50,14 @@ from datetime import datetime, timedelta, timezone
 # 显式定义北京时区
 CN_TZ = timezone(timedelta(hours=8))
 
+# === 终极修正：纯数学计算版 ===
+from datetime import datetime, timedelta, timezone
+
 def parse_time_from_text(text):
     """
-    将文本解析为带北京时区信息的 datetime 对象
+    解析文本，返回 UTC 时间戳 (毫秒)
+    逻辑：读取北京字面时间 -> 减去8小时 -> 视为UTC -> 生成时间戳
     """
-    # 正则匹配：Jan 20 at 9:32 am
     time_pattern = r" ((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}(?:,\s+\d{4})?|Today|Yesterday)\s+at\s+(\d{1,2}:\d{2}\s+(?:am|pm))$"
     match_time = re.search(time_pattern, text, re.IGNORECASE)
     
@@ -62,70 +65,67 @@ def parse_time_from_text(text):
         return None
 
     try:
-        # 1. 永远以北京时间为“现在”的基准
-        now_cn = datetime.now(CN_TZ)
+        # 1. 获取当前北京时间 (用于确定年份和Today)
+        # 这一步纯粹为了获取"现在是几年几月"，不涉及时间戳计算
+        utc_now = datetime.now(timezone.utc)
+        beijing_now = utc_now + timedelta(hours=8)
         
         date_part = match_time.group(1)
         time_part = match_time.group(2)
         full_time_str = f"{date_part} {time_part}"
         
-        # 暂存为 naive (不带时区) 的时间
-        dt_naive = None
+        # 2. 解析出"字面上的时间" (即你在网页上看到的北京时间)
+        dt_face_value = None
         
-        # 2. 解析成年月日时分 (字面量)
         if "Today" in date_part:
-            # 解析时间部分 (e.g. 9:32 am)
             t = datetime.strptime(time_part, "%I:%M %p").time()
-            # 组合：北京的今天日期 + 文本里的时间
-            dt_naive = datetime.combine(now_cn.date(), t)
+            dt_face_value = datetime.combine(beijing_now.date(), t)
             
         elif "Yesterday" in date_part:
             t = datetime.strptime(time_part, "%I:%M %p").time()
-            # 组合：北京的昨天日期 + 文本里的时间
-            dt_naive = datetime.combine(now_cn.date() - timedelta(days=1), t)
+            dt_face_value = datetime.combine(beijing_now.date() - timedelta(days=1), t)
             
         else:
-            # 具体日期：Jan 20 at 9:32 am
             try:
-                # 尝试带年份
-                dt_naive = datetime.strptime(full_time_str, "%b %d, %Y %I:%M %p")
+                # 带年份
+                dt_face_value = datetime.strptime(full_time_str, "%b %d, %Y %I:%M %p")
             except:
-                # 不带年份 -> 拼上北京时间的今年
-                dt_naive = datetime.strptime(full_time_str, "%b %d %I:%M %p")
-                dt_naive = dt_naive.replace(year=now_cn.year)
+                # 不带年份，拼上北京时间的今年
+                dt_face_value = datetime.strptime(full_time_str, "%b %d %I:%M %p")
+                dt_face_value = dt_face_value.replace(year=beijing_now.year)
                 
                 # 跨年修正
-                if now_cn.month == 1 and dt_naive.month == 12:
-                    dt_naive = dt_naive.replace(year=now_cn.year - 1)
+                if beijing_now.month == 1 and dt_face_value.month == 12:
+                    dt_face_value = dt_face_value.replace(year=beijing_now.year - 1)
 
-        # 3. 【核心修正】强制绑定北京时区
-        # 这一步告诉 Python："不要管服务器在哪，这个时间就是北京的 9:32"
-        dt_aware = dt_naive.replace(tzinfo=CN_TZ)
+        # 3. 【绝对修正】物理减去 8 小时，转为 UTC
+        # 例子: 网页显示 9:32 (北京) -> 减8 -> 1:32 (UTC)
+        dt_utc = dt_face_value - timedelta(hours=8)
         
-        return dt_aware
+        # 4. 强制指定为 UTC 并生成时间戳
+        # 这一步生成的秒数是绝对的，飞书拿到后+8小时显示，正好还原回网页上的时间
+        timestamp = dt_utc.replace(tzinfo=timezone.utc).timestamp()
+        
+        return int(timestamp * 1000)
 
     except Exception as e:
-        print(f"时间解析异常: {e}")
+        print(f"时间解析严重错误: {e}")
         return None
 
 def parse_notification_full(text):
-    """解析并返回 Unix 时间戳 (毫秒)"""
+    """解析全部信息"""
     
-    # 默认使用当前北京时间
-    now_cn = datetime.now(CN_TZ)
-    timestamp_ms = int(now_cn.timestamp() * 1000)
+    # 默认当前时间
+    utc_now = datetime.now(timezone.utc)
+    timestamp_ms = int(utc_now.timestamp() * 1000)
     
-    # 解析出带时区的时间
-    dt_cn = parse_time_from_text(text)
+    # 解析时间
+    parsed_ts = parse_time_from_text(text)
     
     clean_text_end = len(text)
     
-    if dt_cn:
-        # 4. 【核心转换】直接转为 Timestamp
-        # 因为 dt_cn 已经带了 tzinfo=UTC+8，.timestamp() 会自动计算出正确的 UTC 秒数
-        # 这一步是绝对准确的，不受服务器美东时间干扰
-        timestamp_ms = int(dt_cn.timestamp() * 1000)
-        
+    if parsed_ts:
+        timestamp_ms = parsed_ts
         # 截断作业名
         match = re.search(r" ((?:Jan|Feb|Today|Yesterday).*)$", text, re.IGNORECASE)
         if match:
