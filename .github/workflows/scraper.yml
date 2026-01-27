@@ -20,11 +20,16 @@ jobs:
         run: |
           pip install selenium webdriver-manager gspread oauth2client
 
-      - name: Run Scraper
+      - name: 执行爬虫
         env:
-          GDRIVE_JSON: ${{ secrets.GDRIVE_JSON }}
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          FEISHU_APP_TOKEN: ${{ secrets.FEISHU_APP_TOKEN }}
+          FEISHU_TABLE_ID: ${{ secrets.FEISHU_TABLE_ID }}
           SCHOOLOGY_COOKIES: ${{ secrets.SCHOOLOGY_COOKIES }}
-        run: python scraper_cloud.py
+          TZ: Asia/Shanghai
+        run: python scraper_cloud_feishu.py  # feishu
+        
       - name: 上传调试截图
         if: always() # 无论成功失败都执行
         uses: actions/upload-artifact@v4
