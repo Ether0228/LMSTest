@@ -45,11 +45,16 @@ def get_feishu_token(app_id, app_secret):
     if resp.json().get("code") == 0: return resp.json().get("tenant_access_token")
     else: raise Exception(f"获取Token失败: {resp.text}")
 
+from datetime import datetime, timedelta, timezone
+
+# 定义北京时区 (UTC+8)
+BEIJING_TZ = timezone(timedelta(hours=8))
+
 def parse_time_from_text(text):
     """
-    仅提取时间，返回 datetime 对象
-    修正逻辑：以北京时间为基准计算 Today/Yesterday
+    解析文本中的时间字符串，返回一个【带北京时区信息】的时间对象
     """
+    # 匹配规则: Jan 5 at 8:53 am | Today at ... | Yesterday at ...
     time_pattern = r" ((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}(?:,\s+\d{4})?|Today|Yesterday)\s+at\s+(\d{1,2}:\d{2}\s+(?:am|pm))$"
     match_time = re.search(time_pattern, text, re.IGNORECASE)
     
@@ -57,70 +62,77 @@ def parse_time_from_text(text):
         return None
 
     try:
-        # 1. 获取当前的【北京时间】作为基准，而不是服务器时间
-        # GitHub 服务器是 UTC，北京是 UTC+8
-        beijing_now = datetime.utcnow() + timedelta(hours=8)
+        # 1. 获取当前的【北京时间】作为基准日期 (用于确定 Today 是哪一天)
+        now_beijing = datetime.now(BEIJING_TZ)
         
         date_part = match_time.group(1)
         time_part = match_time.group(2)
         full_time_str = f"{date_part} {time_part}"
         dt_obj = None
         
-        # 2. 基于北京时间解析 Today/Yesterday
+        # 2. 解析逻辑
         if "Today" in date_part:
-            # 这里的 beijing_now.date() 确保了“今天”是中国的今天
-            time_obj = datetime.strptime(time_part, "%I:%M %p")
-            dt_obj = datetime.combine(beijing_now.date(), time_obj.time())
+            # 文本是 Today -> 用北京时间的今天 + 文本里的时间
+            time_obj = datetime.strptime(time_part, "%I:%M %p").time()
+            dt_obj = datetime.combine(now_beijing.date(), time_obj)
             
         elif "Yesterday" in date_part:
-            time_obj = datetime.strptime(time_part, "%I:%M %p")
-            dt_obj = datetime.combine(beijing_now.date() - timedelta(days=1), time_obj.time())
+            # 文本是 Yesterday -> 用北京时间的昨天 + 文本里的时间
+            time_obj = datetime.strptime(time_part, "%I:%M %p").time()
+            dt_obj = datetime.combine(now_beijing.date() - timedelta(days=1), time_obj)
             
         else:
-            # 解析具体日期 (Jan 5 at 8:53 am)
+            # 文本是具体日期 (Jan 5 ...)
             try:
-                dt_obj = datetime.strptime(full_time_str, "%b %d, %Y %I:%M %p")
+                # 尝试带年份
+                dt_naive = datetime.strptime(full_time_str, "%b %d, %Y %I:%M %p")
             except:
-                dt_obj = datetime.strptime(full_time_str, "%b %d %I:%M %p")
-                dt_obj = dt_obj.replace(year=beijing_now.year)
-                # 跨年修正 (基于北京时间判断)
-                if beijing_now.month == 1 and dt_obj.month == 12:
-                    dt_obj = dt_obj.replace(year=beijing_now.year - 1)
-        
+                # 不带年份，默认为今年
+                dt_naive = datetime.strptime(full_time_str, "%b %d %I:%M %p")
+                dt_naive = dt_naive.replace(year=now_beijing.year)
+                
+                # 跨年修正 (例如现在是1月，抓到12月的作业，算去年的)
+                if now_beijing.month == 1 and dt_naive.month == 12:
+                    dt_naive = dt_naive.replace(year=now_beijing.year - 1)
+            
+            dt_obj = dt_naive
+
+        # 3. 【关键步骤】强制给这个时间打上“北京时区”的标签
+        # 这样 08:53 就被明确定义为 "北京时间 08:53"
+        if dt_obj.tzinfo is None:
+            dt_obj = dt_obj.replace(tzinfo=BEIJING_TZ)
+            
         return dt_obj
+
     except Exception as e:
         print(f"时间解析错误: {e}")
         return None
 
 def parse_notification_full(text):
-    """解析全部信息，并进行时区回拨"""
+    """解析全部信息，返回时间戳"""
     
-    # 默认时间也设为北京时间
-    beijing_now = datetime.utcnow() + timedelta(hours=8)
-    # 如果没解析出来，暂时用当前时间
-    # 注意：timestamp() 在 UTC 服务器上默认当做 UTC 处理，所以这里不用减8
-    timestamp_ms = int(beijing_now.timestamp() * 1000) 
+    # 默认当前时间 (北京)
+    now_beijing = datetime.now(BEIJING_TZ)
+    timestamp_ms = int(now_beijing.timestamp() * 1000)
     
+    # 解析出带时区的时间对象
     dt_obj_beijing = parse_time_from_text(text)
     
     clean_text_end = len(text)
     
     if dt_obj_beijing:
-        # 关键修正步骤！！！
-        # dt_obj_beijing 代表的是 "2026-01-05 08:53:00" (北京字面时间)
-        # 但 GitHub 服务器认为它是 UTC。
-        # 为了得到正确的时间戳，我们需要把它“回拨” 8小时，变成真正的 UTC 时间
-        # 即：2026-01-05 08:53 (CN) -> 2026-01-05 00:53 (UTC)
+        # 直接转为时间戳
+        # 因为 dt_obj_beijing 已经包含了 UTC+8 信息，timestamp() 会自动处理好一切
+        timestamp_ms = int(dt_obj_beijing.timestamp() * 1000)
         
-        dt_obj_utc = dt_obj_beijing - timedelta(hours=8)
-        timestamp_ms = int(dt_obj_utc.timestamp() * 1000)
-        
-        # 截断文本逻辑不变
+        # 截断作业名
         match = re.search(r" ((?:Jan|Feb|Today|Yesterday).*)$", text, re.IGNORECASE)
         if match:
             clean_text_end = match.start()
 
     main_text = text[:clean_text_end].strip()
+    
+    # 解析学生和作业名
     name_pattern = r"^(.*?) (submitted|resubmitted) an item to (.*)$"
     match_body = re.search(name_pattern, main_text, re.IGNORECASE)
     
