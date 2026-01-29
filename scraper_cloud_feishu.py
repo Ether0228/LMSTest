@@ -306,7 +306,10 @@ def start_cloud_scraper():
                     "提交状态": status,
                     "原始通知": raw_text,
                     "提交时间": time_str,
-                    "作业链接": {"link": row['link']},
+                    "作业链接": {
+                        "text": row['link'],  # <--- 关键：强制让显示的文字等于链接本身
+                        "link": row['link']   # 实际跳转的地址
+                    },
                     "唯一ID": unique_id
                 }
                 
