@@ -3,7 +3,7 @@ name: Check Missing Assignments
 on:
   workflow_dispatch:
   schedule:
-    - cron: '30 * * * *'  # 每小时的30分运行一次
+    - cron: '*/30 * * * *'
 
 jobs:
   check:
