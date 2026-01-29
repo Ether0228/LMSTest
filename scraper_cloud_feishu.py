@@ -19,21 +19,22 @@ NOTIFICATION_URL = "https://queenscanada.schoology.com/home/notifications"
 # ===========================================
 
 def get_env_config():
-    # 基础配置
     app_id = os.environ.get("FEISHU_APP_ID", "").strip()
     app_secret = os.environ.get("FEISHU_APP_SECRET", "").strip()
     app_token = os.environ.get("FEISHU_APP_TOKEN", "").strip()
+    table_id = os.environ.get("FEISHU_TABLE_ID", "").strip()
+    
+    # 获取关联表 ID
+    roster_tid = os.environ.get("FEISHU_ROSTER_TABLE_ID", "").strip()
+    lib_tid = os.environ.get("FEISHU_LIB_TABLE_ID", "").strip()
+    
     s_cookies = os.environ.get("SCHOOLOGY_COOKIES")
     
-    # 三张表的 ID
-    table_id = os.environ.get("FEISHU_TABLE_ID", "").strip()       # 提交记录表
-    roster_tid = os.environ.get("FEISHU_ROSTER_TABLE_ID", "").strip() # 花名册表
-    lib_tid = os.environ.get("FEISHU_LIB_TABLE_ID", "").strip()       # 作业库表
-    
-    # 动态参数
+    # 动态参数处理
+    # 默认回溯到昨天
     default_date = (datetime.utcnow() + timedelta(hours=8) - timedelta(days=1)).strftime("%Y-%m-%d")
-    target_date = os.environ.get("TARGET_DATE", "")
-    target_date = target_date.strip() if target_date else default_date
+    target_date_raw = os.environ.get("TARGET_DATE", "").strip()
+    target_date = target_date_raw if target_date_raw else default_date
     
     max_pages_raw = os.environ.get("MAX_PAGES", "").strip()
     max_pages = int(max_pages_raw) if max_pages_raw else 2
@@ -49,100 +50,31 @@ def get_feishu_token(app_id, app_secret):
     if resp.json().get("code") == 0:
         return resp.json().get("tenant_access_token")
     else:
-        raise Exception(f"获取飞书Token失败: {resp.text}")
+        raise Exception(f"获取Token失败: {resp.text}")
 
 def clean_schoology_url(url):
-    """清洗链接，只保留到ID，用于比对"""
     if not url: return ""
     match = re.search(r'(https://.*?/(?:assignment|assessment|discussion)/\d+)', url)
     return match.group(1) if match else url
 
-# === 工具函数：加载辅助表映射 ===
-def get_feishu_mapping(token, app_token, table_id, key_field_name):
-    """
-    读取指定表，返回 { "关键列内容": "record_id" } 的字典
-    例如：{"Yuanke Lu": "rec123...", "https://.../123": "rec456..."}
-    """
-    if not table_id: return {}
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}/records"
-    headers = {"Authorization": f"Bearer {token}"}
-    mapping = {}
-    page_token = None
-    
-    print(f">>> 正在加载表 [{table_id}] 的映射数据...")
-    while True:
-        params = {"page_size": 1000}
-        if page_token: params["page_token"] = page_token
-        try:
-            resp = requests.get(url, headers=headers, params=params).json()
-            if resp.get("code") != 0: break
-            
-            for item in resp.get("data", {}).get("items", []):
-                record_id = item.get("record_id")
-                fields = item.get("fields", {})
-                val = fields.get(key_field_name)
-                
-                # 处理链接类型的字段 (如果是List或Dict)
-                if isinstance(val, dict) and "link" in val: val = val["link"]
-                elif isinstance(val, list): val = str(val[0]) if val else ""
-                
-                if val:
-                    # 如果看起来像链接，清洗一下再存
-                    val_str = str(val).strip()
-                    if "http" in val_str: val_str = clean_schoology_url(val_str)
-                    mapping[val_str] = record_id
-            
-            if not resp.get("data", {}).get("has_more"): break
-            page_token = resp.get("data", {}).get("page_token")
-        except Exception as e:
-            print(f"加载映射出错: {e}")
-            break
-    return mapping
-
-# === 工具函数：自动添加新作业 ===
-def add_assignment_to_lib(token, app_token, lib_table_id, name, clean_url):
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{lib_table_id}/records"
-    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=utf-8"}
-    
-    # 注意：这里对应《作业库》的列名
-    fields = {
-        "作业名称": name,
-        "作业链接": clean_url,
-        "统计状态": "✅ 必交" # 默认值
-    }
-    
-    try:
-        resp = requests.post(url, json={"fields": fields}, headers=headers).json()
-        if resp.get("code") == 0:
-            rec_id = resp.get("data", {}).get("record", {}).get("record_id")
-            print(f">>> [自动建档] 新作业已添加: {name}")
-            return rec_id
-        else:
-            print(f"!!! 建档失败: {resp}")
-            return None
-    except: return None
-
+# === 修复：更严格的时间解析 ===
 def parse_time_to_str(text):
-    """
-    将 Jan 5 at 8:53 am 转换为字符串 2026/01/05 08:53
-    """
-    # === 修改点 1：正则变得更加严格 ===
-    # 必须匹配到 Month ... at HH:MM am/pm 结构，才认为是时间
-    # 这样就不会误判作业名里的 "January 28th" 了
+    # 匹配: Jan 28 at 8:57 pm
     pattern = r"((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}(?:,\s+\d{4})?|Today|Yesterday)\s+at\s+(\d{1,2}:\d{2}\s+(?:am|pm))"
     match = re.search(pattern, text, re.IGNORECASE)
     
+    # 默认为北京时间现在
+    beijing_now = datetime.utcnow() + timedelta(hours=8)
+    
     if not match:
-        # 如果没找到标准时间格式，返回当前北京时间
-        return (datetime.utcnow() + timedelta(hours=8)).strftime("%Y/%m/%d %H:%M")
+        return beijing_now.strftime("%Y/%m/%d %H:%M")
 
     try:
-        beijing_now = datetime.utcnow() + timedelta(hours=8)
         date_part = match.group(1)
         time_part = match.group(2)
         full_time_str = f"{date_part} {time_part}"
-        
         dt_val = None
+        
         if "Today" in date_part:
             t = datetime.strptime(time_part, "%I:%M %p").time()
             dt_val = datetime.combine(beijing_now.date(), t)
@@ -157,34 +89,29 @@ def parse_time_to_str(text):
                 # 默认今年
                 dt_val = datetime.strptime(full_time_str, "%b %d %I:%M %p")
                 dt_val = dt_val.replace(year=beijing_now.year)
+                # 跨年修正
                 if beijing_now.month == 1 and dt_val.month == 12:
                     dt_val = dt_val.replace(year=beijing_now.year - 1)
         
         return dt_val.strftime("%Y/%m/%d %H:%M")
-    except:
-        return text
+    except Exception as e:
+        print(f"DEBUG: 时间解析出错 '{text}' -> {e}")
+        return beijing_now.strftime("%Y/%m/%d %H:%M")
 
+# === 修复：修复Wednesday截断问题 ===
 def parse_notification_simple(text):
-    # 先解析出时间字符串
     time_str = parse_time_to_str(text)
     
     clean_text_end = len(text)
-    
-    # === 修改点 2：截断逻辑也同步变严格 ===
-    # 寻找确切的时间后缀位置（必须包含 " at "）
-    # 这里的正则和上面保持一致，确保只切掉真正的时间部分
+    # 只有后面跟着 at HH:MM 时才截断，避免截断作业名里的月份
     time_suffix_pattern = r"\s+((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|Today|Yesterday).*?\s+at\s+\d{1,2}:\d{2}\s+(?:am|pm))"
-    
-    # 使用 finditer 找所有的匹配项，取【最后一个】
-    # 防止作业名里也有 "Jan 1 at 2:00 pm" 这种极罕见情况
     matches = list(re.finditer(time_suffix_pattern, text, re.IGNORECASE))
     
     if matches:
-        last_match = matches[-1] # 取最后出现的那个时间作为系统时间
+        last_match = matches[-1]
         clean_text_end = last_match.start()
 
     main_text = text[:clean_text_end].strip()
-    
     name_pattern = r"^(.*?) (submitted|resubmitted) an item to (.*)$"
     m = re.search(name_pattern, main_text, re.IGNORECASE)
     
@@ -193,34 +120,73 @@ def parse_notification_simple(text):
     else:
         return main_text, "Unknown", "Unknown", time_str
 
+# === 辅助：加载映射表 ===
+def get_feishu_mapping(token, app_token, table_id, key_field_name):
+    if not table_id: return {}
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}/records"
+    headers = {"Authorization": f"Bearer {token}"}
+    mapping = {}
+    page_token = None
+    
+    print(f">>> 正在加载表 [{table_id}]...")
+    while True:
+        params = {"page_size": 1000}
+        if page_token: params["page_token"] = page_token
+        try:
+            resp = requests.get(url, headers=headers, params=params).json()
+            if resp.get("code") != 0: break
+            for item in resp.get("data", {}).get("items", []):
+                rec_id = item.get("record_id")
+                fields = item.get("fields", {})
+                val = fields.get(key_field_name)
+                # 处理链接字段
+                if isinstance(val, dict) and "link" in val: val = val["link"]
+                elif isinstance(val, list): val = str(val[0]) if val else ""
+                
+                if val:
+                    val_str = str(val).strip()
+                    if "http" in val_str: val_str = clean_schoology_url(val_str)
+                    mapping[val_str] = rec_id
+            if not resp.get("data", {}).get("has_more"): break
+            page_token = resp.get("data", {}).get("page_token")
+        except: break
+    return mapping
+
+def add_assignment_to_lib(token, app_token, lib_table_id, name, clean_url):
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{lib_table_id}/records"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=utf-8"}
+    fields = {"作业名称": name, "作业链接": clean_url, "统计状态": "✅ 必交"}
+    try:
+        resp = requests.post(url, json={"fields": fields}, headers=headers).json()
+        if resp.get("code") == 0:
+            return resp.get("data", {}).get("record", {}).get("record_id")
+    except: pass
+    return None
+
 def save_to_feishu_v2(token, app_token, table_id, records):
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}/records/batch_create"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=utf-8"}
     for i in range(0, len(records), 100):
         batch = records[i:i + 100]
-        # 包装 payload
         payload = [{"fields": r} for r in batch]
         requests.post(url, json={"records": payload}, headers=headers)
 
-# === 主流程 ===
 def start_cloud_scraper():
-    print(">>> 启动全自动关联版爬虫...")
+    print(">>> 启动调试版爬虫...")
     try:
         app_id, app_secret, app_token, table_id, roster_tid, lib_tid, s_cookies, target_date, max_pages = get_env_config()
+        
+        # 转换目标日期对象
         target_dt = datetime.strptime(target_date, "%Y-%m-%d")
+        print(f">>> 目标回溯日期: {target_date} (凡是早于此日期的将被忽略)")
         
         token = get_feishu_token(app_id, app_secret)
         
-        # 1. 预加载映射
-        # 注意：这里的 Key 必须和你飞书表里的列名内容对应
-        # 花名册 Key: "学生姓名"
         roster_map = get_feishu_mapping(token, app_token, roster_tid, "学生姓名")
-        # 作业库 Key: "作业链接" (注意我们把链接放在第二列，但名字叫"作业链接")
         lib_map = get_feishu_mapping(token, app_token, lib_tid, "作业链接")
-        
-        # 获取已有提交ID (用于去重)
         existing_ids = set(get_feishu_mapping(token, app_token, table_id, "唯一ID").keys())
-        print(f">>> 初始化完成: 学生{len(roster_map)}, 作业{len(lib_map)}, 已存记录{len(existing_ids)}")
+        
+        print(f">>> 准备就绪: 库中有 {len(lib_map)} 个作业, 已存 {len(existing_ids)} 条记录")
 
     except Exception as e:
         print(f"初始化失败: {e}")
@@ -249,6 +215,20 @@ def start_cloud_scraper():
 
         for i in range(max_pages):
             try:
+                # 检查日期决定是否停止
+                # 简单抽样检查当前页最后一条
+                items_check = driver.find_elements(By.CSS_SELECTOR, ".s-edge-feed-item")
+                if items_check:
+                    last_text = items_check[-1].text
+                    last_time_str = parse_time_to_str(last_text)
+                    try:
+                        last_dt = datetime.strptime(last_time_str, "%Y/%m/%d %H:%M")
+                        # 比较日期部分
+                        if last_dt.date() < target_dt.date():
+                            print(f">>> 当前页数据已早于目标日期 ({last_time_str})，停止翻页。")
+                            break
+                    except: pass
+
                 btn = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, "li.notif-more a")))
                 driver.execute_script("arguments[0].click();", btn)
                 time.sleep(4)
@@ -257,75 +237,87 @@ def start_cloud_scraper():
         items = driver.find_elements(By.CSS_SELECTOR, ".s-edge-feed-item")
         if not items: items = driver.find_elements(By.TAG_NAME, "li")
         
+        print(f">>> 扫描到 {len(items)} 条通知，开始筛选...")
+        
         new_records = []
         for item in items:
             try:
                 raw_text = item.text.strip().replace("\n", " ")
                 if not raw_text: continue
-                # 过滤逻辑
                 if "comment" in raw_text.lower(): continue
                 if not any(k in raw_text.lower() for k in ["submitted", "resubmitted"]): continue
                 
                 unique_id = hashlib.md5(raw_text.encode('utf-8')).hexdigest()
-                if unique_id in existing_ids: continue
+                
+                # === 调试日志 1: 检查去重 ===
+                if unique_id in existing_ids:
+                    # print(f"[跳过] 已存在: {raw_text[:30]}...") # 调试时可以打开
+                    continue
 
-                # 提取链接
-                link = ""
                 clean_link = ""
+                link_url = ""
                 try:
                     all_links = item.find_elements(By.TAG_NAME, "a")
                     for l in all_links:
                         href = l.get_attribute("href")
                         if href and ("/assignment/" in href or "/assessment/" in href):
-                            link = href
+                            link_url = href
                             clean_link = clean_schoology_url(href)
                             break
                 except: pass
                 
-                if not clean_link: continue # 没链接没法关联，跳过
+                # === 调试日志 2: 检查链接 ===
+                if not clean_link:
+                    print(f"[跳过] 无链接: {raw_text[:30]}...")
+                    continue
 
                 student, assign, status, time_str = parse_notification_simple(raw_text)
-                if datetime.strptime(time_str, "%Y/%m/%d %H:%M") < target_dt: continue
+                
+                # === 调试日志 3: 检查日期过滤 ===
+                try:
+                    item_dt = datetime.strptime(time_str, "%Y/%m/%d %H:%M")
+                    # 只比较日期部分，忽略时间，防止同一天被误删
+                    if item_dt.date() < target_dt.date():
+                        # print(f"[跳过] 日期过早: {time_str} < {target_date}")
+                        continue
+                except:
+                    print(f"[跳过] 日期解析失败: {time_str}")
+                    continue
 
-                # === 核心：处理关联 ===
-                # 1. 查找作业ID，没有则自动创建
+                # 自动建档与关联
                 assign_rec_id = lib_map.get(clean_link)
                 if not assign_rec_id:
-                    print(f">>> 新作业自动建档: {assign}")
+                    print(f">>> 自动建档: {assign}")
                     assign_rec_id = add_assignment_to_lib(token, app_token, lib_tid, assign, clean_link)
-                    if assign_rec_id:
-                        lib_map[clean_link] = assign_rec_id # 更新内存映射
+                    if assign_rec_id: lib_map[clean_link] = assign_rec_id
                 
-                # 2. 查找学生ID
                 student_rec_id = roster_map.get(student)
 
-                # 3. 组装数据 (直接带上关联)
                 fields = {
                     "学生姓名": student,
                     "作业名称": assign,
                     "提交状态": status,
                     "原始通知": raw_text,
                     "提交时间": time_str,
-                    "作业链接": {
-                        "link": row['link']   # 飞书也支持这种简写，但 text 默认为空或链接本身
-                    },
+                    "作业链接": {"text": link_url, "link": link_url}, # 修复：同时设置 text 和 link
                     "唯一ID": unique_id
                 }
                 
-                # 关联字段必须是列表 [id, id]
                 if assign_rec_id: fields["关联作业"] = [assign_rec_id]
                 if student_rec_id: fields["关联学生"] = [student_rec_id]
 
-                print(f"新: {student} | {assign}")
+                print(f"✅ 捕获: {student} | {assign} | {time_str}")
                 new_records.append(fields)
                 existing_ids.add(unique_id)
-            except: continue
+            except Exception as e:
+                print(f"!!! 单条处理出错: {e}")
+                continue
 
         if new_records:
             save_to_feishu_v2(token, app_token, table_id, new_records)
-            print(f">>> 成功写入 {len(new_records)} 条")
+            print(f">>> 成功写入 {len(new_records)} 条数据")
         else:
-            print(">>> 无新数据")
+            print(">>> 筛选后无符合条件的新数据")
             
     finally:
         driver.quit()
