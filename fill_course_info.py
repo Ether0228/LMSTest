@@ -97,8 +97,8 @@ def scrape_course_name(driver, url):
     COURSE_MAPPING = {
         "grade 11 physics": "SPH3U",
         "grade 12 physics": "SPH4U",
-        "grade 10 math": "MPM2D",   # 示例：你可以继续添加
-        "grade 11 math": "MCR3U",   # 示例
+        "Grade 12 Advanced Functions": "MHF4U",   # 示例：你可以继续添加
+        "Grade 12 Data Management": "MDM4U",   # 示例
         "calculus": "MCV4U"         # 示例
     }
     # ===============================================================
