@@ -123,35 +123,75 @@ def add_assignment_to_lib(token, app_token, lib_table_id, name, clean_url):
     except: return None
 
 def parse_time_to_str(text):
-    pattern = r" ((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}(?:,\s+\d{4})?|Today|Yesterday)\s+at\s+(\d{1,2}:\d{2}\s+(?:am|pm))$"
+    """
+    将 Jan 5 at 8:53 am 转换为字符串 2026/01/05 08:53
+    """
+    # === 修改点 1：正则变得更加严格 ===
+    # 必须匹配到 Month ... at HH:MM am/pm 结构，才认为是时间
+    # 这样就不会误判作业名里的 "January 28th" 了
+    pattern = r"((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}(?:,\s+\d{4})?|Today|Yesterday)\s+at\s+(\d{1,2}:\d{2}\s+(?:am|pm))"
     match = re.search(pattern, text, re.IGNORECASE)
-    if not match: return (datetime.utcnow() + timedelta(hours=8)).strftime("%Y/%m/%d %H:%M")
+    
+    if not match:
+        # 如果没找到标准时间格式，返回当前北京时间
+        return (datetime.utcnow() + timedelta(hours=8)).strftime("%Y/%m/%d %H:%M")
+
     try:
         beijing_now = datetime.utcnow() + timedelta(hours=8)
-        date_part, time_part = match.group(1), match.group(2)
+        date_part = match.group(1)
+        time_part = match.group(2)
         full_time_str = f"{date_part} {time_part}"
+        
         dt_val = None
         if "Today" in date_part:
-            dt_val = datetime.combine(beijing_now.date(), datetime.strptime(time_part, "%I:%M %p").time())
+            t = datetime.strptime(time_part, "%I:%M %p").time()
+            dt_val = datetime.combine(beijing_now.date(), t)
         elif "Yesterday" in date_part:
-            dt_val = datetime.combine(beijing_now.date() - timedelta(days=1), datetime.strptime(time_part, "%I:%M %p").time())
+            t = datetime.strptime(time_part, "%I:%M %p").time()
+            dt_val = datetime.combine(beijing_now.date() - timedelta(days=1), t)
         else:
-            try: dt_val = datetime.strptime(full_time_str, "%b %d, %Y %I:%M %p")
-            except: 
-                dt_val = datetime.strptime(full_time_str, "%b %d %I:%M %p").replace(year=beijing_now.year)
-                if beijing_now.month == 1 and dt_val.month == 12: dt_val = dt_val.replace(year=beijing_now.year - 1)
+            try:
+                # 尝试带年份
+                dt_val = datetime.strptime(full_time_str, "%b %d, %Y %I:%M %p")
+            except:
+                # 默认今年
+                dt_val = datetime.strptime(full_time_str, "%b %d %I:%M %p")
+                dt_val = dt_val.replace(year=beijing_now.year)
+                if beijing_now.month == 1 and dt_val.month == 12:
+                    dt_val = dt_val.replace(year=beijing_now.year - 1)
+        
         return dt_val.strftime("%Y/%m/%d %H:%M")
-    except: return text
+    except:
+        return text
 
 def parse_notification_simple(text):
+    # 先解析出时间字符串
     time_str = parse_time_to_str(text)
+    
     clean_text_end = len(text)
-    match = re.search(r" ((?:Jan|Feb|Today|Yesterday).*)$", text, re.IGNORECASE)
-    if match: clean_text_end = match.start()
+    
+    # === 修改点 2：截断逻辑也同步变严格 ===
+    # 寻找确切的时间后缀位置（必须包含 " at "）
+    # 这里的正则和上面保持一致，确保只切掉真正的时间部分
+    time_suffix_pattern = r"\s+((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|Today|Yesterday).*?\s+at\s+\d{1,2}:\d{2}\s+(?:am|pm))"
+    
+    # 使用 finditer 找所有的匹配项，取【最后一个】
+    # 防止作业名里也有 "Jan 1 at 2:00 pm" 这种极罕见情况
+    matches = list(re.finditer(time_suffix_pattern, text, re.IGNORECASE))
+    
+    if matches:
+        last_match = matches[-1] # 取最后出现的那个时间作为系统时间
+        clean_text_end = last_match.start()
+
     main_text = text[:clean_text_end].strip()
-    m = re.search(r"^(.*?) (submitted|resubmitted) an item to (.*)$", main_text, re.IGNORECASE)
-    if m: return m.group(1).strip(), m.group(3).strip(), m.group(2).capitalize(), time_str
-    else: return main_text, "Unknown", "Unknown", time_str
+    
+    name_pattern = r"^(.*?) (submitted|resubmitted) an item to (.*)$"
+    m = re.search(name_pattern, main_text, re.IGNORECASE)
+    
+    if m:
+        return m.group(1).strip(), m.group(3).strip(), m.group(2).capitalize(), time_str
+    else:
+        return main_text, "Unknown", "Unknown", time_str
 
 def save_to_feishu_v2(token, app_token, table_id, records):
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}/records/batch_create"
