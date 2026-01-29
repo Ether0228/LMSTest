@@ -89,51 +89,61 @@ def update_feishu_record(token, app_token, table_id, record_id, course_name):
 # === 3. 核心：去网页抓取课程名 ===
 def scrape_course_name(driver, url):
     """
-    抓取课程名称，并自动转换为简称 (如 SPH3U)
+    抓取课程名称 (兼容普通作业版和新版 Quiz/Assessment 版)
     """
-    # ================= 课程映射表 (在这里添加你的规则) =================
-    # 格式： "Schoology上的关键词": "飞书里的简称"
-    # 注意：关键词写小写即可，脚本会自动忽略大小写
+    # 1. 映射表 (已更新)
     COURSE_MAPPING = {
         "grade 11 physics": "SPH3U",
         "grade 12 physics": "SPH4U",
-        "Grade 12 Advanced Functions": "MHF4U",   # 示例：你可以继续添加
-        "Grade 12 Data Management": "MDM4U",   # 示例
-        "calculus": "MCV4U"         # 示例
+        "grade 12 data management": "MDM4U",
+        "grade 12 advanced functions": "MHF4U", # 新增
+        "grade 10 math": "MPM2D",
+        "grade 11 math": "MCR3U",
+        "calculus": "MCV4U"
     }
-    # ===============================================================
 
     try:
-        print(f"   -> 正在打开作业页面...")
+        print(f"   -> 正在打开页面...")
         driver.get(url)
         
-        # 等待页面加载，特别是面包屑导航区域
-        WebDriverWait(driver, 15).until(
-            EC.presence_of_element_located((By.CLASS_NAME, "course-title"))
-        )
+        # 给 React 页面一点渲染时间
+        time.sleep(5)
         
         raw_name = ""
 
-        # === 策略 A: 精准锁定 span.course-title 里的 a 标签 (根据截图) ===
+        # === 策略 A: 针对 Quiz/Assessment 的新版 Breadcrumb (根据你提供的HTML) ===
         try:
-            # 这里的 CSS 选择器定位: 拥有 course-title 类的 span 下的第一个 a 标签
-            course_element = driver.find_element(By.CSS_SELECTOR, "span.course-title a")
-            raw_name = course_element.text.strip()
+            # 逻辑：在 aria-label 为 Breadcrumb 的导航栏里，找第二个列表项 li 的 a 标签
+            # 结构：Home(li1) > Course Name(li2) > ...
+            breadcrumb_element = driver.find_element(By.XPATH, "//nav[@aria-label='Breadcrumb']//ol/li[2]//a")
+            raw_name = breadcrumb_element.text.strip()
             if raw_name:
-                print(f"   -> [精准策略] 抓取到: {raw_name}")
+                print(f"   -> [Quiz策略] 抓取到: {raw_name}")
         except:
             pass
 
-        # === 策略 B: 备用 - 如果策略 A 失败，尝试抓取网页标题 ===
+        # === 策略 B: 针对普通作业的旧版 Breadcrumb (span.course-title) ===
+        if not raw_name:
+            try:
+                course_element = driver.find_element(By.CSS_SELECTOR, "span.course-title a")
+                raw_name = course_element.text.strip()
+                if raw_name:
+                    print(f"   -> [普通作业策略] 抓取到: {raw_name}")
+            except:
+                pass
+
+        # === 策略 C: 最终备用 - 网页标题 (Title) ===
         if not raw_name:
             page_title = driver.title
             if "|" in page_title:
-                raw_name = page_title.split("|")[-2].strip()
+                # Schoology Title: "Quiz Name | Course Name | Schoology"
+                parts = page_title.split("|")
+                raw_name = parts[-2].strip()
                 print(f"   -> [Title策略] 抓取到: {raw_name}")
 
-        # === 最终逻辑：映射转换 ===
+        # === 执行映射转换 ===
         if not raw_name:
-            print("   -> ❌ 无法通过任何方式定位课程名")
+            print("   -> ❌ 无法定位课程名")
             return None
 
         lower_name = raw_name.lower()
@@ -142,14 +152,12 @@ def scrape_course_name(driver, url):
                 print(f"   -> 🎯 匹配成功! ({raw_name} -> {code})")
                 return code
         
-        # 如果没匹配上，返回原名，让你知道需要更新映射表
         print(f"   -> ⚠️ 未匹配简称，返回原名: {raw_name}")
         return raw_name
 
     except Exception as e:
         print(f"   -> 运行出错: {e}")
         return None
-
 def start_course_filler():
     print(">>> 启动作业分类补全脚本...")
     try:
