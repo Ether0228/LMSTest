@@ -59,22 +59,24 @@ def clean_schoology_url(url):
 
 # === 修复：更严格的时间解析 ===
 def parse_time_to_str(text):
-    # 匹配: Jan 28 at 8:57 pm
-    pattern = r"((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}(?:,\s+\d{4})?|Today|Yesterday)\s+at\s+(\d{1,2}:\d{2}\s+(?:am|pm))"
-    match = re.search(pattern, text, re.IGNORECASE)
-    
-    # 默认为北京时间现在
-    beijing_now = datetime.utcnow() + timedelta(hours=8)
-    
-    if not match:
-        return beijing_now.strftime("%Y/%m/%d %H:%M")
-
+    """
+    辅助函数：仅负责把时间文本转为标准格式
+    """
     try:
+        # 定义标准时间格式正则
+        pattern = r"((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}(?:,\s+\d{4})?|Today|Yesterday)\s+at\s+(\d{1,2}:\d{2}\s+(?:am|pm))"
+        match = re.search(pattern, text, re.IGNORECASE)
+        
+        # 如果不是标准格式，直接返回当前时间 (兜底)
+        if not match:
+            return (datetime.utcnow() + timedelta(hours=8)).strftime("%Y/%m/%d %H:%M")
+
+        beijing_now = datetime.utcnow() + timedelta(hours=8)
         date_part = match.group(1)
         time_part = match.group(2)
         full_time_str = f"{date_part} {time_part}"
-        dt_val = None
         
+        dt_val = None
         if "Today" in date_part:
             t = datetime.strptime(time_part, "%I:%M %p").time()
             dt_val = datetime.combine(beijing_now.date(), t)
@@ -83,42 +85,60 @@ def parse_time_to_str(text):
             dt_val = datetime.combine(beijing_now.date() - timedelta(days=1), t)
         else:
             try:
-                # 尝试带年份
+                # 带年份
                 dt_val = datetime.strptime(full_time_str, "%b %d, %Y %I:%M %p")
             except:
                 # 默认今年
                 dt_val = datetime.strptime(full_time_str, "%b %d %I:%M %p")
                 dt_val = dt_val.replace(year=beijing_now.year)
-                # 跨年修正
                 if beijing_now.month == 1 and dt_val.month == 12:
                     dt_val = dt_val.replace(year=beijing_now.year - 1)
         
         return dt_val.strftime("%Y/%m/%d %H:%M")
-    except Exception as e:
-        print(f"DEBUG: 时间解析出错 '{text}' -> {e}")
-        return beijing_now.strftime("%Y/%m/%d %H:%M")
+    except:
+        return text
 
-# === 修复：修复Wednesday截断问题 ===
 def parse_notification_simple(text):
-    time_str = parse_time_to_str(text)
+    """
+    解析通知，分离作业名和时间
+    """
+    # 1. 定义极其严格的时间后缀正则 (必须包含 at + 时间点)
+    # 这会匹配: " Jan 28 at 8:57 pm"
+    # 但不会匹配: " January 28th" (因为后面没有 at)
+    strict_time_suffix = r"\s+((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}(?:,\s+\d{4})?|Today|Yesterday)\s+at\s+(\d{1,2}:\d{2}\s+(?:am|pm))"
+    
+    # 2. 查找所有的匹配项
+    matches = list(re.finditer(strict_time_suffix, text, re.IGNORECASE))
     
     clean_text_end = len(text)
-    # 只有后面跟着 at HH:MM 时才截断，避免截断作业名里的月份
-    time_suffix_pattern = r"\s+((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|Today|Yesterday).*?\s+at\s+\d{1,2}:\d{2}\s+(?:am|pm))"
-    matches = list(re.finditer(time_suffix_pattern, text, re.IGNORECASE))
+    time_text_segment = "" # 用于提取时间的部分
     
     if matches:
+        # 【关键】取列表里的【最后一个】匹配项作为分割点
+        # 即使作业名里有 "Jan 1 at 2pm"，Schoology 的提交时间肯定是在字符串的最末尾
         last_match = matches[-1]
         clean_text_end = last_match.start()
+        time_text_segment = last_match.group(0).strip() # 取出时间文本用于解析
+    else:
+        # 如果没找到标准时间，就不切断作业名，避免误伤
+        time_text_segment = text 
 
+    # 3. 解析时间字符串
+    time_str = parse_time_to_str(time_text_segment)
+
+    # 4. 截取主体文本
     main_text = text[:clean_text_end].strip()
+    
+    # 5. 拆解学生和作业名
     name_pattern = r"^(.*?) (submitted|resubmitted) an item to (.*)$"
     m = re.search(name_pattern, main_text, re.IGNORECASE)
     
     if m:
         return m.group(1).strip(), m.group(3).strip(), m.group(2).capitalize(), time_str
     else:
-        return main_text, "Unknown", "Unknown", time_str
+        # 如果匹配失败，说明作业名可能包含特殊字符
+        # 此时直接返回 main_text 作为作业名
+        return "Unknown", main_text, "Unknown", time_str
 
 # === 辅助：加载映射表 ===
 def get_feishu_mapping(token, app_token, table_id, key_field_name):
