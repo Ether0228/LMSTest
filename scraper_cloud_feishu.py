@@ -290,28 +290,3 @@ def start_cloud_scraper():
 
 if __name__ == "__main__":
     start_cloud_scraper()
-```
-
----
-
-### 最后一步：修改 `.github/workflows/scraper.yml`
-
-因为我们增加了一些 Secrets，需要在 YAML 文件里把它们传进去。请修改 `env` 部分：
-
-```yaml
-      - name: 执行爬虫
-        env:
-          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
-          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
-          FEISHU_APP_TOKEN: ${{ secrets.FEISHU_APP_TOKEN }}
-          FEISHU_TABLE_ID: ${{ secrets.FEISHU_TABLE_ID }}
-          
-          # 新增的两个表ID
-          FEISHU_ROSTER_TABLE_ID: ${{ secrets.FEISHU_ROSTER_TABLE_ID }}
-          FEISHU_LIB_TABLE_ID: ${{ secrets.FEISHU_LIB_TABLE_ID }}
-          
-          SCHOOLOGY_COOKIES: ${{ secrets.SCHOOLOGY_COOKIES }}
-          TZ: Asia/Shanghai
-          TARGET_DATE: ${{ github.event.inputs.target_date }}
-          MAX_PAGES: ${{ github.event.inputs.max_pages }}
-        run: python scraper_cloud_feishu.py
