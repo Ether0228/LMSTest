@@ -107,63 +107,47 @@ def scrape_course_name(driver, url):
         print(f"   -> 正在打开作业页面...")
         driver.get(url)
         
-        # 等待页面加载，确保 body 出现
-        WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+        # 等待页面加载，特别是面包屑导航区域
+        WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located((By.CLASS_NAME, "course-title"))
+        )
         
-        # === 策略升级：获取所有可能的课程链接 ===
-        potential_names = []
-        
-        try:
-            # 找到所有 href 包含 /course/ 的 a 标签
-            elements = driver.find_elements(By.XPATH, "//a[contains(@href, '/course/')]")
-            
-            for elem in elements:
-                # 方法 A: 获取可见文本
-                text_visible = elem.text.strip()
-                
-                # 方法 B: 获取隐藏文本 (textContent) - 解决抓取为空的问题
-                text_hidden = driver.execute_script("return arguments[0].textContent;", elem).strip()
-                
-                # 优先用可见文本，没有则用隐藏文本
-                final_text = text_visible if text_visible else text_hidden
-                
-                # 过滤掉太短的干扰项 (比如 "Back", "Home" 或 空字符串)
-                if final_text and len(final_text) > 5:
-                    potential_names.append(final_text)
-        except Exception as e:
-            print(f"   -> 元素查找出错: {e}")
+        raw_name = ""
 
-        # === 备用策略：尝试从网页标题 (Title) 抓取 ===
-        # Schoology 的标题通常是: "作业名 | 课程名 | Schoology"
-        if not potential_names:
+        # === 策略 A: 精准锁定 span.course-title 里的 a 标签 (根据截图) ===
+        try:
+            # 这里的 CSS 选择器定位: 拥有 course-title 类的 span 下的第一个 a 标签
+            course_element = driver.find_element(By.CSS_SELECTOR, "span.course-title a")
+            raw_name = course_element.text.strip()
+            if raw_name:
+                print(f"   -> [精准策略] 抓取到: {raw_name}")
+        except:
+            pass
+
+        # === 策略 B: 备用 - 如果策略 A 失败，尝试抓取网页标题 ===
+        if not raw_name:
             page_title = driver.title
             if "|" in page_title:
-                parts = page_title.split("|")
-                if len(parts) >= 2:
-                    # 通常课程名在中间或最后
-                    potential_names.append(parts[1].strip())
+                raw_name = page_title.split("|")[-2].strip()
+                print(f"   -> [Title策略] 抓取到: {raw_name}")
 
-        # === 决策阶段 ===
-        if not potential_names:
-            print("   -> ❌ 未找到任何有效的课程名称文本")
+        # === 最终逻辑：映射转换 ===
+        if not raw_name:
+            print("   -> ❌ 无法通过任何方式定位课程名")
             return None
-            
-        # 取第一个看起来最像课程的名字
-        # 这里假设第一个有效的长文本就是面包屑里的课程名
-        raw_name = potential_names[0]
-        print(f"   -> 提取到名称: {raw_name}")
 
-        # === 映射转换 ===
-        lower_raw_name = raw_name.lower()
+        lower_name = raw_name.lower()
         for key, code in COURSE_MAPPING.items():
-            if key in lower_raw_name:
-                print(f"   -> 匹配成功! 转换为: {code}")
+            if key in lower_name:
+                print(f"   -> 🎯 匹配成功! ({raw_name} -> {code})")
                 return code
         
+        # 如果没匹配上，返回原名，让你知道需要更新映射表
+        print(f"   -> ⚠️ 未匹配简称，返回原名: {raw_name}")
         return raw_name
 
     except Exception as e:
-        print(f"   -> 页面访问失败: {e}")
+        print(f"   -> 运行出错: {e}")
         return None
 
 def start_course_filler():
