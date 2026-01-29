@@ -3,6 +3,7 @@ import json
 import requests
 import re
 import hashlib
+import time 
 from datetime import datetime, timedelta
 
 # ================= 配置与工具函数 =================
@@ -57,7 +58,7 @@ def start_missing_sync():
     submissions = fetch_all_records(token, app_token, conf["FEISHU_TABLE_ID"])
     current_missing_table = fetch_all_records(token, app_token, conf["FEISHU_MISSING_TABLE_ID"])
 
-    beijing_now_ms = int((datetime.utcnow() + timedelta(hours=8)).timestamp() * 1000)
+    absolute_now_ms = int(time.time() * 1000)
 
     # 1. 建立【已提交】索引 (基于 姓名 + 链接)
     submitted_keys = set()
@@ -156,7 +157,8 @@ def start_missing_sync():
             requests.post(upd_url, json={"records": rows[i:i+100]}, headers={"Authorization": f"Bearer {token}"})
 
     # C. 新增
-    if to_add:
+   if to_add:
+        print(f">>> 正在写入 {len(to_add)} 条新缺交记录...")
         add_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{conf['FEISHU_MISSING_TABLE_ID']}/records/batch_create"
         rows = []
         for k in to_add:
@@ -166,15 +168,17 @@ def start_missing_sync():
                 "关联学生": [info["s_id"]],
                 "关联作业": [info["a_id"]],
                 "所属课程": info["course"],
-                "发现日期": beijing_now_ms,
-                "最后核验时间": beijing_now_ms,
+                "发现日期": absolute_now_ms,      # 使用绝对时间戳
+                "最后核验时间": absolute_now_ms,  # 使用绝对时间戳
                 "处理状态": "待处理"
             }})
-        for i in range(0, len(rows), 100):
-            batch = rows[i:i+100]
-            resp = requests.post(add_url, json={"records": batch}, headers={"Authorization": f"Bearer {token}"}).json()
-            if resp.get("code") != 0:
-                print(f"!!! 写入失败: {resp.get('msg')}")
+        # ... (批量写入逻辑) ...
+
+    # === 在执行更新时间 (B) 时修改如下 ===
+    if to_update_time:
+        print(f">>> 正在更新 {len(to_update_time)} 条存量记录时间...")
+        upd_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{conf['FEISHU_MISSING_TABLE_ID']}/records/batch_update"
+        upd_rows = [{"record_id": table_existing_map[k], "fields": {"最后核验时间": absolute_now_ms}} for k in to_update_time]
 
     print(">>> 链接匹配核验完成。")
 
