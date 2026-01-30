@@ -96,10 +96,19 @@ def scrape_course_name(driver, url):
         "grade 11 physics": "SPH3U",
         "grade 12 physics": "SPH4U",
         "grade 12 data management": "MDM4U",
-        "grade 12 advanced functions": "MHF4U", # 新增
-        "grade 10 math": "MPM2D",
-        "grade 11 math": "MCR3U",
-        "calculus": "MCV4U"
+        "grade 12 advanced functions": "MHF4U",
+        "grade 11 functions": "MCR3U",
+        "Grade 12 Calculus & Vectors": "MCV4U",
+        "Grade 12 Canadian and World Issues": "CGW4U",
+        "grade 12 english": "ENG4U",
+        "Grade 11 English": "ENG3U",
+        "Grade 12 Nutrition & Health": "HFA4U",
+        "Grade 12 Visual Arts" : "AVI4M",
+        "G10 Canadian History since WWI" : "CHC2D",
+        "ESL Level 5": "ESLEO",
+        "ESL Level 4": "ESLDO",
+        "ESL Level 3": "ESLCO",
+        "ESL Level 2": "ESLBO",
     }
 
     try:
