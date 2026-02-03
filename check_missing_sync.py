@@ -92,7 +92,8 @@ def start_missing_sync():
     
     for a_rec in lib:
         a_f = a_rec.get("fields", {})
-        if a_f.get("统计状态") != "✅ 必交": continue
+        # 只要不是“忽略”，都进行缺交核查
+        if a_f.get("作业性质") == "🚫 忽略": continue
         
         a_id = a_rec.get("record_id")
         a_url = clean_url(a_f.get("作业链接", ""))
