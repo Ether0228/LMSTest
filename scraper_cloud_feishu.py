@@ -189,7 +189,14 @@ def save_to_feishu_v2(token, app_token, table_id, records):
     for i in range(0, len(records), 100):
         batch = records[i:i + 100]
         payload = [{"fields": r} for r in batch]
-        requests.post(url, json={"records": payload}, headers=headers)
+        
+        resp = requests.post(url, json={"records": payload}, headers=headers).json()
+        if resp.get("code") == 0:
+            # === 新增调试代码 ===
+            new_ids = [item.get("record_id") for item in resp.get("data", {}).get("records", [])]
+            print(f">>> 飞书已确认接收！生成的首个记录ID为: {new_ids[0] if new_ids else '无'}")
+        else:
+            print(f"!!! 写入失败: {resp.get('msg')}")
 
 def start_cloud_scraper():
     print(">>> 启动调试版爬虫...")
