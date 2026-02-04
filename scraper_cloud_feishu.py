@@ -186,17 +186,24 @@ def add_assignment_to_lib(token, app_token, lib_table_id, name, clean_url):
 def save_to_feishu_v2(token, app_token, table_id, records):
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}/records/batch_create"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=utf-8"}
+    
+    success_count = 0
     for i in range(0, len(records), 100):
         batch = records[i:i + 100]
         payload = [{"fields": r} for r in batch]
         
-        resp = requests.post(url, json={"records": payload}, headers=headers).json()
-        if resp.get("code") == 0:
-            # === 新增调试代码 ===
-            new_ids = [item.get("record_id") for item in resp.get("data", {}).get("records", [])]
-            print(f">>> 飞书已确认接收！生成的首个记录ID为: {new_ids[0] if new_ids else '无'}")
+        response = requests.post(url, json={"records": payload}, headers=headers)
+        resp_json = response.json()
+        
+        if resp_json.get("code") == 0:
+            success_count += len(batch)
         else:
-            print(f"!!! 写入失败: {resp.get('msg')}")
+            # 这里会打印出到底是哪个字段导致的权限拒绝
+            print(f"!!! 批次写入失败: {resp_json.get('msg')}")
+            print(f"DEBUG 详情: {json.dumps(resp_json.get('error', {}))}")
+            
+    if success_count > 0:
+        print(f">>> 实际成功写入 {success_count} 条数据")
 
 def start_cloud_scraper():
     print(">>> 启动调试版爬虫...")
