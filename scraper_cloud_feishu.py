@@ -175,13 +175,28 @@ def get_feishu_mapping(token, app_token, table_id, key_field_name):
 def add_assignment_to_lib(token, app_token, lib_table_id, name, clean_url):
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{lib_table_id}/records"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=utf-8"}
-    fields = {"作业名称": name, "作业链接": clean_url, "统计状态": "✅ 必交"}
+    
+    fields = {
+        "作业名称": name,
+        "作业链接": clean_url,
+        "统计状态": "✅ 必交"
+    }
+    
     try:
-        resp = requests.post(url, json={"fields": fields}, headers=headers).json()
-        if resp.get("code") == 0:
-            return resp.get("data", {}).get("record", {}).get("record_id")
-    except: pass
-    return None
+        response = requests.post(url, json={"fields": fields}, headers=headers)
+        resp_json = response.json()
+        if resp_json.get("code") == 0:
+            rec_id = resp_json.get("data", {}).get("record", {}).get("record_id")
+            print(f">>> [自动建档] 成功: {name}")
+            return rec_id
+        else:
+            # === 这里会告诉你为什么失败 ===
+            print(f"!!! [自动建档] 失败! 错误码: {resp_json.get('code')}, 原因: {resp_json.get('msg')}")
+            print(f"DEBUG 详情: {resp_json}")
+            return None
+    except Exception as e:
+        print(f"!!! [自动建档] 网络请求异常: {e}")
+        return None
 
 def save_to_feishu_v2(token, app_token, table_id, records):
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}/records/batch_create"
