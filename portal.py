@@ -96,7 +96,7 @@ def main():
 
         # 拉取数据
         with st.spinner("正在加载你的通关进度..."):
-            missing_data = fetch_feishu_data(TABLE_MISSING, f'CurrentValue.[学生姓名] == "{name}"')
+            missing_data = fetch_feishu_data(TABLE_MISSING, f'CurrentValue.[关联学生] == "{name}"')
             submit_data = fetch_feishu_data(TABLE_SUBMISSION, f'CurrentValue.[学生姓名] == "{name}"')
 
         # 游戏化组件展示
