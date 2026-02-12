@@ -115,7 +115,7 @@ def main():
         st.markdown("### 🏹 待补交的任务 (缺交)")
         if missing_data:
             for item in missing_data:
-                with st.expander(f"❌ {item.get('关联作业', '未命名作业')}"):
+                with st.expander(f"❌ {item.get('缺交概要', '未命名作业')}"):
                     st.write(f"**课程:** {item.get('所属课程', 'N/A')}")
                     st.write(f"**截止日期:** {item.get('最后核验时间', 'N/A')}")
         else:
