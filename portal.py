@@ -24,16 +24,39 @@ def get_tenant_token():
     return resp.json().get("tenant_access_token")
 
 def fetch_feishu_data(table_id, filter_query=""):
-    token = get_tenant_token()
-    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{APP_TOKEN}/tables/{table_id}/records"
-    headers = {"Authorization": f"Bearer {token}"}
-    params = {"page_size": 100}
-    if filter_query:
-        params["filter"] = filter_query
-    
-    resp = requests.get(url, headers=headers, params=params).json()
-    items = resp.get("data", {}).get("items", [])
-    return [i["fields"] for i in items]
+    try:
+        token = get_tenant_token()
+        url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{APP_TOKEN}/tables/{table_id}/records"
+        headers = {"Authorization": f"Bearer {token}"}
+        
+        # 修正 1：飞书筛选器建议使用单个 = 号
+        # 修正 2：增加 page_size 确保拉取足够数据
+        params = {"page_size": 100}
+        if filter_query:
+            # 将 == 替换为 =
+            safe_filter = filter_query.replace("==", "=")
+            params["filter"] = safe_filter
+        
+        response = requests.get(url, headers=headers, params=params)
+        
+        # 检查 HTTP 状态码
+        if response.status_code != 200:
+            st.error(f"飞书请求失败，状态码: {response.status_code}")
+            st.write(response.text) # 打印出具体的 HTML/错误信息
+            return []
+
+        data = response.json()
+        
+        if data.get("code") != 0:
+            st.error(f"飞书接口业务报错: {data.get('msg')}")
+            return []
+            
+        items = data.get("data", {}).get("items", [])
+        return [i["fields"] for i in items]
+        
+    except Exception as e:
+        st.error(f"发生意外错误: {e}")
+        return []
 
 # --- 3. Streamlit 界面 ---
 st.set_page_config(page_title="学生通关指南", page_icon="🎓")
