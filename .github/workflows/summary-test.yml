@@ -24,7 +24,7 @@ jobs:
 
       - name: 4. Validate script exists
         run: |
-          test -f "schoology数据转飞书/build_student_summary.py"
+          test -f "build_student_summary.py"
 
       - name: 5. Run summary builder
         env:
