@@ -234,7 +234,6 @@ def build_summaries(roster, submissions, missing, assignment_lookup):
             students[name]["missing"].append(
                 {
                     "course": course_name,
-                    "status": f.get("处理状态", ""),
                 }
             )
             students[name]["missing_items"].append(
@@ -242,7 +241,6 @@ def build_summaries(roster, submissions, missing, assignment_lookup):
                     "course": course_name,
                     "assignmentName": assignment_name,
                     "assignmentLink": assignment_link,
-                    "status": f.get("处理状态", ""),
                 }
             )
 
