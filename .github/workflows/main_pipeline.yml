@@ -83,16 +83,4 @@ jobs:
           FEISHU_LIB_TABLE_ID: ${{ secrets.FEISHU_LIB_TABLE_ID }}
           FEISHU_MISSING_TABLE_ID: ${{ secrets.FEISHU_MISSING_TABLE_ID }}
         run: python check_missing_sync.py
-        
-      # === 阶段四：学生汇总表 (Dashboard 加速) ===
-      - name: 7. 运行学生汇总 (Build Student Summary)
-        if: success()
-        env:
-          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
-          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
-          FEISHU_APP_TOKEN: ${{ secrets.FEISHU_APP_TOKEN }}
-          FEISHU_TABLE_ID: ${{ secrets.FEISHU_TABLE_ID }}
-          FEISHU_ROSTER_TABLE_ID: ${{ secrets.FEISHU_ROSTER_TABLE_ID }}
-          FEISHU_MISSING_TABLE_ID: ${{ secrets.FEISHU_MISSING_TABLE_ID }}
-          FEISHU_SUMMARY_TABLE_ID: ${{ secrets.FEISHU_SUMMARY_TABLE_ID }}
-        run: python build_student_summary.py
+      
