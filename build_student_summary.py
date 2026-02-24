@@ -11,6 +11,7 @@ def get_env_config():
         "FEISHU_APP_TOKEN",
         "FEISHU_TABLE_ID",  # 提交记录表
         "FEISHU_ROSTER_TABLE_ID",  # 学生花名册
+        "FEISHU_LIB_TABLE_ID",  # 作业库（用于补齐缺交作业名/链接）
         "FEISHU_MISSING_TABLE_ID",  # 缺交表
         "FEISHU_SUMMARY_TABLE_ID",  # 学生汇总表（新增）
     ]
@@ -141,7 +142,29 @@ def extract_linked_record_ids(value):
     return list(out)
 
 
-def build_summaries(roster, submissions, missing):
+def normalize_link(v):
+    if isinstance(v, dict):
+        return str(v.get("link") or v.get("text") or "").strip()
+    return str(v or "").strip()
+
+
+def build_assignment_lookup(lib_records):
+    # rec_id -> {name, link, course}
+    out = {}
+    for rec in lib_records:
+        rec_id = rec.get("record_id")
+        if not rec_id:
+            continue
+        f = rec.get("fields", {})
+        out[rec_id] = {
+            "name": str(f.get("作业名称", "")).strip(),
+            "link": normalize_link(f.get("作业链接")),
+            "course": str(f.get("所属课程", "")).strip(),
+        }
+    return out
+
+
+def build_summaries(roster, submissions, missing, assignment_lookup):
     # 1) 学生基础信息
     students = {}
     for r in roster:
@@ -158,6 +181,7 @@ def build_summaries(roster, submissions, missing):
             "courses": courses,
             "submitted": [],
             "missing": [],
+            "missing_items": [],
         }
 
     # 2) 提交记录聚合（按“学生姓名”文本）
@@ -190,8 +214,17 @@ def build_summaries(roster, submissions, missing):
         missing_rows_total += 1
         f = m.get("fields", {})
         linked = extract_linked_record_ids(f.get("关联学生"))
+        linked_assignment_ids = extract_linked_record_ids(f.get("关联作业"))
         if linked:
             missing_rows_with_link += 1
+        assignment = {}
+        for a_id in linked_assignment_ids:
+            assignment = assignment_lookup.get(a_id, {})
+            if assignment:
+                break
+        course_name = str(f.get("所属课程", "")).strip() or assignment.get("course", "") or "未分类"
+        assignment_name = assignment.get("name", "")
+        assignment_link = assignment.get("link", "")
         for rid in linked:
             name = roster_id_to_name.get(rid)
             if not name:
@@ -200,7 +233,15 @@ def build_summaries(roster, submissions, missing):
             missing_links_matched += 1
             students[name]["missing"].append(
                 {
-                    "course": str(f.get("所属课程", "")).strip() or "未分类",
+                    "course": course_name,
+                    "status": f.get("处理状态", ""),
+                }
+            )
+            students[name]["missing_items"].append(
+                {
+                    "course": course_name,
+                    "assignmentName": assignment_name,
+                    "assignmentLink": assignment_link,
                     "status": f.get("处理状态", ""),
                 }
             )
@@ -218,6 +259,7 @@ def build_summaries(roster, submissions, missing):
             s["submitted"], key=lambda x: str(x.get("submittedAt", "")), reverse=True
         )
         recent = submitted_sorted[:20]
+        missing_items = s["missing_items"][:50]
         missing_total = len(s["missing"])
         submitted_total = len(s["submitted"])
 
@@ -248,6 +290,7 @@ def build_summaries(roster, submissions, missing):
             "缺交总数": missing_total,
             "已提交总数": submitted_total,
             "缺交按课程JSON": chunk_text_json(missing_by_course),
+            "缺交明细JSON": chunk_text_json(missing_items),
             "近期提交JSON": chunk_text_json(recent),
             "推荐JSON": chunk_text_json(recommendations),
             "最后更新时间": now_ms,
@@ -299,12 +342,14 @@ def main():
 
     roster = fetch_all_records(token, app_token, conf["FEISHU_ROSTER_TABLE_ID"])
     submissions = fetch_all_records(token, app_token, conf["FEISHU_TABLE_ID"])
+    lib = fetch_all_records(token, app_token, conf["FEISHU_LIB_TABLE_ID"])
     missing = fetch_all_records(token, app_token, conf["FEISHU_MISSING_TABLE_ID"])
     print(
-        f">>> 数据加载完成: roster={len(roster)}, submissions={len(submissions)}, missing={len(missing)}"
+        f">>> 数据加载完成: roster={len(roster)}, submissions={len(submissions)}, lib={len(lib)}, missing={len(missing)}"
     )
 
-    summary_rows = build_summaries(roster, submissions, missing)
+    assignment_lookup = build_assignment_lookup(lib)
+    summary_rows = build_summaries(roster, submissions, missing, assignment_lookup)
     sync_summary_table(token, conf, summary_rows)
 
 
