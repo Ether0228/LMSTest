@@ -105,25 +105,40 @@ def extract_linked_record_ids(value):
     """
     if value is None:
         return []
-    arr = value if isinstance(value, list) else [value]
-    out = []
-    for item in arr:
-        if isinstance(item, str):
-            s = item.strip()
-            if s:
-                out.append(s)
-            continue
-        if isinstance(item, dict):
-            rid = (
-                item.get("record_id")
-                or item.get("recordId")
-                or item.get("id")
-                or ""
-            )
-            rid = str(rid).strip()
-            if rid:
-                out.append(rid)
-    return out
+
+    out = set()
+
+    def visit(node):
+        if node is None:
+            return
+        if isinstance(node, str):
+            s = node.strip()
+            if s.startswith("rec"):
+                out.add(s)
+            return
+        if isinstance(node, list):
+            for x in node:
+                visit(x)
+            return
+        if isinstance(node, dict):
+            # 常见形式：{"record_id":"rec..."} / {"record_ids":["rec..."]} / 嵌套结构
+            for key in ("record_id", "recordId", "id"):
+                val = node.get(key)
+                if isinstance(val, str) and val.strip().startswith("rec"):
+                    out.add(val.strip())
+            for key in ("record_ids", "recordIds", "link_record_ids", "linkRecordIds"):
+                val = node.get(key)
+                if isinstance(val, list):
+                    for rid in val:
+                        if isinstance(rid, str) and rid.strip().startswith("rec"):
+                            out.add(rid.strip())
+            # 递归扫一遍，兼容未知嵌套
+            for _, v in node.items():
+                if isinstance(v, (dict, list)):
+                    visit(v)
+
+    visit(value)
+    return list(out)
 
 
 def build_summaries(roster, submissions, missing):
@@ -166,13 +181,23 @@ def build_summaries(roster, submissions, missing):
     roster_id_to_name = {
         v["roster_record_id"]: k for k, v in students.items() if v.get("roster_record_id")
     }
+    missing_rows_total = 0
+    missing_rows_with_link = 0
+    missing_links_matched = 0
+    missing_links_unmatched = 0
+
     for m in missing:
+        missing_rows_total += 1
         f = m.get("fields", {})
         linked = extract_linked_record_ids(f.get("关联学生"))
+        if linked:
+            missing_rows_with_link += 1
         for rid in linked:
             name = roster_id_to_name.get(rid)
             if not name:
+                missing_links_unmatched += 1
                 continue
+            missing_links_matched += 1
             students[name]["missing"].append(
                 {
                     "course": str(f.get("所属课程", "")).strip() or "未分类",
@@ -228,6 +253,13 @@ def build_summaries(roster, submissions, missing):
             "最后更新时间": now_ms,
         }
         rows.append(row)
+    print(
+        ">>> 缺交匹配统计:",
+        f"rows={missing_rows_total},",
+        f"rows_with_link={missing_rows_with_link},",
+        f"links_matched={missing_links_matched},",
+        f"links_unmatched={missing_links_unmatched}",
+    )
     return rows
 
 
