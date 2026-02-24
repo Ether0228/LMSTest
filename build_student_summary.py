@@ -94,6 +94,38 @@ def chunk_text_json(obj, max_len=10000):
     return text[:max_len]
 
 
+def extract_linked_record_ids(value):
+    """
+    飞书关联字段在不同场景可能返回：
+    1) ["recxxx", "recyyy"]
+    2) [{"record_id":"recxxx"}, {"record_id":"recyyy"}]
+    3) {"record_id":"recxxx"}
+    4) "recxxx"
+    统一抽取为 record_id 字符串列表。
+    """
+    if value is None:
+        return []
+    arr = value if isinstance(value, list) else [value]
+    out = []
+    for item in arr:
+        if isinstance(item, str):
+            s = item.strip()
+            if s:
+                out.append(s)
+            continue
+        if isinstance(item, dict):
+            rid = (
+                item.get("record_id")
+                or item.get("recordId")
+                or item.get("id")
+                or ""
+            )
+            rid = str(rid).strip()
+            if rid:
+                out.append(rid)
+    return out
+
+
 def build_summaries(roster, submissions, missing):
     # 1) 学生基础信息
     students = {}
@@ -136,9 +168,7 @@ def build_summaries(roster, submissions, missing):
     }
     for m in missing:
         f = m.get("fields", {})
-        linked = f.get("关联学生", [])
-        if not isinstance(linked, list):
-            linked = [linked] if linked else []
+        linked = extract_linked_record_ids(f.get("关联学生"))
         for rid in linked:
             name = roster_id_to_name.get(rid)
             if not name:
@@ -248,4 +278,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
