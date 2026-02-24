@@ -151,20 +151,25 @@ def normalize_link(v):
 def build_assignment_lookup(lib_records):
     # rec_id -> {name, link, course}
     out = {}
+    # clean_link -> {name, link, course}
+    by_link = {}
     for rec in lib_records:
         rec_id = rec.get("record_id")
-        if not rec_id:
-            continue
         f = rec.get("fields", {})
-        out[rec_id] = {
+        item = {
             "name": str(f.get("作业名称", "")).strip(),
             "link": normalize_link(f.get("作业链接")),
             "course": str(f.get("所属课程", "")).strip(),
         }
-    return out
+        if rec_id:
+            out[rec_id] = item
+        link = item["link"]
+        if link:
+            by_link[link] = item
+    return out, by_link
 
 
-def build_summaries(roster, submissions, missing, assignment_lookup):
+def build_summaries(roster, submissions, missing, assignment_lookup, assignment_by_link):
     # 1) 学生基础信息
     students = {}
     for r in roster:
@@ -182,6 +187,7 @@ def build_summaries(roster, submissions, missing, assignment_lookup):
             "submitted": [],
             "missing": [],
             "missing_items": [],
+            "submitted_by_course": {},
         }
 
     # 2) 提交记录聚合（按“学生姓名”文本）
@@ -190,6 +196,15 @@ def build_summaries(roster, submissions, missing, assignment_lookup):
         name = str(f.get("学生姓名", "")).strip()
         if not name or name not in students:
             continue
+        linked_assignment_ids = extract_linked_record_ids(f.get("关联作业"))
+        assignment = {}
+        for a_id in linked_assignment_ids:
+            assignment = assignment_lookup.get(a_id, {})
+            if assignment:
+                break
+        if not assignment:
+            assignment = assignment_by_link.get(normalize_link(f.get("作业链接")), {})
+        course_name = assignment.get("course", "").strip() or "未分类"
         students[name]["submitted"].append(
             {
                 "assignmentName": f.get("作业名称", ""),
@@ -198,8 +213,11 @@ def build_summaries(roster, submissions, missing, assignment_lookup):
                 "link": (f.get("作业链接", {}) or {}).get("link", "")
                 if isinstance(f.get("作业链接"), dict)
                 else str(f.get("作业链接", "")),
+                "course": course_name,
             }
         )
+        sbc = students[name]["submitted_by_course"]
+        sbc[course_name] = sbc.get(course_name, 0) + 1
 
     # 3) 缺交记录聚合（按“关联学生” record_id）
     roster_id_to_name = {
@@ -252,6 +270,21 @@ def build_summaries(roster, submissions, missing, assignment_lookup):
         for item in s["missing"]:
             c = item["course"]
             missing_by_course[c] = missing_by_course.get(c, 0) + 1
+        all_courses = sorted(set(s["courses"]) | set(s["submitted_by_course"].keys()) | set(missing_by_course.keys()))
+        course_progress = []
+        for c in all_courses:
+            submitted_count = int(s["submitted_by_course"].get(c, 0))
+            missing_count = int(missing_by_course.get(c, 0))
+            total = submitted_count + missing_count
+            completion = round((submitted_count / total) * 100, 1) if total > 0 else 0.0
+            course_progress.append(
+                {
+                    "course": c,
+                    "submittedCount": submitted_count,
+                    "missingCount": missing_count,
+                    "completion": completion,
+                }
+            )
 
         submitted_sorted = sorted(
             s["submitted"], key=lambda x: str(x.get("submittedAt", "")), reverse=True
@@ -288,6 +321,7 @@ def build_summaries(roster, submissions, missing, assignment_lookup):
             "缺交总数": missing_total,
             "已提交总数": submitted_total,
             "缺交按课程JSON": chunk_text_json(missing_by_course),
+            "课程进度JSON": chunk_text_json(course_progress),
             "缺交明细JSON": chunk_text_json(missing_items),
             "近期提交JSON": chunk_text_json(recent),
             "推荐JSON": chunk_text_json(recommendations),
@@ -346,8 +380,8 @@ def main():
         f">>> 数据加载完成: roster={len(roster)}, submissions={len(submissions)}, lib={len(lib)}, missing={len(missing)}"
     )
 
-    assignment_lookup = build_assignment_lookup(lib)
-    summary_rows = build_summaries(roster, submissions, missing, assignment_lookup)
+    assignment_lookup, assignment_by_link = build_assignment_lookup(lib)
+    summary_rows = build_summaries(roster, submissions, missing, assignment_lookup, assignment_by_link)
     sync_summary_table(token, conf, summary_rows)
 
 
