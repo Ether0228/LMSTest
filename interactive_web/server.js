@@ -578,7 +578,7 @@ async function handleApiDashboard(req, res, parsedUrl) {
 
   let missingForStudent = [];
   let missingSource = "none";
-  const missingStudentNameField = (tenantConf.missingStudentNameField || "").trim();
+  const missingStudentNameField = (tenantConf.missingStudentNameField || "\u5b66\u751f\u59d3\u540d").trim();
 
   // Fast path: if missing table has a denormalized text field (e.g. 学生姓名), use direct filter.
   if (missingStudentNameField) {
