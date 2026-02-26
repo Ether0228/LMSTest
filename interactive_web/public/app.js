@@ -837,25 +837,108 @@ function renderAll(data) {
 }
 
 ;(function () {
+  // ── Loading 控制 ──────────────────────────────────────────
+  const overlay  = document.getElementById("loadingOverlay")
+  const tipEl    = document.getElementById("loadingTip")
+
+  const TIPS = [
+    "💡 每天 3 分钟登录 Schoology 查看 DDL，胜过临时抱佛脚。",
+    "📋 先读 Rubric 再写作业，对齐评分标准是最省力的提分方式。",
+    "⏰ 作业迟交？先提交一个可评分版本，再发消息说明情况。",
+    "📅 把未来 14 天所有 DDL 写进日历，至少设置一次提醒。",
+    "🔁 每周 15 分钟存档复盘：分数、反馈、风险、下周升级点。",
+    "🤝 找老师提问时带上你已尝试的步骤，反馈会更精准。",
+    "📁 文件命名建议：课程-任务-版本-日期，方便随时找到。",
+    "🎯 连续两周迟交？是系统没跑起来，回到 Daily Loop 重启。",
+    "🧠 错题本只需 3 栏：题目 / 错的原因 / 下次怎么做。",
+    "🚀 入学第一件事：把本学期所有 DDL 一次性写进日历。",
+  ]
+
+  let tipIdx = 0
+  let tipTimer = null
+
+  function showTip(text) {
+    tipEl.classList.add("fade")
+    setTimeout(() => {
+      tipEl.textContent = text
+      tipEl.classList.remove("fade")
+    }, 400)
+  }
+
+  function startTips() {
+    showTip(TIPS[tipIdx])
+    tipTimer = setInterval(() => {
+      tipIdx = (tipIdx + 1) % TIPS.length
+      showTip(TIPS[tipIdx])
+    }, 3500)
+  }
+
+  function hideLoading() {
+    clearInterval(tipTimer)
+    overlay.classList.add("hidden")
+    setTimeout(() => overlay.remove(), 350)
+  }
+
+  // ── localStorage 缓存 ──────────────────────────────────────
+  const CACHE_TTL = 25 * 60 * 1000   // 25 分钟，与 pipeline 周期匹配
+
+  function lsGet(key) {
+    try {
+      const raw = localStorage.getItem(key)
+      if (!raw) return null
+      const { data, ts } = JSON.parse(raw)
+      if (Date.now() - ts > CACHE_TTL) { localStorage.removeItem(key); return null }
+      return data
+    } catch { return null }
+  }
+
+  function lsSet(key, data) {
+    try { localStorage.setItem(key, JSON.stringify({ data, ts: Date.now() })) } catch {}
+  }
+
+  // ── 入口逻辑 ──────────────────────────────────────────────
   const params  = new URLSearchParams(location.search)
   const tenant  = (params.get("t") || "").trim()
   const student = (params.get("student") || "").trim()
 
-  // 没有 tenant 或 student 参数时，用 MOCK_DATA 预览
   if (!tenant || !student) {
+    hideLoading()
     renderAll(MOCK_DATA)
     return
   }
 
+  startTips()
+
+  const cacheKey = `qea__${tenant}__${student}`
+  const cached   = lsGet(cacheKey)
+
+  if (cached) {
+    // 有缓存：立即渲染，loading 几乎不可见
+    hideLoading()
+    renderAll(normalizeApiResponse(cached))
+    // 后台静默刷新，下次访问得到最新数据
+    fetch(`/api/dashboard?t=${encodeURIComponent(tenant)}&student=${encodeURIComponent(student)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) lsSet(cacheKey, data) })
+      .catch(() => {})
+    return
+  }
+
+  // 无缓存：显示 loading，等待 API
   const url = `/api/dashboard?t=${encodeURIComponent(tenant)}&student=${encodeURIComponent(student)}`
   fetch(url)
     .then(r => {
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
       return r.json()
     })
-    .then(data => renderAll(normalizeApiResponse(data)))
+    .then(data => {
+      lsSet(cacheKey, data)
+      hideLoading()
+      renderAll(normalizeApiResponse(data))
+    })
     .catch(err => {
       console.warn("[dashboard] API 失败，降级 MOCK_DATA:", err)
+      hideLoading()
       renderAll(MOCK_DATA)
     })
 })()
