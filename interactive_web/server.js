@@ -433,6 +433,11 @@ async function tryLoadFromSummaryTable(tenantKey, token, tenantConf, studentName
     osslt:         String(getFieldLoose(f, "OSSLT状态") || ""),
     creditsEarned: Number(getFieldLoose(f, "已获学分")  || 0) || null,
     creditsTarget: Number(getFieldLoose(f, "目标学分")  || 0) || null,
+    notices: String(getFieldLoose(f, "公告") || "")
+      .split("\n")
+      .map(s => s.trim())
+      .filter(Boolean)
+      .map(line => ({ title: "📢 通知", body: line })),
     missingSource: "summary_table",
     summaryUpdatedAt: summaryUpdatedAt || null,
   };

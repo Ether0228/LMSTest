@@ -764,8 +764,12 @@ function normalizeApiResponse(raw) {
     const isPass = /通过|pass|yes/i.test(osslt)
     alerts.push({ type: isPass ? "ok" : "info", title: "OSSLT", body: osslt })
   }
-  // 来自服务端的自定义通知
-  const notices = (raw.notices || []).map(n => ({ type: "info", title: n.title || "通知", body: n.body || n.content || "" }))
+  // 来自服务端的自定义通知（花名册 公告 字段，每行一条）
+  const noticesRaw = raw.noticesRaw || ""
+  const noticesFromRoster = noticesRaw
+    .split("\n").map(s => s.trim()).filter(Boolean)
+    .map(line => ({ type: "info", title: "📢 通知", body: line }))
+  const noticesFromServer = (raw.notices || []).map(n => ({ type: "info", title: n.title || "📢 通知", body: n.body || n.content || "" }))
 
   return {
     student,
@@ -779,7 +783,7 @@ function normalizeApiResponse(raw) {
     missing_total:   missingTotal,
     submitted_total: raw.submittedTotal ?? 0,
     combo,
-    alerts:          [...alerts, ...notices],
+    alerts:          [...alerts, ...noticesFromServer, ...noticesFromRoster],
   }
 }
 

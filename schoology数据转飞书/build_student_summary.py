@@ -204,6 +204,7 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
             "osslt":         str(f.get("OSSLT状态", "")).strip(),
             "credits_earned": f.get("已获学分", ""),
             "credits_target": f.get("目标学分", ""),
+            "notices_raw":   str(f.get("公告", "")).strip(),
         }
 
     # 1.5) 每个学生每科“应交总数”（基于作业库，忽略标记为🚫 忽略）
@@ -372,6 +373,7 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
             "OSSLT状态": s.get("osslt", ""),
             "已获学分": s.get("credits_earned", ""),
             "目标学分": s.get("credits_target", ""),
+            "公告":     s.get("notices_raw", ""),
         }
         rows.append(row)
     print(
@@ -458,6 +460,7 @@ def write_json_cache(summary_rows, cache_dir):
             "osslt":         row.get("OSSLT状态", ""),
             "creditsEarned": row.get("已获学分", None),
             "creditsTarget": row.get("目标学分", None),
+            "noticesRaw":    row.get("公告", ""),
             "_cachedAt": int(time.time() * 1000),
         }
         filename = f"{safe_name(tenant_key)}__{safe_name(student_name)}.json"
