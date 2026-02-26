@@ -493,7 +493,7 @@ async function handleApiDashboard(req, res, parsedUrl) {
       return json(res, 200, hit);
     }
   }
-  // ───────────────────────────────────────────────────────────────── bitableFetchOneByTextField(
+  const rosterHint = await bitableFetchOneByTextField(
     tenantKey,
     token,
     tenantConf.appToken,
