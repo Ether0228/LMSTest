@@ -612,6 +612,139 @@ function renderGuideSnippet(data) {
   `
 }
 
+// ─── 从提交记录推算 Combo 热力图 ──────────────────────────────
+// submissions: [{submittedAt, course, assignmentName, ...}]
+// todayStr: "YYYY-MM-DD"
+// 覆盖的月份范围：今天起往前 2 个自然月（确保至少有数据的那几个月都显示）
+function computeComboFromSubmissions(submissions, todayStr) {
+  const today = new Date(todayStr + "T00:00:00")
+
+  // 按日期分组提交记录，建立 dayMap: "YYYY-MM-DD" → [{course, assignmentName}]
+  const dayMap = {}
+  for (const s of submissions) {
+    const raw = s.submittedAt
+    if (!raw) continue
+    let d
+    if (typeof raw === "number") d = new Date(raw)
+    else d = new Date(raw)
+    if (isNaN(d.getTime())) continue
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`
+    if (!dayMap[key]) dayMap[key] = []
+    dayMap[key].push({ course: s.course || "", assignmentName: s.assignmentName || "" })
+  }
+
+  // 计算连击数：从今天往前，连续有 hit 的天数
+  let streak = 0
+  for (let offset = 0; offset <= 30; offset++) {
+    const d = new Date(today)
+    d.setDate(d.getDate() - offset)
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`
+    if (dayMap[key]) streak++
+    else if (offset > 0) break
+  }
+
+  // 生成月份列表：当前月 + 前一个月（共 2 个月）
+  const months = []
+  for (let mOffset = 1; mOffset >= 0; mOffset--) {
+    const ref = new Date(today.getFullYear(), today.getMonth() - mOffset, 1)
+    const year = ref.getFullYear()
+    const month = ref.getMonth() + 1
+    const daysInMonth = new Date(year, month, 0).getDate()
+    const label = `${month}月`
+    const days = {}
+    const day_details = {}
+    for (let d = 1; d <= daysInMonth; d++) {
+      const key = `${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`
+      const dayDate = new Date(year, month - 1, d)
+      if (dayDate > today) {
+        days[key] = "future"
+      } else if (dayMap[key]) {
+        days[key] = "hit"
+        const detailMap = {}
+        for (const item of dayMap[key]) {
+          const c = item.course || "Unknown"
+          detailMap[c] = (detailMap[c] || 0) + 1
+        }
+        day_details[key] = detailMap
+      } else {
+        days[key] = "no_assignment"
+      }
+    }
+    months.push({ label, year, month, days, day_details })
+  }
+
+  return { current_streak: streak, today: todayStr, months }
+}
+
+// ─── 服务端数据 → 前端格式适配层 ──────────────────────────────
+// 服务端返回 camelCase；前端 MOCK_DATA 用 snake_case
+function normalizeApiResponse(raw) {
+  const todayStr = new Date().toISOString().slice(0, 10)
+
+  // recent_submitted：server 不一定包含 course 字段（live 路径缺失）
+  // 尽量透传，渲染时有防御
+  const recentSubmitted = (raw.recentSubmissions || []).map(s => ({
+    course:         s.course        || "",
+    assignmentName: s.assignmentName || s.assignmentname || "",
+    submittedAt:    s.submittedAt   || s.submittedat    || "",
+    status:         s.status        || "",
+    assignmentLink: s.link          || "",
+  }))
+
+  // missing_items：Python pipeline 输出含 course；live 路径暂无，但留空也不崩溃
+  const missingItems = (raw.missingItems || []).map(m => ({
+    course:         m.course         || "",
+    assignmentName: m.assignmentName || m.assignmentname || "",
+    assignmentLink: m.assignmentLink || m.link           || "",
+  }))
+
+  // course_progress：pipeline 输出含完整字段
+  const courseProgress = (raw.courseProgress || []).map(cp => ({
+    course:          cp.course         || "",
+    submittedCount:  cp.submittedCount || 0,
+    missingCount:    cp.missingCount   || 0,
+    completion:      cp.completion     || 0,
+    current_grade:   cp.current_grade  || null,
+    grade_updated_at: cp.grade_updated_at || null,
+    aol_details:     cp.aol_details    || [],
+  }))
+
+  // 如果没有 courseProgress，从 courses 列表生成骨架
+  const finalCourseProgress = courseProgress.length > 0
+    ? courseProgress
+    : (raw.courses || []).map(c => ({
+        course: typeof c === "string" ? c : (c.name || ""),
+        submittedCount: 0, missingCount: 0, completion: 0,
+        current_grade: null, aol_details: []
+      }))
+
+  // student 骨架（server 暂未返回详细 student 对象）
+  const student = {
+    name:              raw.studentName || "",
+    pinyin:            raw.studentName || "",
+    grade:             null,
+    credits_earned:    null,
+    credits_remaining: null,
+  }
+
+  // combo：优先用 server 返回的，否则从提交记录推算
+  const combo = raw.combo
+    || computeComboFromSubmissions(recentSubmitted, todayStr)
+
+  return {
+    student,
+    semester:        { start_date: "", total_weeks: 8, current_week: null },
+    stage:           raw.stage || "在读",
+    course_progress: finalCourseProgress,
+    missing_items:   missingItems,
+    recent_submitted: recentSubmitted,
+    recommendations: raw.recommendations || [],
+    missing_total:   raw.missingTotal   ?? 0,
+    submitted_total: raw.submittedTotal ?? 0,
+    combo,
+  }
+}
+
 // ─── 入口 ─────────────────────────────────────────────────────
 
 function renderAll(data) {
@@ -639,11 +772,26 @@ function renderAll(data) {
   renderGuideSnippet(data)
 }
 
-// TODO: 替换为真实 API 调用
-// const params = new URLSearchParams(location.search)
-// fetch(`/api/dashboard?t=${params.get("t") || ""}`)
-//   .then(r => r.json())
-//   .then(renderAll)
-//   .catch(() => renderAll(MOCK_DATA))
+;(function () {
+  const params  = new URLSearchParams(location.search)
+  const tenant  = (params.get("t") || "").trim()
+  const student = (params.get("student") || "").trim()
 
-renderAll(MOCK_DATA)
+  // 没有 tenant 或 student 参数时，用 MOCK_DATA 预览
+  if (!tenant || !student) {
+    renderAll(MOCK_DATA)
+    return
+  }
+
+  const url = `/api/dashboard?t=${encodeURIComponent(tenant)}&student=${encodeURIComponent(student)}`
+  fetch(url)
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      return r.json()
+    })
+    .then(data => renderAll(normalizeApiResponse(data)))
+    .catch(err => {
+      console.warn("[dashboard] API 失败，降级 MOCK_DATA:", err)
+      renderAll(MOCK_DATA)
+    })
+})()
