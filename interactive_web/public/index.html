@@ -20,7 +20,7 @@
 
     <main class="dashboard">
 
-      <!-- 顶部摘要：左栏（个人档案卡）+ 右栏（日期+进度+连击+热力图）-->
+      <!-- 顶部摘要：左栏（个人档案卡）+ 中栏（日期+进度+连击+热力图）+ 右栏（公告）-->
       <section class="area area--header" id="area-header">
 
         <!-- 个人档案卡：始终左上角 -->
@@ -29,7 +29,7 @@
           <div class="profile__info" id="profileInfo"></div>
         </div>
 
-        <!-- 右侧：日期、学期进度、连击+热力图 -->
+        <!-- 中列：日期、学期进度、连击+热力图 -->
         <div class="header__right">
 
           <div class="header__date-row">
@@ -55,6 +55,13 @@
           </div>
 
         </div>
+
+        <!-- 右列：公告栏 -->
+        <div class="header__announce">
+          <div class="announce__header">📢 通知与提醒</div>
+          <div id="announcePanel" class="announce__list"></div>
+        </div>
+
       </section>
 
       <!-- 区域 B：今日待处理 -->

@@ -198,6 +198,12 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
             "missing_items": [],
             "submitted_by_course": {},
             "expected_by_course": {},
+            # 花名册额外字段（需在飞书花名册表中添加对应列）
+            "school_year":   str(f.get("学年", "")).strip(),
+            "semester_num":  str(f.get("学期号", "")).strip(),
+            "osslt":         str(f.get("OSSLT状态", "")).strip(),
+            "credits_earned": f.get("已获学分", ""),
+            "credits_target": f.get("目标学分", ""),
         }
 
     # 1.5) 每个学生每科“应交总数”（基于作业库，忽略标记为🚫 忽略）
@@ -324,7 +330,7 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
             s["submitted"], key=lambda x: str(x.get("submittedAt", "")), reverse=True
         )
         recent = submitted_sorted[:20]
-        missing_items = s["missing_items"][:50]
+        missing_items = s["missing_items"]          # 不再截断，全量写入
         missing_total = len(s["missing"])
         submitted_total = len(s["submitted"])
 
@@ -356,10 +362,16 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
             "已提交总数": submitted_total,
             "缺交按课程JSON": chunk_text_json(missing_by_course),
             "课程进度JSON": chunk_text_json(course_progress),
-            "缺交明细JSON": chunk_text_json(missing_items),
+            "缺交明细JSON": chunk_text_json(missing_items, max_len=50000),
             "近期提交JSON": chunk_text_json(recent),
             "推荐JSON": chunk_text_json(recommendations),
             "最后更新时间": now_ms,
+            # 花名册透传字段
+            "学年":     s.get("school_year", ""),
+            "学期号":   s.get("semester_num", ""),
+            "OSSLT状态": s.get("osslt", ""),
+            "已获学分": s.get("credits_earned", ""),
+            "目标学分": s.get("credits_target", ""),
         }
         rows.append(row)
     print(
@@ -441,6 +453,11 @@ def write_json_cache(summary_rows, cache_dir):
             "missingByCourse": load("缺交按课程JSON", {}),
             "recentSubmissions": load("近期提交JSON", []),
             "recommendations": load("推荐JSON", []),
+            "schoolYear":    row.get("学年", ""),
+            "semesterNum":   row.get("学期号", ""),
+            "osslt":         row.get("OSSLT状态", ""),
+            "creditsEarned": row.get("已获学分", None),
+            "creditsTarget": row.get("目标学分", None),
             "_cachedAt": int(time.time() * 1000),
         }
         filename = f"{safe_name(tenant_key)}__{safe_name(student_name)}.json"

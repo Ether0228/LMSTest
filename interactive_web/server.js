@@ -428,6 +428,11 @@ async function tryLoadFromSummaryTable(tenantKey, token, tenantConf, studentName
     submittedTotal: Number(getFieldLoose(f, "已提交总数") || 0) || 0,
     recentSubmissions,
     recommendations,
+    schoolYear:    String(getFieldLoose(f, "学年")      || ""),
+    semesterNum:   String(getFieldLoose(f, "学期号")    || ""),
+    osslt:         String(getFieldLoose(f, "OSSLT状态") || ""),
+    creditsEarned: Number(getFieldLoose(f, "已获学分")  || 0) || null,
+    creditsTarget: Number(getFieldLoose(f, "目标学分")  || 0) || null,
     missingSource: "summary_table",
     summaryUpdatedAt: summaryUpdatedAt || null,
   };

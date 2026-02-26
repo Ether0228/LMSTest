@@ -115,7 +115,7 @@ code { font-family: var(--mono); font-size: 12px; }
 /* ─── 顶部摘要区 (area--header) ─────────────────────────────── */
 .area--header {
   display: grid;
-  grid-template-columns: 160px 1fr;
+  grid-template-columns: 160px 1fr 220px;
   gap: 16px;
   align-items: start;
   padding: 14px 16px;
@@ -168,6 +168,13 @@ code { font-family: var(--mono); font-size: 12px; }
   white-space: nowrap;
 }
 
+.profile__sem {
+  font-size: 10px;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.4;
+}
+
 .profile__courses {
   font-size: 10px;
   color: var(--muted);
@@ -182,6 +189,51 @@ code { font-family: var(--mono); font-size: 12px; }
   padding-top: 6px;
   width: 100%;
   text-align: center;
+}
+
+/* ─── 公告栏（第三列）────────────────────────────────────────── */
+.header__announce {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.announce__header {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.announce__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.announce-item {
+  padding: 7px 9px;
+  border-left: 3px solid var(--border);
+  background: var(--bg1);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.announce-item--urgent { border-color: #d44; }
+.announce-item--warn   { border-color: #e8a020; }
+.announce-item--ok     { border-color: #4caf50; }
+.announce-item--info   { border-color: var(--border-act); }
+
+.announce-item__title {
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+.announce-item__body {
+  color: var(--sub);
 }
 
 /* ─── 右列：日期+进度+热力图 ────────────────────────────────── */

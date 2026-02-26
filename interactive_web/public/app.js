@@ -681,8 +681,7 @@ function computeComboFromSubmissions(submissions, todayStr) {
 function normalizeApiResponse(raw) {
   const todayStr = new Date().toISOString().slice(0, 10)
 
-  // recent_submitted：server 不一定包含 course 字段（live 路径缺失）
-  // 尽量透传，渲染时有防御
+  // recent_submitted
   const recentSubmitted = (raw.recentSubmissions || []).map(s => ({
     course:         s.course        || "",
     assignmentName: s.assignmentName || s.assignmentname || "",
@@ -691,14 +690,14 @@ function normalizeApiResponse(raw) {
     assignmentLink: s.link          || "",
   }))
 
-  // missing_items：Python pipeline 输出含 course；live 路径暂无，但留空也不崩溃
+  // missing_items
   const missingItems = (raw.missingItems || []).map(m => ({
     course:         m.course         || "",
     assignmentName: m.assignmentName || m.assignmentname || "",
     assignmentLink: m.assignmentLink || m.link           || "",
   }))
 
-  // course_progress：pipeline 输出含完整字段
+  // course_progress
   const courseProgress = (raw.courseProgress || []).map(cp => ({
     course:          cp.course         || "",
     submittedCount:  cp.submittedCount || 0,
@@ -709,7 +708,6 @@ function normalizeApiResponse(raw) {
     aol_details:     cp.aol_details    || [],
   }))
 
-  // 如果没有 courseProgress，从 courses 列表生成骨架
   const finalCourseProgress = courseProgress.length > 0
     ? courseProgress
     : (raw.courses || []).map(c => ({
@@ -718,30 +716,70 @@ function normalizeApiResponse(raw) {
         current_grade: null, aol_details: []
       }))
 
-  // student 骨架（server 暂未返回详细 student 对象）
+  // 学期标签："2025-2026学年 第3学期"
+  const schoolYear  = raw.schoolYear  || ""
+  const semesterNum = raw.semesterNum || ""
+  let semLabel = ""
+  if (schoolYear)  semLabel += schoolYear + "学年"
+  if (semesterNum) semLabel += (semLabel ? " " : "") + "第" + semesterNum + "学期"
+
+  // 已修/剩余学分
+  const creditsEarned  = (raw.creditsEarned  != null && raw.creditsEarned  !== "") ? Number(raw.creditsEarned)  : null
+  const creditsTarget  = (raw.creditsTarget  != null && raw.creditsTarget  !== "") ? Number(raw.creditsTarget)  : null
+  const creditsRemaining = (creditsEarned != null && creditsTarget != null) ? Math.max(creditsTarget - creditsEarned, 0) : null
+
   const student = {
     name:              raw.studentName || "",
     pinyin:            raw.studentName || "",
     grade:             null,
-    credits_earned:    null,
-    credits_remaining: null,
+    credits_earned:    creditsEarned,
+    credits_remaining: creditsRemaining,
   }
 
-  // combo：优先用 server 返回的，否则从提交记录推算
+  // OSSLT 状态
+  const osslt = raw.osslt || ""
+
+  // combo
   const combo = raw.combo
     || computeComboFromSubmissions(recentSubmitted, todayStr)
+
+  // 自动生成学情提醒
+  const missingTotal = raw.missingTotal ?? 0
+  const alerts = []
+  if (missingTotal >= 10) {
+    alerts.push({ type: "urgent", title: "⚠️ 缺交预警", body: `共 ${missingTotal} 个作业未提交，请优先处理。` })
+  } else if (missingTotal > 0) {
+    alerts.push({ type: "warn", title: "🔶 待处理缺交", body: `${missingTotal} 个作业待补交。` })
+  } else {
+    alerts.push({ type: "ok", title: "✓ 无缺交", body: "本学期所有作业均已提交，继续保持！" })
+  }
+  // 完成度最低的课程预警
+  const worstCourse = finalCourseProgress
+    .filter(cp => cp.completion < 50 && cp.missingCount > 0)
+    .sort((a, b) => a.completion - b.completion)[0]
+  if (worstCourse) {
+    alerts.push({ type: "warn", title: "📉 课程警告", body: `${worstCourse.course} 完成度仅 ${Math.round(worstCourse.completion)}%，需重点关注。` })
+  }
+  if (osslt) {
+    const isPass = /通过|pass|yes/i.test(osslt)
+    alerts.push({ type: isPass ? "ok" : "info", title: "OSSLT", body: osslt })
+  }
+  // 来自服务端的自定义通知
+  const notices = (raw.notices || []).map(n => ({ type: "info", title: n.title || "通知", body: n.body || n.content || "" }))
 
   return {
     student,
     semester:        { start_date: "", total_weeks: 8, current_week: null },
+    semLabel,
     stage:           raw.stage || "在读",
     course_progress: finalCourseProgress,
     missing_items:   missingItems,
     recent_submitted: recentSubmitted,
     recommendations: raw.recommendations || [],
-    missing_total:   raw.missingTotal   ?? 0,
+    missing_total:   missingTotal,
     submitted_total: raw.submittedTotal ?? 0,
     combo,
+    alerts:          [...alerts, ...notices],
   }
 }
 
@@ -759,11 +797,33 @@ function renderAll(data) {
   document.getElementById("profileAvatar").textContent = pinyin
   const courseNames = (data.course_progress || [])
     .map(c => `<div>${esc(c.course)}</div>`).join("")
+  const semLabelHTML = data.semLabel
+    ? `<div class="profile__sem">${esc(data.semLabel)}</div>` : ""
+  const creditsHTML = (s.credits_earned != null || s.credits_remaining != null)
+    ? `<div class="profile__credits">已修 ${s.credits_earned ?? "—"} 学分<br>剩余 ${s.credits_remaining ?? "—"} 学分</div>`
+    : ""
   document.getElementById("profileInfo").innerHTML = `
     <div class="profile__stage">${esc(data.stage)}</div>
+    ${semLabelHTML}
     <div class="profile__courses">${courseNames}</div>
-    <div class="profile__credits">已修 ${s.credits_earned ?? "—"} 学分<br>剩余 ${s.credits_remaining ?? "—"} 学分</div>
+    ${creditsHTML}
   `
+
+  // 公告栏
+  const announcePanel = document.getElementById("announcePanel")
+  if (announcePanel) {
+    const alerts = data.alerts || []
+    if (alerts.length === 0) {
+      announcePanel.innerHTML = `<div class="announce-item announce-item--info"><div class="announce-item__body">暂无通知</div></div>`
+    } else {
+      announcePanel.innerHTML = alerts.map(a => `
+        <div class="announce-item announce-item--${esc(a.type || "info")}">
+          ${a.title ? `<div class="announce-item__title">${esc(a.title)}</div>` : ""}
+          <div class="announce-item__body">${esc(a.body || "")}</div>
+        </div>
+      `).join("")
+    }
+  }
 
   renderSemester(data)
   renderTasks(data)
