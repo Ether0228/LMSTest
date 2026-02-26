@@ -3,6 +3,34 @@ import json
 import requests
 import time
 import re
+from datetime import datetime, timedelta
+
+
+def get_current_week_start():
+    """本周周一 00:00（pipeline 跑在 TZ=Asia/Shanghai 环境下）"""
+    today = datetime.now()
+    monday = today - timedelta(days=today.weekday())
+    return monday.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def parse_submitted_at(value):
+    """把各种格式的提交时间解析为 datetime，失败返回 None"""
+    if not value:
+        return None
+    if isinstance(value, (int, float)):
+        return datetime.fromtimestamp(value / 1000)
+    for fmt in ["%Y/%m/%d %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"]:
+        try:
+            return datetime.strptime(str(value).strip(), fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def is_aol(nature):
+    """判断作业性质是否为 AoL（Assessment of Learning）"""
+    n = str(nature).lower()
+    return "aol" in n or "assessment of learning" in n
 
 
 def get_env_config():
@@ -247,6 +275,7 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
                 if isinstance(f.get("作业链接"), dict)
                 else str(f.get("作业链接", "")),
                 "course": course_name,
+                "nature": assignment.get("nature", ""),
             }
         )
         sbc = students[name]["submitted_by_course"]
@@ -295,48 +324,72 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
                     "course": course_name,
                     "assignmentName": assignment_name,
                     "assignmentLink": assignment_link,
+                    "nature": assignment.get("nature", ""),
                 }
             )
 
     # 4) 汇总字段
     now_ms = int(time.time() * 1000)
+    week_start = get_current_week_start()
+    week_end   = week_start + timedelta(days=7)
+    week_label = f”{week_start.month}/{week_start.day}–{week_end.month}/{week_end.day - 1}”
+
     rows = []
     for name, s in students.items():
         missing_by_course = {}
-        for item in s["missing"]:
-            c = item["course"]
+        for item in s[“missing”]:
+            c = item[“course”]
             missing_by_course[c] = missing_by_course.get(c, 0) + 1
         all_courses = sorted(
-            set(s["courses"])
-            | set(s["submitted_by_course"].keys())
+            set(s[“courses”])
+            | set(s[“submitted_by_course”].keys())
             | set(missing_by_course.keys())
-            | set(s["expected_by_course"].keys())
+            | set(s[“expected_by_course”].keys())
         )
+
+        # AoL 统计
+        aol_submitted_by_course = {}
+        for sub in s[“submitted”]:
+            if is_aol(sub.get(“nature”, “”)):
+                c = sub.get(“course”, “未分类”)
+                aol_submitted_by_course[c] = aol_submitted_by_course.get(c, 0) + 1
+
+        aol_missing_by_course = {}
+        for item in s[“missing_items”]:
+            if is_aol(item.get(“nature”, “”)):
+                c = item.get(“course”, “未分类”)
+                aol_missing_by_course[c] = aol_missing_by_course.get(c, 0) + 1
+
         course_progress = []
         for c in all_courses:
-            expected_count = int(s["expected_by_course"].get(c, 0))
+            expected_count = int(s[“expected_by_course”].get(c, 0))
             missing_count = int(missing_by_course.get(c, 0))
-            # 更稳妥：优先按“应交-缺交”算已交，避免提交记录课程映射不全导致已交=0
             submitted_from_expected = max(expected_count - missing_count, 0) if expected_count > 0 else 0
-            submitted_count = int(s["submitted_by_course"].get(c, submitted_from_expected))
+            submitted_count = int(s[“submitted_by_course”].get(c, submitted_from_expected))
             total = expected_count if expected_count > 0 else (submitted_count + missing_count)
             completion = round((submitted_count / total) * 100, 1) if total > 0 else 0.0
             course_progress.append(
                 {
-                    "course": c,
-                    "submittedCount": submitted_count,
-                    "missingCount": missing_count,
-                    "completion": completion,
+                    “course”:         c,
+                    “submittedCount”: submitted_count,
+                    “missingCount”:   missing_count,
+                    “completion”:     completion,
+                    “aolSubmitted”:   aol_submitted_by_course.get(c, 0),
+                    “aolMissing”:     aol_missing_by_course.get(c, 0),
                 }
             )
 
         submitted_sorted = sorted(
-            s["submitted"], key=lambda x: str(x.get("submittedAt", "")), reverse=True
+            s[“submitted”], key=lambda x: str(x.get(“submittedAt”, “”)), reverse=True
         )
-        recent = submitted_sorted[:20]
-        missing_items = s["missing_items"]          # 不再截断，全量写入
-        missing_total = len(s["missing"])
-        submitted_total = len(s["submitted"])
+        # 近期提交：本周（周一 00:00 到下周一 00:00）
+        recent = [
+            sub for sub in submitted_sorted
+            if week_start <= (parse_submitted_at(sub.get(“submittedAt”)) or datetime.min) < week_end
+        ]
+        missing_items  = s[“missing_items”]
+        missing_total  = len(s[“missing”])
+        submitted_total = len(s[“submitted”])
 
         recommendations = []
         if missing_total > 0:
@@ -381,6 +434,7 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
             "已获学分":  s.get("credits_earned", ""),
             "目标学分":  s.get("credits_target", ""),
             "公告":      s.get("notices_raw", ""),
+            "近期提交周": week_label,
         }
         rows.append(row)
     print(
@@ -465,12 +519,13 @@ def write_json_cache(summary_rows, cache_dir):
             "missingByCourse": load("缺交按课程JSON", {}),
             "recentSubmissions": load("近期提交JSON", []),
             "recommendations": load("推荐JSON", []),
-            "schoolYear":    extra.get("学年", ""),
-            "semesterNum":   extra.get("学期号", ""),
-            "osslt":         extra.get("OSSLT状态", ""),
-            "creditsEarned": extra.get("已获学分", None),
-            "creditsTarget": extra.get("目标学分", None),
-            "noticesRaw":    extra.get("公告", ""),
+            "schoolYear":      extra.get("学年", ""),
+            "semesterNum":     extra.get("学期号", ""),
+            "osslt":           extra.get("OSSLT状态", ""),
+            "creditsEarned":   extra.get("已获学分", None),
+            "creditsTarget":   extra.get("目标学分", None),
+            "noticesRaw":      extra.get("公告", ""),
+            "recentWeekLabel": extra.get("近期提交周", ""),
             "_cachedAt": int(time.time() * 1000),
         }
         filename = f"{safe_name(tenant_key)}__{safe_name(student_name)}.json"

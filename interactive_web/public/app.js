@@ -492,9 +492,9 @@ function renderCourses(data) {
           <div class="course-prog">
             <div class="ascii-course-bar ascii-course-bar--${barCls}">${asciiBar(pct)}</div>
             <div class="course-prog__counts">
-              <span class="count--ok">已提交 ${cp.submittedCount}</span>
+              <span class="count--ok">已提交 ${cp.submittedCount}${cp.aolSubmitted > 0 ? ` <span class="tag-aol">含 ${cp.aolSubmitted} AoL</span>` : ""}</span>
               <span class="count--sep">·</span>
-              <span class="${cp.missingCount > 0 ? "count--miss" : "count--ok"}">缺交 ${cp.missingCount}</span>
+              <span class="${cp.missingCount > 0 ? "count--miss" : "count--ok"}">缺交 ${cp.missingCount}${cp.aolMissing > 0 ? ` <span class="tag-aol tag-aol--miss">含 ${cp.aolMissing} AoL</span>` : ""}</span>
             </div>
           </div>
 
@@ -526,7 +526,7 @@ function renderCourses(data) {
           <div class="course-detail">
             <button class="course-detail__toggle" onclick="toggleDetail(this)">
               <span class="toggle-icon">[+]</span>
-              近期提交记录
+              本周提交记录${data.recentWeekLabel ? ` (${data.recentWeekLabel})` : ""}
               <span class="detail-badge">${submitted.length}</span>
             </button>
             <div class="course-detail__body">

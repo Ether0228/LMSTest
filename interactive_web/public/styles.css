@@ -760,6 +760,23 @@ code { font-family: var(--mono); font-size: 12px; }
   background: var(--warning-bg);
 }
 
+.tag-aol {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 0 4px;
+  border: 1px solid #6ca0dc;
+  color: #3a6ca8;
+  background: #ddeeff;
+  border-radius: 2px;
+  margin-left: 2px;
+}
+.tag-aol--miss {
+  border-color: #d08888;
+  color: #a33;
+  background: #ffeaea;
+}
+
 .detail-empty { font-size: 11px; color: var(--sub); padding: 4px 8px; }
 .detail-empty::before { content: '-- '; }
 
