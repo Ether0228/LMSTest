@@ -370,10 +370,6 @@ function getFieldLoose(fields, preferredKey, aliases = []) {
   for (const [k, v] of Object.entries(fields)) {
     if (targetSet.has(normalizeFieldKey(k))) return v;
   }
-  for (const [k, v] of Object.entries(fields)) {
-    const nk = normalizeFieldKey(k);
-    if (nk.includes("课程进度json") || nk.includes("课程进度")) return v;
-  }
   return undefined;
 }
 
