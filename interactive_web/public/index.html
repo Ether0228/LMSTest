@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>通关指南</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+
+    <!-- 顶栏 -->
+    <header class="topbar">
+      <div class="brand">
+        <span id="dashboardTitle" class="brand__title">通关指南</span>
+      </div>
+      <div class="topbar__right">
+        <a href="/guide.html" class="btn btn--ghost">通关指南全文</a>
+      </div>
+    </header>
+
+    <main class="dashboard">
+
+      <!-- 顶部摘要：左栏（个人档案卡）+ 右栏（日期+进度+连击+热力图）-->
+      <section class="area area--header" id="area-header">
+
+        <!-- 个人档案卡：始终左上角 -->
+        <div class="header__profile">
+          <div class="profile__avatar" id="profileAvatar"></div>
+          <div class="profile__info" id="profileInfo"></div>
+        </div>
+
+        <!-- 右侧：日期、学期进度、连击+热力图 -->
+        <div class="header__right">
+
+          <div class="header__date-row">
+            <span id="headerDate" class="header__today"></span>
+            <span id="headerCountdown" class="header__countdown"></span>
+          </div>
+
+          <div class="header__semester">
+            <span id="semesterWeek" class="semester__week"></span>
+            <span id="stageLabel" class="stage-badge"></span>
+          </div>
+          <div class="progress-track"></div>
+
+          <!-- 连击 + 热力图 -->
+          <div class="header__heatmap">
+            <div class="heatmap__combo-row">
+              🔥 <span id="comboCount"></span> 天连击
+            </div>
+            <div id="comboMessage" class="combo__message"></div>
+            <div class="heatmap-wrap">
+              <div id="heatmapGrid" class="heatmap-grid"></div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- 区域 B：今日待处理 -->
+      <section class="area area--tasks" id="area-b">
+        <div class="area__title">今日待处理</div>
+
+        <div id="taskUrgent" class="task-section task-section--urgent" style="display:none">
+          <div class="task-section__label">
+            <span class="dot dot--red"></span>需要立即处理
+          </div>
+          <div id="taskUrgentList" class="task-list"></div>
+        </div>
+
+        <div id="taskReminder" class="task-section task-section--reminder" style="display:none">
+          <div class="task-section__label">
+            <span class="dot dot--yellow"></span>日常参与提醒
+          </div>
+          <p class="task-reminder__desc">日常作业是你掌握知识的过程，也是老师了解你学习状态的重要依据。</p>
+          <div id="taskReminderList" class="task-list"></div>
+        </div>
+
+        <div id="taskAllClear" class="task-allclear" style="display:none">
+          <span class="allclear__icon">✓</span>
+          <span>今日没有待处理的算分作业，继续保持。</span>
+        </div>
+      </section>
+
+      <!-- 区域 C：课程进度卡片 -->
+      <section class="area" id="area-c">
+        <div class="area__title">课程进度</div>
+        <div id="courseGrid" class="course-grid"></div>
+      </section>
+
+      <!-- 区域 E：情境化指南 -->
+      <section class="area area--guide" id="area-e">
+        <div class="area__title">现在最该关注的</div>
+        <div id="guideSnippet" class="guide-snippet"></div>
+      </section>
+
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

@@ -56,7 +56,7 @@ jobs:
           TZ: Asia/Shanghai
           TARGET_DATE: ${{ github.event.inputs.target_date }}
           MAX_PAGES: ${{ github.event.inputs.max_pages }}
-        run: python scraper_cloud_feishu.py
+        run: python "schoology数据转飞书/scraper_cloud_feishu.py"
 
       # === 阶段二：补全课程信息 (数据清洗) ===
       # 只有爬虫成功运行后，才会执行这一步
@@ -68,7 +68,7 @@ jobs:
           FEISHU_APP_TOKEN: ${{ secrets.FEISHU_APP_TOKEN }}
           FEISHU_LIB_TABLE_ID: ${{ secrets.FEISHU_LIB_TABLE_ID }}
           SCHOOLOGY_COOKIES: ${{ secrets.SCHOOLOGY_COOKIES }}
-        run: python fill_course_info.py
+        run: python "schoology数据转飞书/fill_course_info.py"
 
       # === 阶段三：缺交核验 (生成报表) ===
       # 只有前两步都成功，才会执行这一步，确保数据是最新的
@@ -82,5 +82,5 @@ jobs:
           FEISHU_ROSTER_TABLE_ID: ${{ secrets.FEISHU_ROSTER_TABLE_ID }}
           FEISHU_LIB_TABLE_ID: ${{ secrets.FEISHU_LIB_TABLE_ID }}
           FEISHU_MISSING_TABLE_ID: ${{ secrets.FEISHU_MISSING_TABLE_ID }}
-        run: python check_missing_sync.py
+        run: python "schoology数据转飞书/check_missing_sync.py"
       

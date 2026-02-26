@@ -1,7 +1,13 @@
-name: Summary Table Test
+name: Build Student Summary
 
 on:
   workflow_dispatch:
+  schedule:
+    # 东部时间 EDT (UTC-4)：8:00 / 12:00 / 16:00
+    # 冬令时 EST (UTC-5) 时整体偏移 1 小时，可在 11 月后手动调整
+    - cron: '0 12 * * *'   # 08:00 EDT
+    - cron: '0 16 * * *'   # 12:00 EDT
+    - cron: '0 20 * * *'   # 16:00 EDT
 
 jobs:
   build-summary:
@@ -24,7 +30,7 @@ jobs:
 
       - name: 4. Validate script exists
         run: |
-          test -f "build_student_summary.py"
+          test -f "schoology数据转飞书/build_student_summary.py"
 
       - name: 5. Run summary builder
         env:
@@ -33,7 +39,7 @@ jobs:
           FEISHU_APP_TOKEN: ${{ secrets.FEISHU_APP_TOKEN }}
           FEISHU_TABLE_ID: ${{ secrets.FEISHU_TABLE_ID }}
           FEISHU_ROSTER_TABLE_ID: ${{ secrets.FEISHU_ROSTER_TABLE_ID }}
+          FEISHU_LIB_TABLE_ID: ${{ secrets.FEISHU_LIB_TABLE_ID }}
           FEISHU_MISSING_TABLE_ID: ${{ secrets.FEISHU_MISSING_TABLE_ID }}
           FEISHU_SUMMARY_TABLE_ID: ${{ secrets.FEISHU_SUMMARY_TABLE_ID }}
-          FEISHU_LIB_TABLE_ID: ${{ secrets.FEISHU_LIB_TABLE_ID }}
-        run: python "build_student_summary.py"
+        run: python "schoology数据转飞书/build_student_summary.py"

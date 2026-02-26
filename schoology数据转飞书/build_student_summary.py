@@ -2,6 +2,7 @@ import os
 import json
 import requests
 import time
+import re
 
 
 def get_env_config():
@@ -147,6 +148,13 @@ def normalize_link(v):
         return str(v.get("link") or v.get("text") or "").strip()
     return str(v or "").strip()
 
+def clean_schoology_url(url):
+    if not url:
+        return ""
+    text = str(url).strip()
+    match = re.search(r'(https://.*?/(?:assignment|assessment|discussion)/\d+)', text)
+    return match.group(1) if match else text
+
 
 def build_assignment_lookup(lib_records):
     # rec_id -> {name, link, course}
@@ -158,8 +166,9 @@ def build_assignment_lookup(lib_records):
         f = rec.get("fields", {})
         item = {
             "name": str(f.get("作业名称", "")).strip(),
-            "link": normalize_link(f.get("作业链接")),
+            "link": clean_schoology_url(normalize_link(f.get("作业链接"))),
             "course": str(f.get("所属课程", "")).strip(),
+            "nature": str(f.get("作业性质", "")).strip(),
         }
         if rec_id:
             out[rec_id] = item
@@ -188,7 +197,24 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
             "missing": [],
             "missing_items": [],
             "submitted_by_course": {},
+            "expected_by_course": {},
         }
+
+    # 1.5) 每个学生每科“应交总数”（基于作业库，忽略标记为🚫 忽略）
+    lib_by_course = {}
+    for _, item in assignment_lookup.items():
+        course = (item.get("course") or "").strip()
+        if not course:
+            continue
+        if item.get("nature") == "🚫 忽略":
+            continue
+        lib_by_course[course] = lib_by_course.get(course, 0) + 1
+    for _, s in students.items():
+        for course in s["courses"]:
+            c = str(course).strip()
+            if not c:
+                continue
+            s["expected_by_course"][c] = int(lib_by_course.get(c, 0))
 
     # 2) 提交记录聚合（按“学生姓名”文本）
     for s in submissions:
@@ -203,7 +229,7 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
             if assignment:
                 break
         if not assignment:
-            assignment = assignment_by_link.get(normalize_link(f.get("作业链接")), {})
+            assignment = assignment_by_link.get(clean_schoology_url(normalize_link(f.get("作业链接"))), {})
         course_name = assignment.get("course", "").strip() or "未分类"
         students[name]["submitted"].append(
             {
@@ -270,12 +296,20 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
         for item in s["missing"]:
             c = item["course"]
             missing_by_course[c] = missing_by_course.get(c, 0) + 1
-        all_courses = sorted(set(s["courses"]) | set(s["submitted_by_course"].keys()) | set(missing_by_course.keys()))
+        all_courses = sorted(
+            set(s["courses"])
+            | set(s["submitted_by_course"].keys())
+            | set(missing_by_course.keys())
+            | set(s["expected_by_course"].keys())
+        )
         course_progress = []
         for c in all_courses:
-            submitted_count = int(s["submitted_by_course"].get(c, 0))
+            expected_count = int(s["expected_by_course"].get(c, 0))
             missing_count = int(missing_by_course.get(c, 0))
-            total = submitted_count + missing_count
+            # 更稳妥：优先按“应交-缺交”算已交，避免提交记录课程映射不全导致已交=0
+            submitted_from_expected = max(expected_count - missing_count, 0) if expected_count > 0 else 0
+            submitted_count = int(s["submitted_by_course"].get(c, submitted_from_expected))
+            total = expected_count if expected_count > 0 else (submitted_count + missing_count)
             completion = round((submitted_count / total) * 100, 1) if total > 0 else 0.0
             course_progress.append(
                 {
@@ -367,6 +401,56 @@ def sync_summary_table(token, conf, summary_rows):
     )
 
 
+def write_json_cache(summary_rows, cache_dir):
+    """把每个学生的汇总数据写成独立 JSON 文件，供 Node.js 直接读取（< 5ms）。
+    文件命名规则与 server.js diskCacheFile() 保持一致：
+      {tenant_key}__{student_name}.json
+    env: CACHE_TENANT_KEY — 对应 server 的 tenantKey，默认 'default'
+    """
+    import re
+
+    tenant_key = os.environ.get("CACHE_TENANT_KEY", "default").strip()
+
+    def safe_name(s):
+        return re.sub(r"[^\w\u4e00-\u9fff-]", "_", str(s))[:100]
+
+    os.makedirs(cache_dir, exist_ok=True)
+    written = 0
+    for row in summary_rows:
+        student_name = row.get("学生姓名", "")
+        if not student_name:
+            continue
+
+        def load(key, fallback):
+            v = row.get(key, "")
+            if not v:
+                return fallback
+            try:
+                return json.loads(v)
+            except Exception:
+                return fallback
+
+        payload = {
+            "tenant": tenant_key,
+            "studentName": student_name,
+            "missingTotal": row.get("缺交总数", 0),
+            "submittedTotal": row.get("已提交总数", 0),
+            "courses": load("课程清单JSON", []),
+            "courseProgress": load("课程进度JSON", []),
+            "missingItems": load("缺交明细JSON", []),
+            "missingByCourse": load("缺交按课程JSON", {}),
+            "recentSubmissions": load("近期提交JSON", []),
+            "recommendations": load("推荐JSON", []),
+            "_cachedAt": int(time.time() * 1000),
+        }
+        filename = f"{safe_name(tenant_key)}__{safe_name(student_name)}.json"
+        with open(os.path.join(cache_dir, filename), "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False)
+        written += 1
+
+    print(f">>> JSON 缓存写入完成: {written} 个文件 → {cache_dir}")
+
+
 def main():
     conf = get_env_config()
     token = get_feishu_token(conf)
@@ -383,6 +467,11 @@ def main():
     assignment_lookup, assignment_by_link = build_assignment_lookup(lib)
     summary_rows = build_summaries(roster, submissions, missing, assignment_lookup, assignment_by_link)
     sync_summary_table(token, conf, summary_rows)
+
+    # 可选：同时写本地磁盘缓存（服务器上运行时设置 CACHE_DIR）
+    cache_dir = os.environ.get("CACHE_DIR", "").strip()
+    if cache_dir:
+        write_json_cache(summary_rows, cache_dir)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,12 @@
+{
+  "name": "tongguan-dashboard",
+  "version": "1.0.0",
+  "description": "通关指南学生仪表盘",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
