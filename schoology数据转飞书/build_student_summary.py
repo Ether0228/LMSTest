@@ -358,6 +358,7 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
                 }
             )
 
+        # 写入飞书汇总表的字段（只包含已有列）
         row = {
             "学生姓名": name,
             "关联学生": [s["roster_record_id"]] if s.get("roster_record_id") else [],
@@ -370,13 +371,16 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
             "近期提交JSON": chunk_text_json(recent),
             "推荐JSON": chunk_text_json(recommendations),
             "最后更新时间": now_ms,
-            # 花名册透传字段
-            "学年":     s.get("school_year", ""),
-            "学期号":   s.get("semester_num", ""),
+        }
+        # 花名册透传字段：暂存在 row 扩展区，不写飞书（列不存在会报错）
+        # 等在飞书汇总表手动建好这些列后，把下面这段移入上面的 row dict 即可
+        row["_extra"] = {
+            "学年":      s.get("school_year", ""),
+            "学期号":    s.get("semester_num", ""),
             "OSSLT状态": s.get("osslt", ""),
-            "已获学分": s.get("credits_earned", ""),
-            "目标学分": s.get("credits_target", ""),
-            "公告":     s.get("notices_raw", ""),
+            "已获学分":  s.get("credits_earned", ""),
+            "目标学分":  s.get("credits_target", ""),
+            "公告":      s.get("notices_raw", ""),
         }
         rows.append(row)
     print(
@@ -406,10 +410,12 @@ def sync_summary_table(token, conf, summary_rows):
     for row in summary_rows:
         name = row["学生姓名"]
         rid = exist_map.get(name)
+        # _extra 仅用于 JSON 缓存，不写入飞书
+        feishu_fields = {k: v for k, v in row.items() if k != "_extra"}
         if rid:
-            to_update.append({"record_id": rid, "fields": row})
+            to_update.append({"record_id": rid, "fields": feishu_fields})
         else:
-            to_create.append(row)
+            to_create.append(feishu_fields)
 
     batch_update(token, app_token, table_id, to_update)
     batch_create(token, app_token, table_id, to_create)
@@ -447,6 +453,7 @@ def write_json_cache(summary_rows, cache_dir):
             except Exception:
                 return fallback
 
+        extra = row.get("_extra", {})
         payload = {
             "tenant": tenant_key,
             "studentName": student_name,
@@ -458,12 +465,12 @@ def write_json_cache(summary_rows, cache_dir):
             "missingByCourse": load("缺交按课程JSON", {}),
             "recentSubmissions": load("近期提交JSON", []),
             "recommendations": load("推荐JSON", []),
-            "schoolYear":    row.get("学年", ""),
-            "semesterNum":   row.get("学期号", ""),
-            "osslt":         row.get("OSSLT状态", ""),
-            "creditsEarned": row.get("已获学分", None),
-            "creditsTarget": row.get("目标学分", None),
-            "noticesRaw":    row.get("公告", ""),
+            "schoolYear":    extra.get("学年", ""),
+            "semesterNum":   extra.get("学期号", ""),
+            "osslt":         extra.get("OSSLT状态", ""),
+            "creditsEarned": extra.get("已获学分", None),
+            "creditsTarget": extra.get("目标学分", None),
+            "noticesRaw":    extra.get("公告", ""),
             "_cachedAt": int(time.time() * 1000),
         }
         filename = f"{safe_name(tenant_key)}__{safe_name(student_name)}.json"
