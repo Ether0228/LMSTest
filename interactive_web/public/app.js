@@ -373,22 +373,36 @@ function renderTasks(data) {
   const reminder = document.getElementById("taskReminder")
   const allClear = document.getElementById("taskAllClear")
 
-  // B-1：缺交作业（所有缺交，待 Gradebook 接入后再区分 AOL/AFL）
+  // B-1：缺交作业，显示前 3 条，其余折叠
   if (data.missing_items && data.missing_items.length > 0) {
     urgent.style.display = "flex"
-    document.getElementById("taskUrgentList").innerHTML =
-      data.missing_items.map(item => `
-        <div class="task-item task-item--urgent">
-          <div class="task-item__main">
-            <div class="task-item__course">${esc(item.course)}</div>
-            <div class="task-item__name">${esc(item.assignmentName)}</div>
-          </div>
-          ${item.assignmentLink
-            ? `<a class="task-item__go" href="${esc(item.assignmentLink)}" target="_blank" rel="noopener">前往作业 →</a>`
-            : `<span class="task-item__go task-item__go--na">暂无链接</span>`
-          }
+    const items   = data.missing_items
+    const SHOW    = 3
+    const visible = items.slice(0, SHOW)
+    const hidden  = items.slice(SHOW)
+
+    const renderItem = item => `
+      <div class="task-item task-item--urgent">
+        <div class="task-item__main">
+          <div class="task-item__course">${esc(item.course)}</div>
+          <div class="task-item__name">${esc(item.assignmentName)}</div>
         </div>
-      `).join("")
+        ${item.assignmentLink
+          ? `<a class="task-item__go" href="${esc(item.assignmentLink)}" target="_blank" rel="noopener">前往作业 →</a>`
+          : `<span class="task-item__go task-item__go--na">暂无链接</span>`
+        }
+      </div>
+    `
+
+    const hiddenHTML = hidden.length > 0 ? `
+      <button class="task-fold-btn" onclick="this.nextElementSibling.style.display='block';this.style.display='none'">
+        ▸ 查看另外 ${hidden.length} 项缺交作业
+      </button>
+      <div style="display:none">${hidden.map(renderItem).join("")}</div>
+    ` : ""
+
+    document.getElementById("taskUrgentList").innerHTML =
+      visible.map(renderItem).join("") + hiddenHTML
   }
 
   // B-2：日常参与提醒（待 Gradebook 数据接入后激活）

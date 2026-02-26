@@ -773,6 +773,21 @@ code { font-family: var(--mono); font-size: 12px; }
 .task-item__go:hover { text-decoration: underline; }
 .task-item__go--na { color: var(--sub); font-size: 11px; }
 
+.task-fold-btn {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 6px 10px;
+  background: none;
+  border: 1px dashed var(--border);
+  color: var(--muted);
+  font-size: 11px;
+  font-family: var(--mono);
+  cursor: pointer;
+  text-align: left;
+}
+.task-fold-btn:hover { background: var(--bg1); color: var(--text); }
+
 /* ─── 区域 E：情境指南 ──────────────────────────────────────── */
 .area--guide {}
 

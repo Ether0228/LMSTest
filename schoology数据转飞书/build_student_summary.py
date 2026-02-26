@@ -273,6 +273,9 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
             assignment = assignment_lookup.get(a_id, {})
             if assignment:
                 break
+        # 跳过在作业库中标记为"🚫 忽略"的作业
+        if assignment.get("nature") == "🚫 忽略":
+            continue
         course_name = str(f.get("所属课程", "")).strip() or assignment.get("course", "") or "未分类"
         assignment_name = assignment.get("name", "")
         assignment_link = assignment.get("link", "")
