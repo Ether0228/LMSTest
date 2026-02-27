@@ -26,6 +26,7 @@ jobs:
           FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
           FEISHU_APP_TOKEN: ${{ secrets.FEISHU_APP_TOKEN }}
           FEISHU_GRADEBOOK_TABLE_ID: ${{ secrets.FEISHU_GRADEBOOK_TABLE_ID }}
+          FEISHU_LIB_TABLE_ID: ${{ secrets.FEISHU_LIB_TABLE_ID }}
           SCHOOLOGY_COOKIES: ${{ secrets.SCHOOLOGY_COOKIES }}
           SCHOOLOGY_SECTION_NIDS: ${{ secrets.SCHOOLOGY_SECTION_NIDS }}
         run: python pipeline/scrape_gradebook.py
