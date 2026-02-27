@@ -17,6 +17,7 @@ import os
 import json
 import re
 import time
+import calendar
 import requests
 from datetime import datetime
 
@@ -222,6 +223,13 @@ def build_feishu_fields(row: dict) -> dict:
     for num_key in ("得分", "满分", "得分率", "课程总分%"):
         if num_key in fields and isinstance(fields[num_key], (int, float)):
             fields[num_key] = float(fields[num_key])
+    # 飞书日期字段须为 Unix 毫秒时间戳
+    if "截止日期" in fields:
+        try:
+            dt = datetime.strptime(fields["截止日期"].strip(), "%b %d, %Y at %I:%M %p")
+            fields["截止日期"] = calendar.timegm(dt.timetuple()) * 1000
+        except Exception:
+            del fields["截止日期"]
     return fields
 
 
