@@ -175,13 +175,13 @@ def get_feishu_mapping(token, app_token, table_id, key_field_name):
 def add_assignment_to_lib(token, app_token, lib_table_id, name, clean_url):
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{lib_table_id}/records"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=utf-8"}
-    
+
     fields = {
         "作业名称": name,
-        "作业链接": clean_url,
+        "作业链接": {"text": clean_url, "link": clean_url},
         "统计状态": "✅ 必交"
     }
-    
+
     try:
         response = requests.post(url, json={"fields": fields}, headers=headers)
         resp_json = response.json()
@@ -190,7 +190,6 @@ def add_assignment_to_lib(token, app_token, lib_table_id, name, clean_url):
             print(f">>> [自动建档] 成功: {name}")
             return rec_id
         else:
-            # === 这里会告诉你为什么失败 ===
             print(f"!!! [自动建档] 失败! 错误码: {resp_json.get('code')}, 原因: {resp_json.get('msg')}")
             print(f"DEBUG 详情: {resp_json}")
             return None
@@ -355,7 +354,7 @@ def start_cloud_scraper():
                 if assign_rec_id: fields["关联作业"] = [assign_rec_id]
                 if student_rec_id: fields["关联学生"] = [student_rec_id]
 
-                print(f"✅ 捕获: {student} | {assign} | {time_str}")
+                print(f"✅ 捕获: {student} | {assign} | {time_str} | 关联作业={'✓' if assign_rec_id else '✗'} | 关联学生={'✓' if student_rec_id else '✗'}")
                 new_records.append(fields)
                 existing_ids.add(unique_id)
             except Exception as e:
