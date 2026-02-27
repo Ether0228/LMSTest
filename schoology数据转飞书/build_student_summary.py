@@ -235,7 +235,7 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
             "notices_raw":   str(f.get("公告", "")).strip(),
         }
 
-    # 1.5) 每个学生每科“应交总数”（基于作业库，忽略标记为🚫 忽略）
+    # 1.5) 每个学生每科"应交总数"（基于作业库，忽略标记为🚫 忽略）
     lib_by_course = {}
     for _, item in assignment_lookup.items():
         course = (item.get("course") or "").strip()
@@ -251,7 +251,7 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
                 continue
             s["expected_by_course"][c] = int(lib_by_course.get(c, 0))
 
-    # 2) 提交记录聚合（按“学生姓名”文本）
+    # 2) 提交记录聚合（按"学生姓名"文本）
     for s in submissions:
         f = s.get("fields", {})
         name = str(f.get("学生姓名", "")).strip()
@@ -281,7 +281,7 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
         sbc = students[name]["submitted_by_course"]
         sbc[course_name] = sbc.get(course_name, 0) + 1
 
-    # 3) 缺交记录聚合（按“关联学生” record_id）
+    # 3) 缺交记录聚合（按"关联学生" record_id）
     roster_id_to_name = {
         v["roster_record_id"]: k for k, v in students.items() if v.get("roster_record_id")
     }
@@ -332,64 +332,64 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
     now_ms = int(time.time() * 1000)
     week_start = get_current_week_start()
     week_end   = week_start + timedelta(days=7)
-    week_label = f”{week_start.month}/{week_start.day}-{week_end.month}/{week_end.day - 1}”
+    week_label = f"{week_start.month}/{week_start.day}-{week_end.month}/{week_end.day - 1}"
 
     rows = []
     for name, s in students.items():
         missing_by_course = {}
-        for item in s[“missing”]:
-            c = item[“course”]
+        for item in s["missing"]:
+            c = item["course"]
             missing_by_course[c] = missing_by_course.get(c, 0) + 1
         all_courses = sorted(
-            set(s[“courses”])
-            | set(s[“submitted_by_course”].keys())
+            set(s["courses"])
+            | set(s["submitted_by_course"].keys())
             | set(missing_by_course.keys())
-            | set(s[“expected_by_course”].keys())
+            | set(s["expected_by_course"].keys())
         )
 
         # AoL 统计
         aol_submitted_by_course = {}
-        for sub in s[“submitted”]:
-            if is_aol(sub.get(“nature”, “”)):
-                c = sub.get(“course”, “未分类”)
+        for sub in s["submitted"]:
+            if is_aol(sub.get("nature", "")):
+                c = sub.get("course", "未分类")
                 aol_submitted_by_course[c] = aol_submitted_by_course.get(c, 0) + 1
 
         aol_missing_by_course = {}
-        for item in s[“missing_items”]:
-            if is_aol(item.get(“nature”, “”)):
-                c = item.get(“course”, “未分类”)
+        for item in s["missing_items"]:
+            if is_aol(item.get("nature", "")):
+                c = item.get("course", "未分类")
                 aol_missing_by_course[c] = aol_missing_by_course.get(c, 0) + 1
 
         course_progress = []
         for c in all_courses:
-            expected_count = int(s[“expected_by_course”].get(c, 0))
+            expected_count = int(s["expected_by_course"].get(c, 0))
             missing_count = int(missing_by_course.get(c, 0))
             submitted_from_expected = max(expected_count - missing_count, 0) if expected_count > 0 else 0
-            submitted_count = int(s[“submitted_by_course”].get(c, submitted_from_expected))
+            submitted_count = int(s["submitted_by_course"].get(c, submitted_from_expected))
             total = expected_count if expected_count > 0 else (submitted_count + missing_count)
             completion = round((submitted_count / total) * 100, 1) if total > 0 else 0.0
             course_progress.append(
                 {
-                    “course”:         c,
-                    “submittedCount”: submitted_count,
-                    “missingCount”:   missing_count,
-                    “completion”:     completion,
-                    “aolSubmitted”:   aol_submitted_by_course.get(c, 0),
-                    “aolMissing”:     aol_missing_by_course.get(c, 0),
+                    "course":         c,
+                    "submittedCount": submitted_count,
+                    "missingCount":   missing_count,
+                    "completion":     completion,
+                    "aolSubmitted":   aol_submitted_by_course.get(c, 0),
+                    "aolMissing":     aol_missing_by_course.get(c, 0),
                 }
             )
 
         submitted_sorted = sorted(
-            s[“submitted”], key=lambda x: str(x.get(“submittedAt”, “”)), reverse=True
+            s["submitted"], key=lambda x: str(x.get("submittedAt", "")), reverse=True
         )
         # 近期提交：本周（周一 00:00 到下周一 00:00）
         recent = [
             sub for sub in submitted_sorted
-            if week_start <= (parse_submitted_at(sub.get(“submittedAt”)) or datetime.min) < week_end
+            if week_start <= (parse_submitted_at(sub.get("submittedAt")) or datetime.min) < week_end
         ]
-        missing_items  = s[“missing_items”]
-        missing_total  = len(s[“missing”])
-        submitted_total = len(s[“submitted”])
+        missing_items  = s["missing_items"]
+        missing_total  = len(s["missing"])
+        submitted_total = len(s["submitted"])
 
         recommendations = []
         if missing_total > 0:
