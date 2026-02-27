@@ -71,8 +71,13 @@ def build_session(cookies_json: list) -> requests.Session:
 def fetch_gradebook(session: requests.Session, section_nid: str) -> dict:
     url = f"{BASE_URL}/iapi/grades/grader_header_data/{section_nid}"
     print(f"  → GET {url}")
-    resp = session.get(url, timeout=30)
-    resp.raise_for_status()
+    resp = session.get(url, timeout=30, allow_redirects=True)
+    print(f"  ← HTTP {resp.status_code}  final_url={resp.url}")
+    if not resp.text.strip():
+        raise ValueError("响应为空（cookies 可能已过期，请更新 SCHOOLOGY_COOKIES）")
+    if resp.text.strip().startswith("<"):
+        # 返回了 HTML，说明被重定向到登录页
+        raise ValueError(f"返回 HTML 而非 JSON（被重定向到登录页）: {resp.text[:200]}")
     return resp.json()
 
 
