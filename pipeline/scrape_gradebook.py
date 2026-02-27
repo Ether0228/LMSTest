@@ -95,8 +95,12 @@ def parse_gradebook(data: dict, section_nid: str, course_name: str = "") -> list
     返回 list of flat dicts，每条 = 一个 (student, assignment)。
     键名直接对应飞书字段名。
     """
+    # API 响应包在 {"response_code": 200, "body": {...}} 里
+    if "body" in data:
+        data = data["body"]
+
     grade_item_data  = data.get("grade_item_data", {})
-    grades_by_uid    = data.get("grades", {})          # grades[uid][nid]
+    grades_by_uid    = data.get("grades", {})
     user_data        = data.get("user_data", {})
     grading_categories = {
         str(c["id"]): c["title"]
@@ -104,15 +108,7 @@ def parse_gradebook(data: dict, section_nid: str, course_name: str = "") -> list
         if c["id"] not in ("all", "summary")
     }
 
-    # 调试：打印顶层结构
-    print(f"  [debug] 顶层 keys: {list(data.keys())}")
-    print(f"  [debug] user_data 数量: {len(user_data)}, grade_item_data 数量: {len(grade_item_data)}, grades 数量: {len(grades_by_uid)}")
-    if user_data:
-        sample_uid = next(iter(user_data))
-        print(f"  [debug] user_data 示例 uid={sample_uid}: {list(user_data[sample_uid].keys())}")
-    if grade_item_data:
-        sample_nid = next(iter(grade_item_data))
-        print(f"  [debug] grade_item_data 示例 nid={sample_nid}: {list(grade_item_data[sample_nid].keys())}")
+    print(f"  [debug] user_data: {len(user_data)} 人, grade_item_data: {len(grade_item_data)} 项")
 
     rows = []
     for uid, student in user_data.items():
