@@ -74,9 +74,21 @@ jobs:
           FEISHU_MISSING_TABLE_ID: ${{ secrets.FEISHU_MISSING_TABLE_ID }}
         run: python "schoology数据转飞书/check_missing_sync.py"
 
-      # === 阶段四：构建学生汇总（仪表盘数据源）===
+      # === 阶段四：爬取 Gradebook 成绩册 ===
+      - name: 7. 爬取成绩册 (Scrape Gradebook)
+        if: success()
+        env:
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          FEISHU_APP_TOKEN: ${{ secrets.FEISHU_APP_TOKEN }}
+          FEISHU_GRADEBOOK_TABLE_ID: ${{ secrets.FEISHU_GRADEBOOK_TABLE_ID }}
+          SCHOOLOGY_COOKIES: ${{ secrets.SCHOOLOGY_COOKIES }}
+          SCHOOLOGY_SECTION_NIDS: ${{ secrets.SCHOOLOGY_SECTION_NIDS }}
+        run: python "schoology数据转飞书/scrape_gradebook.py"
+
+      # === 阶段五：构建学生汇总（仪表盘数据源）===
       # 无论前面步骤是否成功都运行，确保汇总表始终是最新状态
-      - name: 7. 构建学生汇总 (Build Student Summary)
+      - name: 8. 构建学生汇总 (Build Student Summary)
         if: always()
         env:
           FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
