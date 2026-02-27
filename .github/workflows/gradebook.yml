@@ -1,0 +1,31 @@
+name: Scrape Gradebook
+
+on:
+  workflow_dispatch:   # 仅手动触发
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 Python 环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: 安装依赖
+        run: pip install requests
+
+      - name: 爬取 Gradebook
+        env:
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          FEISHU_APP_TOKEN: ${{ secrets.FEISHU_APP_TOKEN }}
+          FEISHU_GRADEBOOK_TABLE_ID: ${{ secrets.FEISHU_GRADEBOOK_TABLE_ID }}
+          SCHOOLOGY_COOKIES: ${{ secrets.SCHOOLOGY_COOKIES }}
+          SCHOOLOGY_SECTION_NIDS: ${{ secrets.SCHOOLOGY_SECTION_NIDS }}
+        run: python pipeline/scrape_gradebook.py
