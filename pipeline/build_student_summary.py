@@ -206,7 +206,30 @@ def build_assignment_lookup(lib_records):
     return out, by_link
 
 
-def build_summaries(roster, submissions, missing, assignment_lookup, assignment_by_link):
+def build_nid_lookup(lib_records):
+    """从作业库构建 NID → lib_item 映射（用于 gradebook 低分条目关联作业信息）。"""
+    out = {}
+    for rec in lib_records:
+        f = rec.get("fields", {})
+        link = clean_schoology_url(normalize_link(f.get("作业链接")))
+        if not link:
+            continue
+        m = re.search(r'/(?:assignment|assessment|discussion)/(\d+)', link)
+        if not m:
+            continue
+        nid = m.group(1)
+        if nid not in out:
+            out[nid] = {
+                "name": str(f.get("作业名称", "")).strip(),
+                "link": link,
+                "course": str(f.get("所属课程", "")).strip(),
+                "nature": str(f.get("作业性质", "")).strip(),
+            }
+    return out
+
+
+def build_summaries(roster, submissions, missing, assignment_lookup, assignment_by_link,
+                    gradebook_by_student=None, nid_to_lib=None):
     # 1) 学生基础信息
     students = {}
     for r in roster:
@@ -412,6 +435,48 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
             )
 
         # 写入飞书汇总表的字段（只包含已有列）
+        # 关注列表：合并缺交 + 已交但低分（< 60%）
+        _gb_by_student = gradebook_by_student or {}
+        _nid_to_lib = nid_to_lib or {}
+        attention_items = []
+        # missing 部分
+        for item in missing_items:
+            is_hot = item.get("nature", "") == "🔥 极其重要"
+            attention_items.append({
+                "type": "missing",
+                "course": item.get("course", ""),
+                "assignmentName": item.get("assignmentName", ""),
+                "assignmentLink": item.get("assignmentLink", ""),
+                "nature": item.get("nature", ""),
+                "_priority": 0 if is_hot else 1,
+            })
+        # low_score 部分
+        for gb_row in _gb_by_student.get(name, []):
+            if gb_row.get("已提交") != "✓":
+                continue
+            pct = gb_row.get("得分率")
+            if pct is None or pct >= 60:
+                continue
+            nid = str(gb_row.get("作业NID", "")).strip()
+            lib_item = _nid_to_lib.get(nid, {})
+            is_hot = lib_item.get("nature", "") == "🔥 极其重要"
+            entry = {
+                "type": "low_score",
+                "course": str(gb_row.get("课程名", "")).strip() or lib_item.get("course", ""),
+                "assignmentName": str(gb_row.get("作业名", "")).strip() or lib_item.get("name", ""),
+                "assignmentLink": lib_item.get("link", ""),
+                "nature": lib_item.get("nature", ""),
+                "_priority": 2 if is_hot else 3,
+            }
+            if gb_row.get("得分") is not None:
+                entry["score"] = float(gb_row["得分"])
+            if gb_row.get("满分") is not None:
+                entry["maxScore"] = float(gb_row["满分"])
+            attention_items.append(entry)
+        attention_items.sort(key=lambda x: x["_priority"])
+        for _item in attention_items:
+            _item.pop("_priority", None)
+
         row = {
             "学生姓名": name,
             "关联学生": [s["roster_record_id"]] if s.get("roster_record_id") else [],
@@ -423,6 +488,7 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
             "缺交明细JSON": chunk_text_json(missing_items, max_len=50000),
             "近期提交JSON": chunk_text_json(recent),
             "推荐JSON": chunk_text_json(recommendations),
+            "关注列表JSON": chunk_text_json(attention_items, max_len=50000),
             "最后更新时间": now_ms,
         }
         # 花名册透传字段：暂存在 row 扩展区，不写飞书（列不存在会报错）
@@ -519,6 +585,7 @@ def write_json_cache(summary_rows, cache_dir):
             "missingByCourse": load("缺交按课程JSON", {}),
             "recentSubmissions": load("近期提交JSON", []),
             "recommendations": load("推荐JSON", []),
+            "attentionItems": load("关注列表JSON", []),
             "schoolYear":      extra.get("学年", ""),
             "semesterNum":     extra.get("学期号", ""),
             "osslt":           extra.get("OSSLT状态", ""),
@@ -545,12 +612,34 @@ def main():
     submissions = fetch_all_records(token, app_token, conf["FEISHU_TABLE_ID"])
     lib = fetch_all_records(token, app_token, conf["FEISHU_LIB_TABLE_ID"])
     missing = fetch_all_records(token, app_token, conf["FEISHU_MISSING_TABLE_ID"])
+
+    # 可选：gradebook 表（用于计算低分关注列表）
+    gradebook_table_id = os.environ.get("FEISHU_GRADEBOOK_TABLE_ID", "").strip()
+    gradebook_rows = []
+    if gradebook_table_id:
+        gradebook_records = fetch_all_records(token, app_token, gradebook_table_id)
+        gradebook_rows = [r.get("fields", {}) for r in gradebook_records]
+        print(f">>> gradebook={len(gradebook_rows)} 条")
+
     print(
         f">>> 数据加载完成: roster={len(roster)}, submissions={len(submissions)}, lib={len(lib)}, missing={len(missing)}"
     )
 
     assignment_lookup, assignment_by_link = build_assignment_lookup(lib)
-    summary_rows = build_summaries(roster, submissions, missing, assignment_lookup, assignment_by_link)
+    nid_to_lib = build_nid_lookup(lib)
+
+    # 按学生姓名分组 gradebook 数据
+    gradebook_by_student = {}
+    for gb_row in gradebook_rows:
+        name = str(gb_row.get("学生姓名", "")).strip()
+        if not name:
+            continue
+        gradebook_by_student.setdefault(name, []).append(gb_row)
+
+    summary_rows = build_summaries(
+        roster, submissions, missing, assignment_lookup, assignment_by_link,
+        gradebook_by_student, nid_to_lib,
+    )
     sync_summary_table(token, conf, summary_rows)
 
     # 可选：同时写本地磁盘缓存（服务器上运行时设置 CACHE_DIR）

@@ -711,6 +711,17 @@ function normalizeApiResponse(raw) {
     assignmentLink: m.assignmentLink || m.link           || "",
   }))
 
+  // attention_items：缺交 + 低分合并列表（来自 关注列表JSON）
+  const attentionItems = (raw.attentionItems || []).map(item => ({
+    type:           item.type           || "missing",
+    course:         item.course         || "",
+    assignmentName: item.assignmentName || "",
+    assignmentLink: item.assignmentLink || item.link || "",
+    nature:         item.nature         || "",
+    score:          item.score          ?? null,
+    maxScore:       item.maxScore       ?? null,
+  }))
+
   // course_progress
   const courseProgress = (raw.courseProgress || []).map(cp => ({
     course:          cp.course         || "",
@@ -792,12 +803,73 @@ function normalizeApiResponse(raw) {
     stage:           raw.stage || "在读",
     course_progress: finalCourseProgress,
     missing_items:   missingItems,
+    attention_items: attentionItems,
     recent_submitted: recentSubmitted,
     recommendations: raw.recommendations || [],
     missing_total:   missingTotal,
     submitted_total: raw.submittedTotal ?? 0,
     combo,
     alerts:          [...alerts, ...noticesFromServer, ...noticesFromRoster],
+  }
+}
+
+// ─── 区域 B2：关注列表 ────────────────────────────────────────
+
+function buildAttentionItemHTML(item) {
+  const isMissing  = item.type === "missing"
+  const cls        = isMissing ? "task-item--urgent" : "task-item--warning"
+  const typeTag    = isMissing
+    ? `<span class="task-item__type-tag tag--missing">缺交</span>`
+    : `<span class="task-item__type-tag tag--low-score">低分</span>`
+  const scoreStr   = (!isMissing && item.score != null && item.maxScore != null)
+    ? `<span class="task-item__score">${item.score}/${item.maxScore} (${Math.round(item.score / item.maxScore * 100)}%)</span>`
+    : ""
+  const link = item.assignmentLink
+    ? `<a class="task-item__go" href="${esc(item.assignmentLink)}" target="_blank" rel="noopener">前往作业 →</a>`
+    : `<span class="task-item__go task-item__go--na">暂无链接</span>`
+  return `
+    <div class="task-item ${cls}">
+      <div class="task-item__main">
+        <div class="task-item__course">${esc(item.course)}${typeTag}</div>
+        <div class="task-item__name">${esc(item.assignmentName)}</div>
+      </div>
+      <div class="task-item__meta">
+        ${scoreStr}
+        ${link}
+      </div>
+    </div>
+  `
+}
+
+function toggleAttentionMore() {
+  const more = document.getElementById("attentionListMore")
+  const icon = document.getElementById("attentionToggleIcon")
+  const btn  = document.getElementById("attentionToggleMore")
+  const open = more.style.display !== "none"
+  more.style.display = open ? "none" : "flex"
+  if (!open) { more.style.flexDirection = "column"; more.style.gap = "4px" }
+  icon.textContent = open ? "[+]" : "[-]"
+  const total = more.children.length
+  btn.lastChild.textContent = open ? ` 展开更多（${total}）` : " 收起"
+}
+
+function renderAttentionList(data) {
+  const items   = data.attention_items || []
+  const section = document.getElementById("area-attention")
+  if (!section) return
+  if (!items.length) { section.style.display = "none"; return }
+  section.style.display = "block"
+  const top  = items.slice(0, 3)
+  const rest = items.slice(3)
+  document.getElementById("attentionListTop").innerHTML = top.map(buildAttentionItemHTML).join("")
+  const moreEl  = document.getElementById("attentionListMore")
+  const moreBtn = document.getElementById("attentionToggleMore")
+  if (rest.length) {
+    moreEl.innerHTML = rest.map(buildAttentionItemHTML).join("")
+    moreBtn.style.display = "block"
+    moreBtn.lastChild.textContent = ` 展开更多（${rest.length}）`
+  } else {
+    moreBtn.style.display = "none"
   }
 }
 
@@ -845,6 +917,7 @@ function renderAll(data) {
 
   renderSemester(data)
   renderTasks(data)
+  renderAttentionList(data)
   renderCourses(data)
   renderCombo(data)
   renderGuideSnippet(data)

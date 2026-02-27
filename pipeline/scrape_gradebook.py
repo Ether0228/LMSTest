@@ -30,13 +30,15 @@ BASE_URL = "https://queenscanada.schoology.com"
 # ──────────────────────────────────────────────
 
 def get_env_config():
-    keys = [
+    required_keys = [
         "FEISHU_APP_ID", "FEISHU_APP_SECRET",
         "FEISHU_APP_TOKEN", "FEISHU_GRADEBOOK_TABLE_ID",
         "SCHOOLOGY_COOKIES", "SCHOOLOGY_SECTION_NIDS",
     ]
-    cfg = {k: os.environ.get(k, "").strip() for k in keys}
-    missing = [k for k, v in cfg.items() if not v]
+    # FEISHU_LIB_TABLE_ID 可选：有则在 scrape 后同步更新作业库
+    optional_keys = ["FEISHU_LIB_TABLE_ID"]
+    cfg = {k: os.environ.get(k, "").strip() for k in required_keys + optional_keys}
+    missing = [k for k in required_keys if not cfg[k]]
     if missing:
         raise ValueError(f"缺少环境变量: {', '.join(missing)}")
     return cfg
@@ -241,19 +243,36 @@ def batch_upsert(token: str, app_token: str, table_id: str,
     }
     to_insert = []
     to_update = []   # list of (record_id, fields)
+    current_keys = set()
 
     for row in rows:
         key    = row["_key"]
         fields = build_feishu_fields(row)
         fields["_key"] = key   # 保留 _key 供下次查重
+        current_keys.add(key)
 
         if key in existing:
             to_update.append((existing[key], fields))
         else:
             to_insert.append(fields)
 
-    # ── insert ──
+    # ── delete（Schoology 已删除的作业） ──
+    to_delete = [existing[k] for k in existing if k not in current_keys]
     chunk = 100
+    if to_delete:
+        del_url = (f"https://open.feishu.cn/open-apis/bitable/v1/apps"
+                   f"/{app_token}/tables/{table_id}/records/batch_delete")
+        for i in range(0, len(to_delete), chunk):
+            batch = to_delete[i:i+chunk]
+            resp = requests.post(del_url, headers=headers, json={"records": batch})
+            rj = resp.json()
+            if rj.get("code") == 0:
+                print(f"  ✓ 删除 {len(batch)} 条（作业已在 Schoology 移除）")
+            else:
+                print(f"  ✗ 删除失败: {rj}")
+            time.sleep(0.3)
+
+    # ── insert ──
     for i in range(0, len(to_insert), chunk):
         batch = to_insert[i:i+chunk]
         url = (f"https://open.feishu.cn/open-apis/bitable/v1/apps"
@@ -280,6 +299,128 @@ def batch_upsert(token: str, app_token: str, table_id: str,
         else:
             print(f"  ✗ 更新失败: {rj}")
         time.sleep(0.3)
+
+
+# ──────────────────────────────────────────────
+# 飞书：同步更新作业库
+# ──────────────────────────────────────────────
+
+def fetch_all_lib_records(token: str, app_token: str, lib_table_id: str) -> list:
+    """拉取作业库全量记录，返回 items 列表。"""
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{lib_table_id}/records"
+    headers = {"Authorization": f"Bearer {token}"}
+    records = []
+    page_token = None
+    while True:
+        params = {"page_size": 500}
+        if page_token:
+            params["page_token"] = page_token
+        resp = requests.get(url, headers=headers, params=params).json()
+        if resp.get("code") != 0:
+            print(f"  [警告] 拉取作业库失败: {resp}")
+            break
+        data = resp.get("data", {})
+        records.extend(data.get("items", []))
+        if not data.get("has_more"):
+            break
+        page_token = data.get("page_token")
+    return records
+
+
+def update_lib_from_gradebook(token: str, app_token: str, lib_table_id: str,
+                               all_rows: list) -> None:
+    """
+    根据 gradebook 里的作业，在作业库中标记为 🔥 极其重要 并补全截止日期。
+    匹配策略：gradebook 的 作业NID 对应作业库的 作业链接 中的数字 ID。
+    已标记为 🚫 忽略 的记录不覆盖。
+    """
+    # 1. 从 all_rows 收集 {nid: due_date_ms}（去重，取最早截止日期）
+    nid_due: dict[str, int] = {}
+    for row in all_rows:
+        nid = str(row.get("作业NID", "")).strip()
+        due_str = str(row.get("截止日期", "")).strip()
+        if not nid or not due_str:
+            continue
+        try:
+            dt = datetime.strptime(due_str, "%b %d, %Y at %I:%M %p")
+            due_ms = calendar.timegm(dt.timetuple()) * 1000
+        except Exception:
+            continue
+        if nid not in nid_due or due_ms < nid_due[nid]:
+            nid_due[nid] = due_ms
+
+    if not nid_due:
+        print("  [更新作业库] 无有效作业 NID，跳过")
+        return
+
+    # 2. 拉取作业库全量，构建 NID → (record_id, nature) 映射
+    print("\n读取作业库全量记录（用于同步 🔥 极其重要）...")
+    lib_records = fetch_all_lib_records(token, app_token, lib_table_id)
+    print(f"  作业库记录数: {len(lib_records)}")
+
+    nid_to_record: dict[str, tuple] = {}
+    for rec in lib_records:
+        rec_id = rec.get("record_id", "")
+        f = rec.get("fields", {})
+        raw_link = f.get("作业链接", "")
+        if isinstance(raw_link, dict):
+            link_str = str(raw_link.get("link", "") or raw_link.get("text", "")).strip()
+        else:
+            link_str = str(raw_link or "").strip()
+        if not link_str:
+            continue
+        m = re.search(r'/(?:assignment|assessment|discussion)/(\d+)', link_str)
+        if not m:
+            continue
+        nid = m.group(1)
+        if nid not in nid_to_record:
+            nid_to_record[nid] = (rec_id, str(f.get("作业性质", "")).strip())
+
+    # 3. 构建更新列表（匹配到的 + 排除 🚫 忽略）
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type":  "application/json",
+    }
+    to_update = []
+    skipped_ignore = 0
+    for nid, due_ms in nid_due.items():
+        if nid not in nid_to_record:
+            continue
+        rec_id, nature = nid_to_record[nid]
+        if nature == "🚫 忽略":
+            skipped_ignore += 1
+            continue
+        to_update.append({
+            "record_id": rec_id,
+            "fields": {
+                "作业性质": "🔥 极其重要",
+                "截止日期": due_ms,
+            },
+        })
+
+    if skipped_ignore:
+        print(f"  跳过 🚫 忽略 记录: {skipped_ignore} 条")
+
+    if not to_update:
+        print("  [更新作业库] 无匹配记录，跳过")
+        return
+
+    # 4. 批量更新
+    chunk = 100
+    updated = 0
+    update_url = (f"https://open.feishu.cn/open-apis/bitable/v1/apps"
+                  f"/{app_token}/tables/{lib_table_id}/records/batch_update")
+    for i in range(0, len(to_update), chunk):
+        batch = to_update[i:i+chunk]
+        resp = requests.post(update_url, headers=headers,
+                             json={"records": batch}).json()
+        if resp.get("code") == 0:
+            updated += len(batch)
+        else:
+            print(f"  ✗ 更新作业库失败: {resp}")
+        time.sleep(0.3)
+
+    print(f"  ✓ 更新作业库 {updated} 条")
 
 
 # ──────────────────────────────────────────────
@@ -329,6 +470,15 @@ def main():
         token, cfg["FEISHU_APP_TOKEN"], cfg["FEISHU_GRADEBOOK_TABLE_ID"],
         all_rows, existing
     )
+
+    # 可选：同步更新作业库（需设置 FEISHU_LIB_TABLE_ID）
+    lib_table_id = cfg.get("FEISHU_LIB_TABLE_ID", "").strip()
+    if lib_table_id:
+        update_lib_from_gradebook(
+            token, cfg["FEISHU_APP_TOKEN"], lib_table_id, all_rows
+        )
+    else:
+        print("\n[跳过] FEISHU_LIB_TABLE_ID 未设置，不更新作业库")
 
     print("\n✅ Gradebook 同步完成")
 

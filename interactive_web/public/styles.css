@@ -602,6 +602,36 @@ code { font-family: var(--mono); font-size: 12px; }
 .task-item__weight  { font-size: 11px; color: var(--muted); }
 .task-item__rate    { font-size: 11px; font-weight: 700; color: var(--caution); }
 
+.task-item--warning {
+  background: var(--warning-bg);
+  border: 1px solid var(--warning);
+  border-left: 3px solid var(--warning);
+}
+.task-item--warning .task-item__name { color: var(--caution); }
+.task-item__score { font-size: 11px; color: var(--caution); font-weight: 700; white-space: nowrap; }
+.task-item__type-tag {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 2px;
+  font-weight: 700;
+  margin-left: 4px;
+}
+.tag--missing   { background: var(--danger-bg);  color: var(--danger);  border: 1px solid var(--danger); }
+.tag--low-score { background: var(--warning-bg); color: var(--caution); border: 1px solid var(--warning); }
+
+.attention-more-btn {
+  margin-top: 6px;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 3px 10px;
+}
+.attention-more-btn:hover { border-color: var(--border-act); color: var(--text); }
+
 .task-allclear {
   display: flex;
   align-items: center;

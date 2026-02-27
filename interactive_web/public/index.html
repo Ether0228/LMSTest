@@ -98,6 +98,16 @@
         </div>
       </section>
 
+      <!-- 区域 B2：关注列表（缺交 + 低分） -->
+      <section class="area area--attention" id="area-attention" style="display:none">
+        <div class="area__title">⚠️ 需要关注</div>
+        <div id="attentionListTop" class="task-list"></div>
+        <div id="attentionListMore" class="task-list" style="display:none"></div>
+        <button id="attentionToggleMore" class="attention-more-btn" onclick="toggleAttentionMore()" style="display:none">
+          <span id="attentionToggleIcon">[+]</span> 展开更多
+        </button>
+      </section>
+
       <!-- 区域 C：课程进度卡片 -->
       <section class="area" id="area-c">
         <div class="area__title">课程进度</div>

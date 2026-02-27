@@ -410,6 +410,7 @@ async function tryLoadFromSummaryTable(tenantKey, token, tenantConf, studentName
   const recentSubmissions = parseMaybeJson(getFieldLoose(f, "近期提交JSON"), []);
   const courseProgress = parseMaybeJson(getFieldLoose(f, "课程进度JSON", ["课程进度Json", "课程进度"]), []);
   const missingItems = parseMaybeJson(getFieldLoose(f, "缺交明细JSON", ["缺交明细Json"]), []);
+  const attentionItems = parseMaybeJson(getFieldLoose(f, "关注列表JSON"), []);
   const summaryUpdatedAt = getFieldLoose(f, "最后更新时间");
 
   return {
@@ -424,6 +425,7 @@ async function tryLoadFromSummaryTable(tenantKey, token, tenantConf, studentName
     submittedTotal: Number(getFieldLoose(f, "已提交总数") || 0) || 0,
     recentSubmissions,
     recommendations,
+    attentionItems,
     schoolYear:    String(getFieldLoose(f, "学年")      || ""),
     semesterNum:   String(getFieldLoose(f, "学期号")    || ""),
     osslt:         String(getFieldLoose(f, "OSSLT状态") || ""),
