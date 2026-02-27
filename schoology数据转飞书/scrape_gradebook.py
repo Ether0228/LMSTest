@@ -274,7 +274,9 @@ def main():
 
     cfg = get_env_config()
     # SCHOOLOGY_SECTION_NIDS 格式：{"section_nid": "课程名", ...}
-    sections: dict = json.loads(cfg["SCHOOLOGY_SECTION_NIDS"])
+    # 清洗 GitHub Secret 可能混入的不可见控制字符
+    nids_raw = re.sub(r'[\x00-\x1f\x7f]', '', cfg["SCHOOLOGY_SECTION_NIDS"])
+    sections: dict = json.loads(nids_raw)
     cookies_raw  = json.loads(cfg["SCHOOLOGY_COOKIES"])
 
     print(f"课程 Section 数量: {len(sections)}")

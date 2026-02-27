@@ -332,7 +332,7 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
     now_ms = int(time.time() * 1000)
     week_start = get_current_week_start()
     week_end   = week_start + timedelta(days=7)
-    week_label = f”{week_start.month}/{week_start.day}–{week_end.month}/{week_end.day - 1}”
+    week_label = f”{week_start.month}/{week_start.day}-{week_end.month}/{week_end.day - 1}”
 
     rows = []
     for name, s in students.items():
