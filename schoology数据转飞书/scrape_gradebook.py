@@ -9,7 +9,8 @@ scrape_gradebook.py
   FEISHU_APP_TOKEN
   FEISHU_GRADEBOOK_TABLE_ID   飞书 Gradebook 表 ID（新建一张表）
   SCHOOLOGY_COOKIES            与现有爬虫相同的 JSON cookie 数组
-  SCHOOLOGY_SECTION_NIDS       JSON 数组，如 ["8173239667", "8999999999"]
+  SCHOOLOGY_SECTION_NIDS       JSON 对象，格式 {"section_nid": "课程名", ...}
+                               例：{"8173239667": "Grade 11 Functions"}
 """
 
 import os
@@ -84,7 +85,7 @@ def strip_html(text: str) -> str:
     return re.sub(r"<[^>]+>", "", text or "").strip()
 
 
-def parse_gradebook(data: dict, section_nid: str) -> list[dict]:
+def parse_gradebook(data: dict, section_nid: str, course_name: str = "") -> list[dict]:
     """
     返回 list of flat dicts，每条 = 一个 (student, assignment)。
     键名直接对应飞书字段名。
@@ -129,6 +130,7 @@ def parse_gradebook(data: dict, section_nid: str) -> list[dict]:
             rows.append({
                 "学生姓名":   student_name,
                 "学生UID":    uid,
+                "课程名":     course_name,
                 "SectionNID": section_nid,
                 "作业NID":    nid,
                 "作业名":     item.get("title", ""),
@@ -271,10 +273,11 @@ def main():
     print("=" * 55)
 
     cfg = get_env_config()
-    section_nids = json.loads(cfg["SCHOOLOGY_SECTION_NIDS"])
+    # SCHOOLOGY_SECTION_NIDS 格式：{"section_nid": "课程名", ...}
+    sections: dict = json.loads(cfg["SCHOOLOGY_SECTION_NIDS"])
     cookies_raw  = json.loads(cfg["SCHOOLOGY_COOKIES"])
 
-    print(f"课程 Section 数量: {len(section_nids)}")
+    print(f"课程 Section 数量: {len(sections)}")
 
     # 建立 Schoology 请求会话
     session = build_session(cookies_raw)
@@ -290,11 +293,11 @@ def main():
     print(f"  现有记录数: {len(existing)}")
 
     all_rows = []
-    for nid in section_nids:
-        print(f"\n── Section {nid} ──")
+    for nid, course_name in sections.items():
+        print(f"\n── {course_name} ({nid}) ──")
         try:
             data = fetch_gradebook(session, nid)
-            rows = parse_gradebook(data, nid)
+            rows = parse_gradebook(data, nid, course_name)
             print(f"  解析到 {len(rows)} 条 (学生×作业)")
             all_rows.extend(rows)
         except Exception as e:
