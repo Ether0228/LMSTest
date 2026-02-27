@@ -384,6 +384,13 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
                 aol_missing_by_course[c] = aol_missing_by_course.get(c, 0) + 1
 
         course_progress = []
+        # 按课程分组本学生的 gradebook 行，用于填充成绩数据
+        _gb_rows_by_course = {}
+        for gb_row in (_gb_by_student or {}).get(name, []):
+            c_key = str(gb_row.get("课程名", "")).strip()
+            if c_key:
+                _gb_rows_by_course.setdefault(c_key, []).append(gb_row)
+
         for c in all_courses:
             expected_count = int(s["expected_by_course"].get(c, 0))
             missing_count = int(missing_by_course.get(c, 0))
@@ -391,16 +398,49 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
             submitted_count = int(s["submitted_by_course"].get(c, submitted_from_expected))
             total = expected_count if expected_count > 0 else (submitted_count + missing_count)
             completion = round((submitted_count / total) * 100, 1) if total > 0 else 0.0
-            course_progress.append(
-                {
-                    "course":         c,
-                    "submittedCount": submitted_count,
-                    "missingCount":   missing_count,
-                    "completion":     completion,
-                    "aolSubmitted":   aol_submitted_by_course.get(c, 0),
-                    "aolMissing":     aol_missing_by_course.get(c, 0),
-                }
-            )
+
+            # 从 gradebook 补充成绩字段
+            gb_course_rows = _gb_rows_by_course.get(c, [])
+            current_grade = None
+            grade_updated_at = None
+            aol_details = []
+            if gb_course_rows:
+                # 课程总分%：取第一个非空值（同一学生同一课程该值应一致）
+                for r in gb_course_rows:
+                    v = r.get("课程总分%")
+                    if v is not None:
+                        current_grade = round(float(v), 1)
+                        grade_updated_at = now_ms
+                        break
+                # AoL 评分明细：分类名含 "aol" 或 "assessment of learning"
+                for r in gb_course_rows:
+                    cat = str(r.get("分类", "")).lower()
+                    if "aol" not in cat and "assessment of learning" not in cat:
+                        continue
+                    score = r.get("得分")
+                    max_score = r.get("满分")
+                    if score is None or not max_score:
+                        continue
+                    aol_details.append({
+                        "name":  str(r.get("作业名", "")).strip(),
+                        "score": round(float(score), 1),
+                        "max":   round(float(max_score), 1),
+                    })
+
+            cp_entry = {
+                "course":         c,
+                "submittedCount": submitted_count,
+                "missingCount":   missing_count,
+                "completion":     completion,
+                "aolSubmitted":   aol_submitted_by_course.get(c, 0),
+                "aolMissing":     aol_missing_by_course.get(c, 0),
+            }
+            if current_grade is not None:
+                cp_entry["current_grade"]    = current_grade
+                cp_entry["grade_updated_at"] = grade_updated_at
+            if aol_details:
+                cp_entry["aol_details"] = aol_details
+            course_progress.append(cp_entry)
 
         submitted_sorted = sorted(
             s["submitted"], key=lambda x: str(x.get("submittedAt", "")), reverse=True
