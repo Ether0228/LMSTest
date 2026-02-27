@@ -179,7 +179,7 @@ def add_assignment_to_lib(token, app_token, lib_table_id, name, clean_url):
     fields = {
         "作业名称": name,
         "作业链接": {"text": clean_url, "link": clean_url},
-        "统计状态": "✅ 必交"
+        "作业性质": "✅ 必交"
     }
 
     try:
