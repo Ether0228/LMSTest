@@ -48,7 +48,7 @@ jobs:
           TZ: Asia/Shanghai
           TARGET_DATE: ${{ github.event.inputs.target_date }}
           MAX_PAGES: ${{ github.event.inputs.max_pages }}
-        run: python "schoology数据转飞书/scraper_cloud_feishu.py"
+        run: python "pipeline/scraper_cloud_feishu.py"
 
       # === 阶段二：补全课程信息 ===
       - name: 5. 运行课程补全 (Fill Course Info)
@@ -59,7 +59,7 @@ jobs:
           FEISHU_APP_TOKEN: ${{ secrets.FEISHU_APP_TOKEN }}
           FEISHU_LIB_TABLE_ID: ${{ secrets.FEISHU_LIB_TABLE_ID }}
           SCHOOLOGY_COOKIES: ${{ secrets.SCHOOLOGY_COOKIES }}
-        run: python "schoology数据转飞书/fill_course_info.py"
+        run: python "pipeline/fill_course_info.py"
 
       # === 阶段三：缺交核验 ===
       - name: 6. 运行缺交核验 (Check Missing)
@@ -72,7 +72,7 @@ jobs:
           FEISHU_ROSTER_TABLE_ID: ${{ secrets.FEISHU_ROSTER_TABLE_ID }}
           FEISHU_LIB_TABLE_ID: ${{ secrets.FEISHU_LIB_TABLE_ID }}
           FEISHU_MISSING_TABLE_ID: ${{ secrets.FEISHU_MISSING_TABLE_ID }}
-        run: python "schoology数据转飞书/check_missing_sync.py"
+        run: python "pipeline/check_missing_sync.py"
 
       # === 阶段四：爬取 Gradebook 成绩册 ===
       - name: 7. 爬取成绩册 (Scrape Gradebook)
@@ -84,7 +84,7 @@ jobs:
           FEISHU_GRADEBOOK_TABLE_ID: ${{ secrets.FEISHU_GRADEBOOK_TABLE_ID }}
           SCHOOLOGY_COOKIES: ${{ secrets.SCHOOLOGY_COOKIES }}
           SCHOOLOGY_SECTION_NIDS: ${{ secrets.SCHOOLOGY_SECTION_NIDS }}
-        run: python "schoology数据转飞书/scrape_gradebook.py"
+        run: python "pipeline/scrape_gradebook.py"
 
       # === 阶段五：构建学生汇总（仪表盘数据源）===
       # 无论前面步骤是否成功都运行，确保汇总表始终是最新状态
@@ -99,4 +99,4 @@ jobs:
           FEISHU_LIB_TABLE_ID: ${{ secrets.FEISHU_LIB_TABLE_ID }}
           FEISHU_MISSING_TABLE_ID: ${{ secrets.FEISHU_MISSING_TABLE_ID }}
           FEISHU_SUMMARY_TABLE_ID: ${{ secrets.FEISHU_SUMMARY_TABLE_ID }}
-        run: python "schoology数据转飞书/build_student_summary.py"
+        run: python "pipeline/build_student_summary.py"
