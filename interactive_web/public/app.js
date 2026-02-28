@@ -744,6 +744,8 @@ function normalizeApiResponse(raw) {
     current_grade:   cp.current_grade  || null,
     grade_updated_at: cp.grade_updated_at || null,
     aol_details:     cp.aol_details    || [],
+    aolSubmitted:    cp.aolSubmitted   || 0,
+    aolMissing:      cp.aolMissing     || 0,
   }))
 
   const finalCourseProgress = courseProgress.length > 0
@@ -871,7 +873,7 @@ function toggleAttentionMore() {
 }
 
 function renderAttentionList(data) {
-  const items   = data.attention_items || []
+  const items   = (data.attention_items || []).filter(i => i.type === "low_score")
   const section = document.getElementById("area-attention")
   if (!section) return
   if (!items.length) { section.style.display = "none"; return }

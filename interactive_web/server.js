@@ -26,6 +26,29 @@ function loadDotEnvIfPresent() {
 
 loadDotEnvIfPresent();
 
+function computeSemesterProgress() {
+  let gp = null;
+  const jsonPath = (process.env.GRADING_PERIOD_JSON_PATH || "").trim();
+  if (jsonPath) {
+    try { gp = JSON.parse(fs.readFileSync(jsonPath, "utf8")); } catch { /* 降级 */ }
+  }
+  if (!gp) {
+    const raw = (process.env.SCHOOLOGY_GRADING_PERIOD || "").trim();
+    if (raw) { try { gp = JSON.parse(raw); } catch { /* 忽略 */ } }
+  }
+  if (!gp || !gp.start_date || !gp.end_date) return { semesterStart: "", totalWeeks: null, currentWeek: null };
+  try {
+    const start = new Date(gp.start_date);
+    const end   = new Date(gp.end_date);
+    const today = new Date();
+    const totalDays   = Math.max(1, (end - start) / 86400000);
+    const totalWeeks  = Math.max(1, Math.round(totalDays / 7));
+    const elapsedDays = Math.floor((today - start) / 86400000);
+    const currentWeek = Math.max(1, Math.min(totalWeeks, Math.floor(elapsedDays / 7) + 1));
+    return { semesterStart: gp.start_date, totalWeeks, currentWeek };
+  } catch { return { semesterStart: "", totalWeeks: null, currentWeek: null }; }
+}
+
 const PORT = parseInt(process.env.PORT || "8787", 10);
 const AUTH_MODE = (process.env.AUTH_MODE || "mock").trim(); // mock | feishu
 const SESSION_SECRET = (process.env.SESSION_SECRET || "").trim();
@@ -438,6 +461,7 @@ async function tryLoadFromSummaryTable(tenantKey, token, tenantConf, studentName
       .map(line => ({ title: "📢 通知", body: line })),
     missingSource: "summary_table",
     summaryUpdatedAt: summaryUpdatedAt || null,
+    ...computeSemesterProgress(),
   };
 }
 
@@ -540,6 +564,7 @@ async function handleApiDashboard(req, res, parsedUrl) {
       recentSubmissions: [],
       recommendations: [{ type: "guide", title: "未找到你的汇总数据，请联系老师刷新汇总", anchorText: "四、日常通关系统（把机制变成分数）" }],
       missingSource: "summary_miss_fast_return",
+      ...computeSemesterProgress(),
     });
   }
 
@@ -630,6 +655,7 @@ async function handleApiDashboard(req, res, parsedUrl) {
     rosterRecordId: rosterRecId,
     missingSource,
     ...summary,
+    ...computeSemesterProgress(),
   };
   diskCacheSet(tenantKey, studentName, result);
   return json(res, 200, result);
