@@ -20,6 +20,8 @@ jobs:
   master-process:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    permissions:
+      contents: write   # 允许 git push grading_period.json 回 repo
 
     steps:
       - name: 1. 检出代码
