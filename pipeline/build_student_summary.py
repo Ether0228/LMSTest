@@ -590,6 +590,16 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
 def sync_summary_table(token, conf, summary_rows):
     app_token = conf["FEISHU_APP_TOKEN"]
     table_id = conf["FEISHU_SUMMARY_TABLE_ID"]
+
+    # 拉取飞书表的实际列名，只写入已存在的列，避免 FieldNameNotFound
+    fields_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}/fields"
+    fields_resp = requests.get(fields_url, headers={"Authorization": f"Bearer {token}"}).json()
+    known_fields = {item["field_name"] for item in fields_resp.get("data", {}).get("items", [])}
+    if not known_fields:
+        print("WARNING: 无法获取汇总表列信息，跳过写入")
+        return
+    skip_keys = {"_extra"} | (set() if not known_fields else set())  # _extra 始终跳过
+
     existing = fetch_all_records(token, app_token, table_id)
 
     exist_map = {}
@@ -601,15 +611,25 @@ def sync_summary_table(token, conf, summary_rows):
 
     to_create = []
     to_update = []
+    skipped_fields = set()
     for row in summary_rows:
         name = row["学生姓名"]
         rid = exist_map.get(name)
-        # _extra 仅用于 JSON 缓存，不写入飞书
-        feishu_fields = {k: v for k, v in row.items() if k != "_extra"}
+        feishu_fields = {}
+        for k, v in row.items():
+            if k == "_extra":
+                continue
+            if k not in known_fields:
+                skipped_fields.add(k)
+                continue
+            feishu_fields[k] = v
         if rid:
             to_update.append({"record_id": rid, "fields": feishu_fields})
         else:
             to_create.append(feishu_fields)
+
+    if skipped_fields:
+        print(f"INFO: 以下字段在汇总表中不存在，已跳过（飞书建列后自动生效）: {', '.join(sorted(skipped_fields))}")
 
     batch_update(token, app_token, table_id, to_update)
     batch_create(token, app_token, table_id, to_create)
