@@ -181,10 +181,8 @@ def start_missing_sync():
                 "最后核验时间": absolute_now_ms,
                 "处理状态": "待处理"
             }
-            if info.get("due_ms"):
-                fields["截止日期"] = info["due_ms"]
-            if info.get("nature"):
-                fields["作业性质"] = info["nature"]
+            # 截止日期/作业性质 为引用字段（lookup），飞书 API 不支持直接写入，
+            # 由飞书从关联作业记录自动填充，此处不写入。
             add_payload.append({"fields": fields})
         for i in range(0, len(add_payload), 100):
             batch = add_payload[i:i+100]
