@@ -520,7 +520,11 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
         for gb_row in _gb_by_student.get(name, []):
             if gb_row.get("已提交") != "✓":
                 continue
-            pct = gb_row.get("得分率")
+            pct_raw = gb_row.get("得分率")
+            try:
+                pct = float(pct_raw) if pct_raw is not None else None
+            except (TypeError, ValueError):
+                pct = None
             if pct is None or pct >= 60:
                 continue
             nid = str(gb_row.get("作业NID", "")).strip()
