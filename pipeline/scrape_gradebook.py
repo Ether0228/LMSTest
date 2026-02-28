@@ -94,7 +94,6 @@ def verify_cookies(session: requests.Session):
     resp = session.get(f"{BASE_URL}/home", timeout=15, allow_redirects=True)
     expired = (
         "login" in resp.url.lower() or
-        resp.text.strip().startswith("<") or
         resp.status_code in (401, 403)
     )
     if expired:
