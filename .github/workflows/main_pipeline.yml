@@ -119,3 +119,28 @@ jobs:
           ACTIVE_SEMESTERS: ${{ secrets.ACTIVE_SEMESTERS }}
           CURRENT_SEMESTER: ${{ secrets.CURRENT_SEMESTER }}
         run: python "pipeline/build_student_summary.py"
+
+      # === 失败通知 ===
+      - name: 8. 飞书通知（仅失败时）
+        if: failure()
+        env:
+          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
+        run: |
+          curl -s -X POST "$FEISHU_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "msg_type": "interactive",
+              "card": {
+                "elements": [{
+                  "tag": "div",
+                  "text": {
+                    "tag": "lark_md",
+                    "content": "**❌ Pipeline 失败**\n\n**仓库**: ${{ github.repository }}\n**分支**: ${{ github.ref_name }}\n**触发**: ${{ github.event_name }}\n**时间**: ${{ github.run_id }}\n\n[查看详细日志](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+                  }
+                }],
+                "header": {
+                  "title": { "tag": "plain_text", "content": "🚨 LMS Pipeline 异常" },
+                  "template": "red"
+                }
+              }
+            }'
