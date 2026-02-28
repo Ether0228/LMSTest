@@ -172,7 +172,7 @@ def get_feishu_mapping(token, app_token, table_id, key_field_name):
         except: break
     return mapping
 
-def add_assignment_to_lib(token, app_token, lib_table_id, name, clean_url):
+def add_assignment_to_lib(token, app_token, lib_table_id, name, clean_url, semester=""):
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{lib_table_id}/records"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=utf-8"}
 
@@ -181,6 +181,8 @@ def add_assignment_to_lib(token, app_token, lib_table_id, name, clean_url):
         "作业链接": clean_url,
         "作业性质": "✅ 必交"
     }
+    if semester:
+        fields["学期"] = semester
 
     try:
         response = requests.post(url, json={"fields": fields}, headers=headers)
@@ -223,10 +225,17 @@ def start_cloud_scraper():
     print(">>> 启动调试版爬虫...")
     try:
         app_id, app_secret, app_token, table_id, roster_tid, lib_tid, s_cookies, target_date, max_pages = get_env_config()
-        
+
         # 转换目标日期对象
         target_dt = datetime.strptime(target_date, "%Y-%m-%d")
         print(f">>> 目标回溯日期: {target_date} (凡是早于此日期的将被忽略)")
+
+        # 当前学期标签（用于自动建档时写入作业库）
+        current_semester = os.environ.get("CURRENT_SEMESTER", "").strip()
+        if current_semester:
+            print(f">>> 当前学期: {current_semester}（新建档作业将自动打标签）")
+        else:
+            print("INFO: CURRENT_SEMESTER 未设置，新建档作业不会携带学期标签")
         
         token = get_feishu_token(app_id, app_secret)
         
@@ -336,7 +345,7 @@ def start_cloud_scraper():
                 assign_rec_id = lib_map.get(clean_link)
                 if not assign_rec_id:
                     print(f">>> 自动建档: {assign}")
-                    assign_rec_id = add_assignment_to_lib(token, app_token, lib_tid, assign, clean_link)
+                    assign_rec_id = add_assignment_to_lib(token, app_token, lib_tid, assign, clean_link, current_semester)
                     if assign_rec_id: lib_map[clean_link] = assign_rec_id
                 
                 student_rec_id = roster_map.get(student)

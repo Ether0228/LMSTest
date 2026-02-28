@@ -344,7 +344,6 @@ function toggleDetail(btn) {
 
 function renderSemester(data) {
   const { start_date, current_week, total_weeks } = data.semester
-  const pct = Math.round((current_week / total_weeks) * 100)
 
   // 日期显示
   const today = data.combo?.today ? new Date(data.combo.today) : new Date()
@@ -352,12 +351,26 @@ function renderSemester(data) {
   document.getElementById("headerDate").textContent =
     `今天  ${today.getMonth()+1}月${today.getDate()}日（周${dayNames[today.getDay()]}）`
 
+  // 学期进度（无数据时显示占位）
+  if (!current_week || !total_weeks) {
+    document.getElementById("headerCountdown").textContent = ""
+    document.getElementById("semesterWeek").textContent = "学期进度加载中…"
+    document.getElementById("stageLabel").textContent = data.stage
+    const track = document.querySelector('.progress-track')
+    if (track) track.innerHTML = `<span class="ascii-bar">${asciiBar(0)}</span>`
+    return
+  }
+
+  const pct = Math.round((current_week / total_weeks) * 100)
+
   // 距学期结束天数
-  const endDate = new Date(start_date)
-  endDate.setDate(endDate.getDate() + total_weeks * 7)
-  const daysLeft = Math.max(0, Math.ceil((endDate - today) / 86400000))
-  document.getElementById("headerCountdown").textContent =
-    daysLeft > 0 ? `距学期结束还有 ${daysLeft} 天` : `学期已结束`
+  if (start_date) {
+    const endDate = new Date(start_date)
+    endDate.setDate(endDate.getDate() + total_weeks * 7)
+    const daysLeft = Math.max(0, Math.ceil((endDate - today) / 86400000))
+    document.getElementById("headerCountdown").textContent =
+      daysLeft > 0 ? `距学期结束还有 ${daysLeft} 天` : `学期已结束`
+  }
 
   // 学期进度
   document.getElementById("semesterWeek").textContent = `第 ${current_week} 周 / 共 ${total_weeks} 周`
@@ -798,7 +811,11 @@ function normalizeApiResponse(raw) {
 
   return {
     student,
-    semester:        { start_date: "", total_weeks: 8, current_week: null },
+    semester:        {
+      start_date:   raw.semesterStart || "",
+      total_weeks:  raw.totalWeeks    || null,
+      current_week: raw.currentWeek   || null,
+    },
     semLabel,
     stage:           raw.stage || "在读",
     course_progress: finalCourseProgress,

@@ -48,6 +48,7 @@ jobs:
           TZ: Asia/Shanghai
           TARGET_DATE: ${{ github.event.inputs.target_date }}
           MAX_PAGES: ${{ github.event.inputs.max_pages }}
+          CURRENT_SEMESTER: ${{ secrets.CURRENT_SEMESTER }}
         run: python "pipeline/scraper_cloud_feishu.py"
 
       # === 阶段二：补全课程信息 ===
@@ -72,6 +73,7 @@ jobs:
           FEISHU_ROSTER_TABLE_ID: ${{ secrets.FEISHU_ROSTER_TABLE_ID }}
           FEISHU_LIB_TABLE_ID: ${{ secrets.FEISHU_LIB_TABLE_ID }}
           FEISHU_MISSING_TABLE_ID: ${{ secrets.FEISHU_MISSING_TABLE_ID }}
+          ACTIVE_SEMESTERS: ${{ secrets.ACTIVE_SEMESTERS }}
         run: python "pipeline/check_missing_sync.py"
 
       # === 阶段四：构建学生汇总（仪表盘数据源）===
@@ -88,4 +90,7 @@ jobs:
           FEISHU_MISSING_TABLE_ID: ${{ secrets.FEISHU_MISSING_TABLE_ID }}
           FEISHU_SUMMARY_TABLE_ID: ${{ secrets.FEISHU_SUMMARY_TABLE_ID }}
           FEISHU_GRADEBOOK_TABLE_ID: ${{ secrets.FEISHU_GRADEBOOK_TABLE_ID }}
+          SCHOOLOGY_GRADING_PERIOD: ${{ secrets.SCHOOLOGY_GRADING_PERIOD }}
+          ACTIVE_SEMESTERS: ${{ secrets.ACTIVE_SEMESTERS }}
+          CURRENT_SEMESTER: ${{ secrets.CURRENT_SEMESTER }}
         run: python "pipeline/build_student_summary.py"

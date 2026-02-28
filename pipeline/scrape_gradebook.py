@@ -93,6 +93,35 @@ def strip_html(text: str) -> str:
     return re.sub(r"<[^>]+>", "", text or "").strip()
 
 
+def parse_grading_period_dates(data: dict) -> dict:
+    """
+    从 API 响应的 grading_period.title 提取学期起止日期。
+    格式示例: "Session 3: 1/05/26 - 2/28/26"
+    返回: {"start_date": "2026-01-05", "end_date": "2026-02-28", "session": "Session 3"}
+    解析失败时返回空字典。
+    """
+    body = data.get("body", data)
+    gp = body.get("grading_period", {})
+    if not gp:
+        return {}
+    title = gp.get("title", "") or gp.get("aria_label", "")
+    if not title:
+        return {}
+    # 匹配 "M/DD/YY - M/DD/YY" 或 "M/DD/YY – M/DD/YY"（含破折号变体）
+    m = re.search(r'(\d{1,2})/(\d{1,2})/(\d{2})\s*[-\u2013]\s*(\d{1,2})/(\d{1,2})/(\d{2})', title)
+    if not m:
+        return {}
+
+    def yy2yyyy(yy: str) -> int:
+        y = int(yy)
+        return 2000 + y if y < 50 else 1900 + y
+
+    start_str = f"{yy2yyyy(m.group(3))}-{int(m.group(1)):02d}-{int(m.group(2)):02d}"
+    end_str   = f"{yy2yyyy(m.group(6))}-{int(m.group(4)):02d}-{int(m.group(5)):02d}"
+    session_name = title.split(":")[0].strip() if ":" in title else title.strip()
+    return {"start_date": start_str, "end_date": end_str, "session": session_name}
+
+
 def parse_gradebook(data: dict, section_nid: str, course_name: str = "") -> list[dict]:
     """
     返回 list of flat dicts，每条 = 一个 (student, assignment)。
@@ -330,10 +359,11 @@ def fetch_all_lib_records(token: str, app_token: str, lib_table_id: str) -> list
 def update_lib_from_gradebook(token: str, app_token: str, lib_table_id: str,
                                all_rows: list) -> None:
     """
-    根据 gradebook 里的作业，在作业库中标记为 🔥 极其重要 并补全截止日期。
+    根据 gradebook 里的作业，在作业库中标记为 🔥 极其重要、补全截止日期，并写入学期标签。
     匹配策略：gradebook 的 作业NID 对应作业库的 作业链接 中的数字 ID。
     已标记为 🚫 忽略 的记录不覆盖。
     """
+    current_semester = os.environ.get("CURRENT_SEMESTER", "").strip()
     # 1. 从 all_rows 收集 {nid: due_date_ms}（去重，取最早截止日期）
     nid_due: dict[str, int] = {}
     for row in all_rows:
@@ -390,13 +420,13 @@ def update_lib_from_gradebook(token: str, app_token: str, lib_table_id: str,
         if nature == "🚫 忽略":
             skipped_ignore += 1
             continue
-        to_update.append({
-            "record_id": rec_id,
-            "fields": {
-                "作业性质": "🔥 极其重要",
-                "截止日期": due_ms,
-            },
-        })
+        fields = {
+            "作业性质": "🔥 极其重要",
+            "截止日期": due_ms,
+        }
+        if current_semester:
+            fields["学期"] = current_semester
+        to_update.append({"record_id": rec_id, "fields": fields})
 
     if skipped_ignore:
         print(f"  跳过 🚫 忽略 记录: {skipped_ignore} 条")
@@ -455,6 +485,7 @@ def main():
     print(f"  现有记录数: {len(existing)}")
 
     all_rows = []
+    gp_info = {}
     for nid, course_name in sections.items():
         print(f"\n── {course_name} ({nid}) ──")
         try:
@@ -462,6 +493,11 @@ def main():
             rows = parse_gradebook(data, nid, course_name)
             print(f"  解析到 {len(rows)} 条 (学生×作业)")
             all_rows.extend(rows)
+            # 从第一个有效 section 提取学期日期
+            if not gp_info:
+                gp_info = parse_grading_period_dates(data)
+                if gp_info:
+                    print(f"  学期: {gp_info['session']}  {gp_info['start_date']} → {gp_info['end_date']}")
         except Exception as e:
             print(f"  [错误] {e}")
 
@@ -470,6 +506,16 @@ def main():
         token, cfg["FEISHU_APP_TOKEN"], cfg["FEISHU_GRADEBOOK_TABLE_ID"],
         all_rows, existing
     )
+
+    # 学期元数据写入本地文件，供 build_student_summary.py 读取
+    if gp_info:
+        gp_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "grading_period.json")
+        try:
+            with open(gp_path, "w", encoding="utf-8") as f:
+                json.dump(gp_info, f, ensure_ascii=False)
+            print(f">>> 学期元数据已写入: {gp_path}")
+        except Exception as e:
+            print(f"  [警告] 学期元数据写入失败: {e}")
 
     # 可选：同步更新作业库（需设置 FEISHU_LIB_TABLE_ID）
     lib_table_id = cfg.get("FEISHU_LIB_TABLE_ID", "").strip()

@@ -57,6 +57,20 @@ def start_missing_sync():
     submissions = fetch_all_records(token, app_token, conf["FEISHU_TABLE_ID"])
     current_missing_table = fetch_all_records(token, app_token, conf["FEISHU_MISSING_TABLE_ID"])
 
+    # 学期过滤：只有活跃学期（或无标签旧数据）的作业参与缺交考核
+    active_semesters_raw = os.environ.get("ACTIVE_SEMESTERS", "").strip()
+    active_semesters = {s.strip() for s in active_semesters_raw.split(",") if s.strip()} if active_semesters_raw else set()
+    if active_semesters:
+        lib_before = len(lib)
+        lib = [
+            rec for rec in lib
+            if not str(rec.get("fields", {}).get("学期", "")).strip()
+            or str(rec.get("fields", {}).get("学期", "")).strip() in active_semesters
+        ]
+        print(f">>> 学期过滤 ({', '.join(sorted(active_semesters))}): {lib_before} → {len(lib)} 条作业参与考核")
+    else:
+        print("INFO: ACTIVE_SEMESTERS 未设置，所有非忽略作业计入考核（向后兼容模式）")
+
     # 【关键修正】使用 Unix 绝对时间戳，解决时区显示问题
     absolute_now_ms = int(time.time() * 1000)
 
@@ -118,7 +132,9 @@ def start_missing_sync():
                     logic_missing_data[unique_id] = {
                         "s_id": s_id,
                         "a_id": a_id,
-                        "course": a_course
+                        "course": a_course,
+                        "due_ms": a_f.get("截止日期"),   # 可能为 None（scrape_gradebook 未跑则无）
+                        "nature": a_f.get("作业性质", ""),
                     }
 
     # 4. 同步决策
@@ -156,7 +172,7 @@ def start_missing_sync():
         add_payload = []
         for k in to_add:
             info = logic_missing_data[k]
-            add_payload.append({"fields": {
+            fields = {
                 "唯一标识": k,
                 "关联学生": [info["s_id"]],
                 "关联作业": [info["a_id"]],
@@ -164,7 +180,12 @@ def start_missing_sync():
                 "发现日期": absolute_now_ms,
                 "最后核验时间": absolute_now_ms,
                 "处理状态": "待处理"
-            }})
+            }
+            if info.get("due_ms"):
+                fields["截止日期"] = info["due_ms"]
+            if info.get("nature"):
+                fields["作业性质"] = info["nature"]
+            add_payload.append({"fields": fields})
         for i in range(0, len(add_payload), 100):
             batch = add_payload[i:i+100]
             resp = requests.post(add_url, json={"records": batch}, headers={"Authorization": f"Bearer {token}"}).json()

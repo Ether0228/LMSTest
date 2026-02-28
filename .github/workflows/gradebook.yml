@@ -29,4 +29,6 @@ jobs:
           FEISHU_LIB_TABLE_ID: ${{ secrets.FEISHU_LIB_TABLE_ID }}
           SCHOOLOGY_COOKIES: ${{ secrets.SCHOOLOGY_COOKIES }}
           SCHOOLOGY_SECTION_NIDS: ${{ secrets.SCHOOLOGY_SECTION_NIDS }}
+          SCHOOLOGY_GRADING_PERIOD: ${{ secrets.SCHOOLOGY_GRADING_PERIOD }}
+          CURRENT_SEMESTER: ${{ secrets.CURRENT_SEMESTER }}
         run: python pipeline/scrape_gradebook.py

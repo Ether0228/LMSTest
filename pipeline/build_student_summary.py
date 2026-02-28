@@ -116,12 +116,15 @@ def chunk_text_json(obj, max_len=10000):
     text = json.dumps(obj, ensure_ascii=False)
     if len(text) <= max_len:
         return text
-    # 防止单元格太长，截断近期提交
+    # 防止单元格太长：逐条删除直到满足长度，避免在 JSON 中间截断
     if isinstance(obj, list):
-        while len(text) > max_len and len(obj) > 5:
-            obj = obj[: len(obj) - 5]
+        while len(text) > max_len and obj:
+            obj = obj[:-1]
             text = json.dumps(obj, ensure_ascii=False)
-    return text[:max_len]
+        if len(text) <= max_len:
+            return text
+    # 非列表或无法缩减到限制：返回空 JSON
+    return json.dumps([] if isinstance(obj, list) else {}, ensure_ascii=False)
 
 
 def extract_linked_record_ids(value):
@@ -185,9 +188,9 @@ def clean_schoology_url(url):
 
 
 def build_assignment_lookup(lib_records):
-    # rec_id -> {name, link, course}
+    # rec_id -> {name, link, course, nature, semester}
     out = {}
-    # clean_link -> {name, link, course}
+    # clean_link -> {name, link, course, nature, semester}
     by_link = {}
     for rec in lib_records:
         rec_id = rec.get("record_id")
@@ -197,6 +200,7 @@ def build_assignment_lookup(lib_records):
             "link": clean_schoology_url(normalize_link(f.get("作业链接"))),
             "course": str(f.get("所属课程", "")).strip(),
             "nature": str(f.get("作业性质", "")).strip(),
+            "semester": str(f.get("学期", "")).strip(),
         }
         if rec_id:
             out[rec_id] = item
@@ -229,7 +233,7 @@ def build_nid_lookup(lib_records):
 
 
 def build_summaries(roster, submissions, missing, assignment_lookup, assignment_by_link,
-                    gradebook_by_student=None, nid_to_lib=None):
+                    gradebook_by_student=None, nid_to_lib=None, gp_info=None):
     # 1) 学生基础信息
     students = {}
     for r in roster:
@@ -355,7 +359,31 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
     now_ms = int(time.time() * 1000)
     week_start = get_current_week_start()
     week_end   = week_start + timedelta(days=7)
-    week_label = f"{week_start.month}/{week_start.day}-{week_end.month}/{week_end.day - 1}"
+    week_last  = week_end - timedelta(days=1)   # 本周最后一天（周日），避免跨月时 day-1=0
+    week_label = f"{week_start.month}/{week_start.day}-{week_last.month}/{week_last.day}"
+
+    # 学期进度：从 grading_period.json 解析（由 scrape_gradebook.py 写入）
+    semester_start_str = ""
+    semester_end_str   = ""
+    total_weeks        = None
+    current_week       = None
+    if gp_info and gp_info.get("start_date") and gp_info.get("end_date"):
+        try:
+            sem_start    = datetime.strptime(gp_info["start_date"], "%Y-%m-%d")
+            sem_end      = datetime.strptime(gp_info["end_date"],   "%Y-%m-%d")
+            today_dt     = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            total_days   = max(1, (sem_end - sem_start).days)
+            total_weeks  = max(1, round(total_days / 7))
+            elapsed_days = (today_dt - sem_start).days
+            current_week = max(1, min(total_weeks, elapsed_days // 7 + 1))
+            semester_start_str = gp_info["start_date"]
+            semester_end_str   = gp_info["end_date"]
+        except Exception as e:
+            print(f"WARNING: 学期进度计算失败: {e}")
+
+    # 预先解引用，避免在循环内部出现 NameError
+    _gb_by_student = gradebook_by_student or {}
+    _nid_to_lib = nid_to_lib or {}
 
     rows = []
     for name, s in students.items():
@@ -474,10 +502,7 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
                 }
             )
 
-        # 写入飞书汇总表的字段（只包含已有列）
         # 关注列表：合并缺交 + 已交但低分（< 60%）
-        _gb_by_student = gradebook_by_student or {}
-        _nid_to_lib = nid_to_lib or {}
         attention_items = []
         # missing 部分
         for item in missing_items:
@@ -541,6 +566,10 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
             "目标学分":  s.get("credits_target", ""),
             "公告":      s.get("notices_raw", ""),
             "近期提交周": week_label,
+            "学期开始日期": semester_start_str,
+            "学期结束日期": semester_end_str,
+            "学期总周数":  total_weeks,
+            "当前第几周":  current_week,
         }
         rows.append(row)
     print(
@@ -633,6 +662,10 @@ def write_json_cache(summary_rows, cache_dir):
             "creditsTarget":   extra.get("目标学分", None),
             "noticesRaw":      extra.get("公告", ""),
             "recentWeekLabel": extra.get("近期提交周", ""),
+            "semesterStart":   extra.get("学期开始日期", ""),
+            "semesterEnd":     extra.get("学期结束日期", ""),
+            "totalWeeks":      extra.get("学期总周数",   None),
+            "currentWeek":     extra.get("当前第几周",   None),
             "_cachedAt": int(time.time() * 1000),
         }
         filename = f"{safe_name(tenant_key)}__{safe_name(student_name)}.json"
@@ -660,15 +693,30 @@ def main():
         gradebook_records = fetch_all_records(token, app_token, gradebook_table_id)
         gradebook_rows = [r.get("fields", {}) for r in gradebook_records]
         print(f">>> gradebook={len(gradebook_rows)} 条")
+    else:
+        print("WARNING: FEISHU_GRADEBOOK_TABLE_ID 未设置 — 成绩数据和低分关注列表将为空。"
+              "如需成绩功能请在 GitHub Secrets 中配置此变量。")
 
     print(
         f">>> 数据加载完成: roster={len(roster)}, submissions={len(submissions)}, lib={len(lib)}, missing={len(missing)}"
     )
 
+    # 学期过滤：只有 ACTIVE_SEMESTERS 里的学期（或无标签的旧数据）参与缺交考核
+    active_semesters_raw = os.environ.get("ACTIVE_SEMESTERS", "").strip()
+    active_semesters = {s.strip() for s in active_semesters_raw.split(",") if s.strip()} if active_semesters_raw else set()
+    if active_semesters:
+        lib_before = len(lib)
+        lib = [
+            rec for rec in lib
+            if not str(rec.get("fields", {}).get("学期", "")).strip()
+            or str(rec.get("fields", {}).get("学期", "")).strip() in active_semesters
+        ]
+        print(f">>> 学期过滤 ({', '.join(sorted(active_semesters))}): {lib_before} → {len(lib)} 条作业参与考核")
+    else:
+        print("INFO: ACTIVE_SEMESTERS 未设置，所有非忽略作业计入考核（向后兼容模式）")
+
     assignment_lookup, assignment_by_link = build_assignment_lookup(lib)
     nid_to_lib = build_nid_lookup(lib)
-
-    # 按学生姓名分组 gradebook 数据
     gradebook_by_student = {}
     for gb_row in gradebook_rows:
         name = str(gb_row.get("学生姓名", "")).strip()
@@ -676,9 +724,33 @@ def main():
             continue
         gradebook_by_student.setdefault(name, []).append(gb_row)
 
+    # 读取学期元数据：
+    # 优先读本地文件（scrape_gradebook.py 在同一 job 内运行时写入）
+    # 其次读 SCHOOLOGY_GRADING_PERIOD 环境变量（main_pipeline 跨 job 时由 Secret 提供）
+    gp_info = {}
+    gp_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "grading_period.json")
+    if os.path.exists(gp_path):
+        try:
+            with open(gp_path, "r", encoding="utf-8") as f:
+                gp_info = json.load(f)
+            print(f">>> 学期参数 [本地文件]: {gp_info.get('session', '')} {gp_info.get('start_date', '')} → {gp_info.get('end_date', '')}")
+        except Exception as e:
+            print(f"WARNING: 读取 grading_period.json 失败: {e}")
+    else:
+        gp_raw = os.environ.get("SCHOOLOGY_GRADING_PERIOD", "").strip()
+        if gp_raw:
+            try:
+                gp_info = json.loads(gp_raw)
+                print(f">>> 学期参数 [环境变量]: {gp_info.get('session', '')} {gp_info.get('start_date', '')} → {gp_info.get('end_date', '')}")
+            except Exception as e:
+                print(f"WARNING: 解析 SCHOOLOGY_GRADING_PERIOD 失败: {e}")
+        else:
+            print("INFO: 未找到学期参数（grading_period.json 或 SCHOOLOGY_GRADING_PERIOD），学期进度条将不显示。"
+                  "切换学期后请在 GitHub Secrets 中设置 SCHOOLOGY_GRADING_PERIOD。")
+
     summary_rows = build_summaries(
         roster, submissions, missing, assignment_lookup, assignment_by_link,
-        gradebook_by_student, nid_to_lib,
+        gradebook_by_student, nid_to_lib, gp_info=gp_info,
     )
     sync_summary_table(token, conf, summary_rows)
 
