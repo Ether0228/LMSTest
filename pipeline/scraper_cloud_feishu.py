@@ -268,7 +268,28 @@ def start_cloud_scraper():
         
         driver.get(NOTIFICATION_URL)
         time.sleep(8)
-        if "login" in driver.current_url.lower(): return
+        if "login" in driver.current_url.lower():
+            webhook = os.environ.get("FEISHU_WEBHOOK_URL", "").strip()
+            if webhook:
+                try:
+                    import requests as _req
+                    _req.post(webhook, json={
+                        "msg_type": "interactive",
+                        "card": {
+                            "header": {
+                                "title": {"tag": "plain_text", "content": "🔑 Schoology Cookie 已过期"},
+                                "template": "orange"
+                            },
+                            "elements": [{"tag": "div", "text": {"tag": "lark_md", "content":
+                                "**Schoology Cookie 已过期**，爬虫无法登录。\n\n"
+                                "请重新获取 Cookie 并更新 GitHub Secret `SCHOOLOGY_COOKIES`。"
+                            }}]
+                        }
+                    }, timeout=10)
+                except Exception:
+                    pass
+            driver.quit()
+            raise RuntimeError("COOKIE_EXPIRED: 被重定向到登录页，Schoology Cookie 已过期")
 
         for i in range(max_pages):
             try:

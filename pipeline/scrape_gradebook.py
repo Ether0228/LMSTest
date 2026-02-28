@@ -48,6 +48,46 @@ def get_env_config():
 # Schoology：用 cookies 建 requests.Session
 # ──────────────────────────────────────────────
 
+def notify_feishu_alert(msg: str):
+    """向飞书群机器人发送告警，FEISHU_WEBHOOK_URL 未设置时静默跳过。"""
+    webhook = os.environ.get("FEISHU_WEBHOOK_URL", "").strip()
+    if not webhook:
+        return
+    try:
+        requests.post(webhook, json={
+            "msg_type": "interactive",
+            "card": {
+                "header": {
+                    "title": {"tag": "plain_text", "content": "🔑 Schoology Cookie 已过期"},
+                    "template": "orange"
+                },
+                "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": msg}}]
+            }
+        }, timeout=10)
+    except Exception:
+        pass  # 通知失败不影响主流程
+
+
+def verify_cookies(session: requests.Session):
+    """用轻量请求验证 Cookie 是否有效，过期则发飞书告警并抛出异常。"""
+    resp = session.get(f"{BASE_URL}/home", timeout=15, allow_redirects=True)
+    expired = (
+        "login" in resp.url.lower() or
+        resp.text.strip().startswith("<") or
+        resp.status_code in (401, 403)
+    )
+    if expired:
+        msg = (
+            "**Schoology Cookie 已过期**，爬虫无法登录。\n\n"
+            "请重新获取 Cookie 并更新 GitHub Secret `SCHOOLOGY_COOKIES`。\n\n"
+            f"当前 URL: `{resp.url}`"
+        )
+        print(f"❌ Cookie 验证失败: {resp.url}")
+        notify_feishu_alert(msg)
+        raise RuntimeError("COOKIE_EXPIRED: Schoology Cookie 已过期，请更新 SCHOOLOGY_COOKIES")
+    print(f"✅ Cookie 验证通过 (HTTP {resp.status_code})")
+
+
 def build_session(cookies_json: list) -> requests.Session:
     """把 Selenium 格式的 cookie 数组转成 requests.Session。"""
     session = requests.Session()
@@ -497,6 +537,7 @@ def main():
 
     # 建立 Schoology 请求会话
     session = build_session(cookies_raw)
+    verify_cookies(session)  # Cookie 过期时立即告警并终止
 
     # 获取飞书 Token
     token = get_feishu_token(cfg["FEISHU_APP_ID"], cfg["FEISHU_APP_SECRET"])
