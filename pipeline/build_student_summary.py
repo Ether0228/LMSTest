@@ -43,6 +43,7 @@ def get_env_config():
         "FEISHU_LIB_TABLE_ID",  # 作业库（用于补齐缺交作业名/链接）
         "FEISHU_MISSING_TABLE_ID",  # 缺交表
         "FEISHU_SUMMARY_TABLE_ID",  # 学生汇总表（新增）
+        "FEISHU_GRADEBOOK_TABLE_ID", #gradebook表
     ]
     conf = {k: os.environ.get(k, "").strip() for k in keys}
     if not all(conf.values()):
