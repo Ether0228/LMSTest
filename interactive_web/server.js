@@ -26,17 +26,9 @@ function loadDotEnvIfPresent() {
 
 loadDotEnvIfPresent();
 
-function computeSemesterProgress() {
-  let gp = null;
-  const jsonPath = (process.env.GRADING_PERIOD_JSON_PATH ||
-    path.join(__dirname, "..", "pipeline", "grading_period.json")).trim();
-  if (jsonPath) {
-    try { gp = JSON.parse(fs.readFileSync(jsonPath, "utf8")); } catch { /* 降级 */ }
-  }
-  if (!gp) {
-    const raw = (process.env.SCHOOLOGY_GRADING_PERIOD || "").trim();
-    if (raw) { try { gp = JSON.parse(raw); } catch { /* 忽略 */ } }
-  }
+// ── 学期进度 ──────────────────────────────────────────────────────────────────
+// 纯计算：接受 gp 对象（{ start_date, end_date }），返回 { semesterStart, totalWeeks, currentWeek }
+function computeSemesterProgress(gp) {
   if (!gp || !gp.start_date || !gp.end_date) return { semesterStart: "", totalWeeks: null, currentWeek: null };
   try {
     const start = new Date(gp.start_date);
@@ -48,6 +40,56 @@ function computeSemesterProgress() {
     const currentWeek = Math.max(1, Math.min(totalWeeks, Math.floor(elapsedDays / 7) + 1));
     return { semesterStart: gp.start_date, totalWeeks, currentWeek };
   } catch { return { semesterStart: "", totalWeeks: null, currentWeek: null }; }
+}
+
+// 读取 gp 数据源（文件 / 环境变量），仅作 Feishu 不可用时的 fallback
+function _gpFromEnvOrFile() {
+  let gp = null;
+  const jsonPath = (process.env.GRADING_PERIOD_JSON_PATH ||
+    path.join(__dirname, "..", "pipeline", "grading_period.json")).trim();
+  if (jsonPath) {
+    try { gp = JSON.parse(fs.readFileSync(jsonPath, "utf8")); } catch { /* 降级 */ }
+  }
+  if (!gp) {
+    const raw = (process.env.SCHOOLOGY_GRADING_PERIOD || "").trim();
+    if (raw) { try { gp = JSON.parse(raw); } catch { /* 忽略 */ } }
+  }
+  return gp;
+}
+
+// 按租户缓存 gp（2小时 TTL），优先从飞书系统配置表读取
+const _gpCache = new Map(); // tenantKey -> { gp, fetchedAt }
+const GP_CACHE_TTL_MS = 2 * 60 * 60 * 1000;
+
+async function fetchGradingPeriod(tenantKey, tenantConf) {
+  const cached = _gpCache.get(tenantKey);
+  if (cached && Date.now() - cached.fetchedAt < GP_CACHE_TTL_MS) return cached.gp;
+
+  const configTableId = (tenantConf.configTableId || "").trim();
+  if (configTableId) {
+    try {
+      const token = await feishuGetTenantAccessToken(tenantKey, tenantConf);
+      const filter = JSON.stringify({
+        conjunction: "and",
+        conditions: [{ field_name: "配置键", operator: "is", value: ["grading_period"] }],
+      });
+      const items = await bitableFetchAll(token, tenantConf.appToken, configTableId, { filter, page_size: 5 });
+      const row = items[0];
+      if (row) {
+        const raw = row.fields["配置值"] || "";
+        const text = typeof raw === "string" ? raw : (raw[0]?.text || "");
+        const gp = JSON.parse(text);
+        _gpCache.set(tenantKey, { gp, fetchedAt: Date.now() });
+        return gp;
+      }
+    } catch (e) {
+      console.warn("[fetchGradingPeriod] 飞书读取失败，降级到文件/环境变量:", e.message);
+    }
+  }
+
+  const gp = _gpFromEnvOrFile();
+  _gpCache.set(tenantKey, { gp, fetchedAt: Date.now() });
+  return gp;
 }
 
 const PORT = parseInt(process.env.PORT || "8787", 10);
@@ -462,7 +504,7 @@ async function tryLoadFromSummaryTable(tenantKey, token, tenantConf, studentName
       .map(line => ({ title: "📢 通知", body: line })),
     missingSource: "summary_table",
     summaryUpdatedAt: summaryUpdatedAt || null,
-    ...computeSemesterProgress(),
+    ...computeSemesterProgress(await fetchGradingPeriod(tenantKey, tenantConf)),
   };
 }
 
@@ -565,7 +607,7 @@ async function handleApiDashboard(req, res, parsedUrl) {
       recentSubmissions: [],
       recommendations: [{ type: "guide", title: "未找到你的汇总数据，请联系老师刷新汇总", anchorText: "四、日常通关系统（把机制变成分数）" }],
       missingSource: "summary_miss_fast_return",
-      ...computeSemesterProgress(),
+      ...computeSemesterProgress(await fetchGradingPeriod(tenantKey, tenantConf)),
     });
   }
 
@@ -656,7 +698,7 @@ async function handleApiDashboard(req, res, parsedUrl) {
     rosterRecordId: rosterRecId,
     missingSource,
     ...summary,
-    ...computeSemesterProgress(),
+    ...computeSemesterProgress(await fetchGradingPeriod(tenantKey, tenantConf)),
   };
   diskCacheSet(tenantKey, studentName, result);
   return json(res, 200, result);

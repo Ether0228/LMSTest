@@ -78,7 +78,7 @@ jobs:
           ACTIVE_SEMESTERS: ${{ secrets.ACTIVE_SEMESTERS }}
         run: python "pipeline/check_missing_sync.py"
 
-      # === 阶段三·五：抓取 Gradebook（写 grading_period.json 供汇总读取）===
+      # === 阶段三·五：抓取 Gradebook（写 grading_period 供汇总读取）===
       - name: 6.5 抓取 Gradebook (Scrape Gradebook)
         continue-on-error: true   # 失败不阻塞后续汇总步骤
         env:
@@ -90,17 +90,8 @@ jobs:
           SCHOOLOGY_COOKIES: ${{ secrets.SCHOOLOGY_COOKIES }}
           SCHOOLOGY_SECTION_NIDS: ${{ secrets.SCHOOLOGY_SECTION_NIDS }}
           CURRENT_SEMESTER: ${{ secrets.CURRENT_SEMESTER }}
+          FEISHU_CONFIG_TABLE_ID: ${{ secrets.FEISHU_CONFIG_TABLE_ID }}
         run: python pipeline/scrape_gradebook.py
-
-      # === 阶段三·六：把 grading_period.json 提交回 repo，供 Render 读取 ===
-      - name: 6.6 提交学期区间文件 (Commit grading_period.json)
-        continue-on-error: true
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add pipeline/grading_period.json
-          git diff --cached --quiet || git commit -m "chore: update grading_period.json [skip ci]"
-          git push
 
       # === 阶段四：构建学生汇总（仪表盘数据源）===
       # 无论前面步骤是否成功都运行，确保汇总表始终是最新状态

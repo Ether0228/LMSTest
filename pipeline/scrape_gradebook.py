@@ -36,7 +36,8 @@ def get_env_config():
         "SCHOOLOGY_COOKIES", "SCHOOLOGY_SECTION_NIDS",
     ]
     # FEISHU_LIB_TABLE_ID 可选：有则在 scrape 后同步更新作业库
-    optional_keys = ["FEISHU_LIB_TABLE_ID"]
+    # FEISHU_CONFIG_TABLE_ID 可选：有则把学期区间写入飞书系统配置表
+    optional_keys = ["FEISHU_LIB_TABLE_ID", "FEISHU_CONFIG_TABLE_ID"]
     cfg = {k: os.environ.get(k, "").strip() for k in required_keys + optional_keys}
     missing = [k for k in required_keys if not cfg[k]]
     if missing:
@@ -497,6 +498,22 @@ def update_lib_from_gradebook(token: str, app_token: str, lib_table_id: str,
 # 主流程
 # ──────────────────────────────────────────────
 
+def _upsert_config(token: str, app_token: str, table_id: str, key: str, value: str):
+    """在系统配置表中 upsert 一行 (配置键=key, 配置值=value)。"""
+    base = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    # 先查是否已有这个 key
+    flt = json.dumps({"conjunction":"and","conditions":[{"field_name":"配置键","operator":"is","value":[key]}]})
+    r = requests.get(f"{base}/records", params={"filter": flt, "page_size": 5}, headers=headers)
+    items = r.json().get("data", {}).get("items", [])
+    payload = {"fields": {"配置键": key, "配置值": value}}
+    if items:
+        record_id = items[0]["record_id"]
+        requests.put(f"{base}/records/{record_id}", json=payload, headers=headers)
+    else:
+        requests.post(f"{base}/records", json=payload, headers=headers)
+
+
 def main():
     print("=" * 55)
     print("  Gradebook Scraper 启动")
@@ -581,6 +598,18 @@ def main():
             print(f">>> 学期元数据已写入: {gp_path}")
         except Exception as e:
             print(f"  [警告] 学期元数据写入失败: {e}")
+
+        # 同时写入飞书系统配置表（供 server.js 读取，避免依赖文件/环境变量）
+        config_table_id = cfg.get("FEISHU_CONFIG_TABLE_ID", "").strip()
+        if config_table_id:
+            try:
+                _upsert_config(token, cfg["FEISHU_APP_TOKEN"], config_table_id,
+                               "grading_period", json.dumps(gp_info, ensure_ascii=False))
+                print(f">>> 学期元数据已写入飞书系统配置表")
+            except Exception as e:
+                print(f"  [警告] 学期元数据写入飞书失败: {e}")
+        else:
+            print("  [提示] FEISHU_CONFIG_TABLE_ID 未设置，跳过写入飞书配置表")
 
     # 可选：同步更新作业库（需设置 FEISHU_LIB_TABLE_ID）
     lib_table_id = cfg.get("FEISHU_LIB_TABLE_ID", "").strip()
