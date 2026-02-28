@@ -466,7 +466,31 @@ def main():
     # SCHOOLOGY_SECTION_NIDS 格式：{"section_nid": "课程名", ...}
     # 清洗 GitHub Secret 可能混入的不可见控制字符
     nids_raw = re.sub(r'[\x00-\x1f\x7f]', '', cfg["SCHOOLOGY_SECTION_NIDS"])
-    sections: dict = json.loads(nids_raw)
+    sections_raw: dict = json.loads(nids_raw)
+
+    # 课程全名 → 课程代码映射（大小写不敏感）
+    COURSE_MAPPING = {
+        "grade 11 physics":               "SPH3U",
+        "grade 12 physics":               "SPH4U",
+        "grade 12 data management":       "MDM4U",
+        "grade 12 advanced functions":    "MHF4U",
+        "grade 11 functions":             "MCR3U",
+        "grade 12 calculus & vectors":    "MCV4U",
+        "grade 12 canadian and world issues": "CGW4U",
+        "grade 12 english":               "ENG4U",
+        "grade 11 english":               "ENG3U",
+        "grade 12 nutrition & health":    "HFA4U",
+        "grade 12 visual arts":           "AVI4M",
+        "g10 canadian history since wwi": "CHC2D",
+        "esl level 5":                    "ESLEO",
+        "esl level 4":                    "ESLDO",
+        "esl level 3":                    "ESLCO",
+        "esl level 2":                    "ESLBO",
+    }
+    sections = {
+        nid: COURSE_MAPPING.get(name.lower().strip(), name)
+        for nid, name in sections_raw.items()
+    }
     cookies_raw  = json.loads(cfg["SCHOOLOGY_COOKIES"])
 
     print(f"课程 Section 数量: {len(sections)}")
