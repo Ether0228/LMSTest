@@ -76,6 +76,20 @@ jobs:
           ACTIVE_SEMESTERS: ${{ secrets.ACTIVE_SEMESTERS }}
         run: python "pipeline/check_missing_sync.py"
 
+      # === 阶段三·五：抓取 Gradebook（写 grading_period.json 供汇总读取）===
+      - name: 6.5 抓取 Gradebook (Scrape Gradebook)
+        continue-on-error: true   # 失败不阻塞后续汇总步骤
+        env:
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          FEISHU_APP_TOKEN: ${{ secrets.FEISHU_APP_TOKEN }}
+          FEISHU_GRADEBOOK_TABLE_ID: ${{ secrets.FEISHU_GRADEBOOK_TABLE_ID }}
+          FEISHU_LIB_TABLE_ID: ${{ secrets.FEISHU_LIB_TABLE_ID }}
+          SCHOOLOGY_COOKIES: ${{ secrets.SCHOOLOGY_COOKIES }}
+          SCHOOLOGY_SECTION_NIDS: ${{ secrets.SCHOOLOGY_SECTION_NIDS }}
+          CURRENT_SEMESTER: ${{ secrets.CURRENT_SEMESTER }}
+        run: python pipeline/scrape_gradebook.py
+
       # === 阶段四：构建学生汇总（仪表盘数据源）===
       # 无论前面步骤是否成功都运行，确保汇总表始终是最新状态
       - name: 7. 构建学生汇总 (Build Student Summary)
@@ -90,7 +104,6 @@ jobs:
           FEISHU_MISSING_TABLE_ID: ${{ secrets.FEISHU_MISSING_TABLE_ID }}
           FEISHU_SUMMARY_TABLE_ID: ${{ secrets.FEISHU_SUMMARY_TABLE_ID }}
           FEISHU_GRADEBOOK_TABLE_ID: ${{ secrets.FEISHU_GRADEBOOK_TABLE_ID }}
-          SCHOOLOGY_GRADING_PERIOD: ${{ secrets.SCHOOLOGY_GRADING_PERIOD }}
           ACTIVE_SEMESTERS: ${{ secrets.ACTIVE_SEMESTERS }}
           CURRENT_SEMESTER: ${{ secrets.CURRENT_SEMESTER }}
         run: python "pipeline/build_student_summary.py"
