@@ -154,22 +154,22 @@ ACTIVE_SEMESTERS = 2026-S4
 
 ## 附录 A：GitHub Secrets 完整一览
 
-| Secret | 每学期是否变 | 说明 |
-|---|---|---|
-| `FEISHU_APP_ID` | 否 | |
-| `FEISHU_APP_SECRET` | 否 | |
-| `FEISHU_APP_TOKEN` | 否 | |
-| `FEISHU_TABLE_ID` | 否 | 提交记录表 |
-| `FEISHU_ROSTER_TABLE_ID` | 否 | 花名册 |
-| `FEISHU_LIB_TABLE_ID` | 否 | 作业库 |
-| `FEISHU_MISSING_TABLE_ID` | 否 | 缺交表 |
-| `FEISHU_SUMMARY_TABLE_ID` | 否 | 汇总表 |
-| `FEISHU_GRADEBOOK_TABLE_ID` | 否 | Gradebook 表 |
-| `SCHOOLOGY_COOKIES` | 到期更换 | Selenium 格式 JSON 数组 |
-| `SCHOOLOGY_SECTION_NIDS` | **每学期** | `{"nid":"课程代码", ...}` |
-| `SCHOOLOGY_GRADING_PERIOD` | **每学期**（gradebook 跑后自动校准） | `{"start_date":"YYYY-MM-DD","end_date":"YYYY-MM-DD","session":"Session N"}` |
-| `CURRENT_SEMESTER` | **每学期** | 新建档作业的学期标签，如 `2026-S4` |
-| `ACTIVE_SEMESTERS` | **每学期** + 宽限期结束时再改一次 | 参与考核的学期，如 `2026-S3,2026-S4` 或 `2026-S4` |
+| Secret                      | 每学期是否变                    | 说明                                                                          |
+| --------------------------- | ------------------------- | --------------------------------------------------------------------------- |
+| `FEISHU_APP_ID`             | 否                         |                                                                             |
+| `FEISHU_APP_SECRET`         | 否                         |                                                                             |
+| `FEISHU_APP_TOKEN`          | 否                         |                                                                             |
+| `FEISHU_TABLE_ID`           | 否                         | 提交记录表                                                                       |
+| `FEISHU_ROSTER_TABLE_ID`    | 否                         | 花名册                                                                         |
+| `FEISHU_LIB_TABLE_ID`       | 否                         | 作业库                                                                         |
+| `FEISHU_MISSING_TABLE_ID`   | 否                         | 缺交表                                                                         |
+| `FEISHU_SUMMARY_TABLE_ID`   | 否                         | 汇总表                                                                         |
+| `FEISHU_GRADEBOOK_TABLE_ID` | 否                         | Gradebook 表                                                                 |
+| `SCHOOLOGY_COOKIES`         | 到期更换                      | Selenium 格式 JSON 数组                                                         |
+| `SCHOOLOGY_SECTION_NIDS`    | **每学期**                   | `{"nid":"课程代码", ...}`                                                       |
+| `SCHOOLOGY_GRADING_PERIOD`  | **每学期**（gradebook 跑后自动校准） | `{"start_date":"YYYY-MM-DD","end_date":"YYYY-MM-DD","session":"Session N"}` |
+| `CURRENT_SEMESTER`          | **每学期**                   | 新建档作业的学期标签，如 `2026-S4`                                                      |
+| `ACTIVE_SEMESTERS`          | **每学期** + 宽限期结束时再改一次      | 参与考核的学期，如 `2026-S3,2026-S4` 或 `2026-S4`                                     |
 
 ---
 

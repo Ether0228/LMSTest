@@ -556,16 +556,16 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
             "推荐JSON": chunk_text_json(recommendations),
             "关注列表JSON": chunk_text_json(attention_items, max_len=50000),
             "最后更新时间": now_ms,
-        }
-        # 花名册透传字段：暂存在 row 扩展区，不写飞书（列不存在会报错）
-        # 等在飞书汇总表手动建好这些列后，把下面这段移入上面的 row dict 即可
-        row["_extra"] = {
+            # 花名册透传字段：飞书汇总表建好对应列后自动生效
             "学年":      s.get("school_year", ""),
             "学期号":    s.get("semester_num", ""),
             "OSSLT状态": s.get("osslt", ""),
             "已获学分":  s.get("credits_earned", ""),
             "目标学分":  s.get("credits_target", ""),
             "公告":      s.get("notices_raw", ""),
+        }
+        # 学期时间数据仅用于 JSON 缓存，server 改从环境变量计算后不再需要
+        row["_extra"] = {
             "近期提交周": week_label,
             "学期开始日期": semester_start_str,
             "学期结束日期": semester_end_str,
@@ -656,12 +656,12 @@ def write_json_cache(summary_rows, cache_dir):
             "recentSubmissions": load("近期提交JSON", []),
             "recommendations": load("推荐JSON", []),
             "attentionItems": load("关注列表JSON", []),
-            "schoolYear":      extra.get("学年", ""),
-            "semesterNum":     extra.get("学期号", ""),
-            "osslt":           extra.get("OSSLT状态", ""),
-            "creditsEarned":   extra.get("已获学分", None),
-            "creditsTarget":   extra.get("目标学分", None),
-            "noticesRaw":      extra.get("公告", ""),
+            "schoolYear":      row.get("学年", ""),
+            "semesterNum":     row.get("学期号", ""),
+            "osslt":           row.get("OSSLT状态", ""),
+            "creditsEarned":   row.get("已获学分", None),
+            "creditsTarget":   row.get("目标学分", None),
+            "noticesRaw":      row.get("公告", ""),
             "recentWeekLabel": extra.get("近期提交周", ""),
             "semesterStart":   extra.get("学期开始日期", ""),
             "semesterEnd":     extra.get("学期结束日期", ""),
