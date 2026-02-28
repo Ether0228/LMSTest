@@ -239,12 +239,93 @@ def cmd_courses():
 # 入口
 # ──────────────────────────────────────────────
 
+def get_cfg_with_config_table():
+    """get_cfg() 的扩展版，额外要求 FEISHU_CONFIG_TABLE_ID。"""
+    cfg = get_cfg()
+    load_env()
+    config_table_id = os.environ.get("FEISHU_CONFIG_TABLE_ID", "").strip()
+    if not config_table_id:
+        print("❌ 缺少 FEISHU_CONFIG_TABLE_ID，请在 pipeline/.env 里配置")
+        sys.exit(1)
+    cfg["FEISHU_CONFIG_TABLE_ID"] = config_table_id
+    return cfg
+
+
+# ──────────────────────────────────────────────
+# 命令：init-config
+# ──────────────────────────────────────────────
+
+DEFAULT_COURSE_MAPPING = {
+    "grade 11 physics":               "SPH3U",
+    "grade 12 physics":               "SPH4U",
+    "grade 12 data management":       "MDM4U",
+    "grade 12 advanced functions":    "MHF4U",
+    "grade 11 functions":             "MCR3U",
+    "grade 12 calculus & vectors":    "MCV4U",
+    "grade 12 canadian and world issues": "CGW4U",
+    "grade 12 english":               "ENG4U",
+    "grade 11 english":               "ENG3U",
+    "grade 12 nutrition & health":    "HFA4U",
+    "grade 12 visual arts":           "AVI4M",
+    "g10 canadian history since wwi": "CHC2D",
+    "esl level 5":                    "ESLEO",
+    "esl level 4":                    "ESLDO",
+    "esl level 3":                    "ESLCO",
+    "esl level 2":                    "ESLBO",
+}
+
+def _upsert_config(tok, app_token, table_id, key, value):
+    base = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}"
+    headers = {"Authorization": f"Bearer {tok}", "Content-Type": "application/json"}
+    flt = json.dumps({"conjunction":"and","conditions":[{"field_name":"配置键","operator":"is","value":[key]}]})
+    r = requests.get(f"{base}/records", params={"filter": flt, "page_size": 5}, headers=headers).json()
+    items = r.get("data", {}).get("items", [])
+    payload = {"fields": {"配置键": key, "配置值": value}}
+    if items:
+        record_id = items[0]["record_id"]
+        requests.put(f"{base}/records/{record_id}", json=payload, headers=headers)
+        return "updated"
+    else:
+        requests.post(f"{base}/records", json=payload, headers=headers)
+        return "created"
+
+def cmd_init_config():
+    cfg = get_cfg_with_config_table()
+    tok = get_token(cfg)
+    app_token = cfg["FEISHU_APP_TOKEN"]
+    table_id  = cfg["FEISHU_CONFIG_TABLE_ID"]
+
+    print("\n📝 初始化飞书系统配置表...")
+
+    # 写入 course_mapping
+    mapping_json = json.dumps(DEFAULT_COURSE_MAPPING, ensure_ascii=False)
+    action = _upsert_config(tok, app_token, table_id, "course_mapping", mapping_json)
+    print(f"  course_mapping ({len(DEFAULT_COURSE_MAPPING)} 条) → {action}")
+
+    # 检查 grading_period 是否已存在
+    base = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}"
+    headers = {"Authorization": f"Bearer {tok}"}
+    flt = json.dumps({"conjunction":"and","conditions":[{"field_name":"配置键","operator":"is","value":["grading_period"]}]})
+    r = requests.get(f"{base}/records", params={"filter": flt, "page_size": 5}, headers=headers).json()
+    gp_items = r.get("data", {}).get("items", [])
+    if gp_items:
+        print(f"  grading_period → 已存在，跳过")
+    else:
+        print(f"  grading_period → 未找到（运行 pipeline 后会自动写入）")
+
+    print("\n✅ 完成！以后在飞书"系统配置"表里直接修改 course_mapping 的配置值即可。")
+    print("   下次 pipeline 运行时会自动读取最新映射。")
+
+
+# ──────────────────────────────────────────────
+
 HELP = """
 用法:
   python debug.py student <姓名>     查看某学生的汇总数据
   python debug.py gradebook <姓名>   查看该学生在 gradebook 表里的记录
   python debug.py list               列出所有学生及成绩覆盖情况
   python debug.py courses            对比 gradebook 与汇总表的课程名，排查不匹配
+  python debug.py init-config        把默认课程名映射写入飞书系统配置表（只需跑一次）
 """
 
 if __name__ == "__main__":
@@ -259,5 +340,7 @@ if __name__ == "__main__":
         cmd_list()
     elif args[0] == "courses":
         cmd_courses()
+    elif args[0] == "init-config":
+        cmd_init_config()
     else:
         print(HELP)

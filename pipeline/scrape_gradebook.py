@@ -24,6 +24,26 @@ from datetime import datetime
 
 BASE_URL = "https://queenscanada.schoology.com"
 
+# 课程全名 → 课程代码的默认映射（代码 fallback，优先从飞书系统配置表读取）
+DEFAULT_COURSE_MAPPING = {
+    "grade 11 physics":               "SPH3U",
+    "grade 12 physics":               "SPH4U",
+    "grade 12 data management":       "MDM4U",
+    "grade 12 advanced functions":    "MHF4U",
+    "grade 11 functions":             "MCR3U",
+    "grade 12 calculus & vectors":    "MCV4U",
+    "grade 12 canadian and world issues": "CGW4U",
+    "grade 12 english":               "ENG4U",
+    "grade 11 english":               "ENG3U",
+    "grade 12 nutrition & health":    "HFA4U",
+    "grade 12 visual arts":           "AVI4M",
+    "g10 canadian history since wwi": "CHC2D",
+    "esl level 5":                    "ESLEO",
+    "esl level 4":                    "ESLDO",
+    "esl level 3":                    "ESLCO",
+    "esl level 2":                    "ESLBO",
+}
+
 
 # ──────────────────────────────────────────────
 # 配置读取
@@ -498,8 +518,21 @@ def update_lib_from_gradebook(token: str, app_token: str, lib_table_id: str,
 # 主流程
 # ──────────────────────────────────────────────
 
-def _upsert_config(token: str, app_token: str, table_id: str, key: str, value: str):
-    """在系统配置表中 upsert 一行 (配置键=key, 配置值=value)。"""
+def _fetch_course_mapping(token: str, app_token: str, table_id: str) -> dict:
+    """从飞书系统配置表读取 course_mapping，失败时返回 None（调用方使用 DEFAULT_COURSE_MAPPING）。"""
+    base = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}"
+    headers = {"Authorization": f"Bearer {token}"}
+    flt = json.dumps({"conjunction":"and","conditions":[{"field_name":"配置键","operator":"is","value":["course_mapping"]}]})
+    r = requests.get(f"{base}/records", params={"filter": flt, "page_size": 5}, headers=headers)
+    items = r.json().get("data", {}).get("items", [])
+    if not items:
+        return None
+    raw = items[0]["fields"].get("配置值", "")
+    text = raw if isinstance(raw, str) else (raw[0].get("text", "") if raw else "")
+    return json.loads(text)
+
+
+def _upsert_config(token: str, app_token: str, table_id: str, key: str, value: str):    """在系统配置表中 upsert 一行 (配置键=key, 配置值=value)。"""
     base = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     # 先查是否已有这个 key
@@ -525,32 +558,7 @@ def main():
     nids_raw = re.sub(r'[\x00-\x1f\x7f]', '', cfg["SCHOOLOGY_SECTION_NIDS"])
     sections_raw: dict = json.loads(nids_raw)
 
-    # 课程全名 → 课程代码映射（大小写不敏感）
-    COURSE_MAPPING = {
-        "grade 11 physics":               "SPH3U",
-        "grade 12 physics":               "SPH4U",
-        "grade 12 data management":       "MDM4U",
-        "grade 12 advanced functions":    "MHF4U",
-        "grade 11 functions":             "MCR3U",
-        "grade 12 calculus & vectors":    "MCV4U",
-        "grade 12 canadian and world issues": "CGW4U",
-        "grade 12 english":               "ENG4U",
-        "grade 11 english":               "ENG3U",
-        "grade 12 nutrition & health":    "HFA4U",
-        "grade 12 visual arts":           "AVI4M",
-        "g10 canadian history since wwi": "CHC2D",
-        "esl level 5":                    "ESLEO",
-        "esl level 4":                    "ESLDO",
-        "esl level 3":                    "ESLCO",
-        "esl level 2":                    "ESLBO",
-    }
-    sections = {
-        nid: COURSE_MAPPING.get(name.lower().strip(), name)
-        for nid, name in sections_raw.items()
-    }
-    cookies_raw  = json.loads(cfg["SCHOOLOGY_COOKIES"])
-
-    print(f"课程 Section 数量: {len(sections)}")
+    cookies_raw = json.loads(cfg["SCHOOLOGY_COOKIES"])
 
     # 建立 Schoology 请求会话
     session = build_session(cookies_raw)
@@ -558,6 +566,26 @@ def main():
 
     # 获取飞书 Token
     token = get_feishu_token(cfg["FEISHU_APP_ID"], cfg["FEISHU_APP_SECRET"])
+
+    # 读取课程名映射：优先从飞书系统配置表，fallback 到代码内置映射
+    config_table_id = cfg.get("FEISHU_CONFIG_TABLE_ID", "").strip()
+    course_mapping = None
+    if config_table_id:
+        try:
+            course_mapping = _fetch_course_mapping(token, cfg["FEISHU_APP_TOKEN"], config_table_id)
+            if course_mapping:
+                print(f"✅ 课程名映射已从飞书读取（{len(course_mapping)} 条）")
+        except Exception as e:
+            print(f"  [警告] 飞书课程映射读取失败，使用内置映射: {e}")
+    if not course_mapping:
+        course_mapping = DEFAULT_COURSE_MAPPING
+        print(f"  [提示] 使用内置课程名映射（{len(course_mapping)} 条）")
+
+    sections = {
+        nid: course_mapping.get(name.lower().strip(), name)
+        for nid, name in sections_raw.items()
+    }
+    print(f"课程 Section 数量: {len(sections)}")
 
     # 读取飞书现有记录（用于 upsert）
     print("\n读取飞书 Gradebook 表现有记录...")
