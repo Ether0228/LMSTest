@@ -90,6 +90,16 @@ jobs:
           CURRENT_SEMESTER: ${{ secrets.CURRENT_SEMESTER }}
         run: python pipeline/scrape_gradebook.py
 
+      # === 阶段三·六：把 grading_period.json 提交回 repo，供 Render 读取 ===
+      - name: 6.6 提交学期区间文件 (Commit grading_period.json)
+        continue-on-error: true
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pipeline/grading_period.json
+          git diff --cached --quiet || git commit -m "chore: update grading_period.json [skip ci]"
+          git push
+
       # === 阶段四：构建学生汇总（仪表盘数据源）===
       # 无论前面步骤是否成功都运行，确保汇总表始终是最新状态
       - name: 7. 构建学生汇总 (Build Student Summary)

@@ -28,7 +28,8 @@ loadDotEnvIfPresent();
 
 function computeSemesterProgress() {
   let gp = null;
-  const jsonPath = (process.env.GRADING_PERIOD_JSON_PATH || "").trim();
+  const jsonPath = (process.env.GRADING_PERIOD_JSON_PATH ||
+    path.join(__dirname, "..", "pipeline", "grading_period.json")).trim();
   if (jsonPath) {
     try { gp = JSON.parse(fs.readFileSync(jsonPath, "utf8")); } catch { /* 降级 */ }
   }
