@@ -532,7 +532,8 @@ def _fetch_course_mapping(token: str, app_token: str, table_id: str) -> dict:
     return json.loads(text)
 
 
-def _upsert_config(token: str, app_token: str, table_id: str, key: str, value: str):    """在系统配置表中 upsert 一行 (配置键=key, 配置值=value)。"""
+def _upsert_config(token: str, app_token: str, table_id: str, key: str, value: str):
+    """在系统配置表中 upsert 一行 (配置键=key, 配置值=value)。"""
     base = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     # 先查是否已有这个 key

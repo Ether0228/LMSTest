@@ -81,6 +81,7 @@ jobs:
       # === 阶段三·五：抓取 Gradebook（写 grading_period 供汇总读取）===
       - name: 6.5 抓取 Gradebook (Scrape Gradebook)
         continue-on-error: true   # 失败不阻塞后续汇总步骤
+        id: scrape_gradebook
         env:
           FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
           FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
@@ -91,7 +92,23 @@ jobs:
           SCHOOLOGY_SECTION_NIDS: ${{ secrets.SCHOOLOGY_SECTION_NIDS }}
           CURRENT_SEMESTER: ${{ secrets.CURRENT_SEMESTER }}
           FEISHU_CONFIG_TABLE_ID: ${{ secrets.FEISHU_CONFIG_TABLE_ID }}
+          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
         run: python pipeline/scrape_gradebook.py
+
+      - name: 6.5b 通知 Gradebook 失败
+        if: steps.scrape_gradebook.outcome == 'failure'
+        env:
+          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
+        run: |
+          curl -s -X POST "$FEISHU_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "msg_type": "interactive",
+              "card": {
+                "header": {"title": {"tag": "plain_text", "content": "⚠️ Gradebook 抓取失败"}, "template": "orange"},
+                "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "scrape_gradebook.py 执行失败（不影响其他步骤）\n\n[查看日志](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"}}]
+              }
+            }'
 
       # === 阶段四：构建学生汇总（仪表盘数据源）===
       # 无论前面步骤是否成功都运行，确保汇总表始终是最新状态
