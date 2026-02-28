@@ -313,7 +313,7 @@ def cmd_init_config():
     else:
         print(f"  grading_period → 未找到（运行 pipeline 后会自动写入）")
 
-    print("\n✅ 完成！以后在飞书"系统配置"表里直接修改 course_mapping 的配置值即可。")
+    print('\n✅ 完成！以后在飞书"系统配置"表里直接修改 course_mapping 的配置值即可。')
     print("   下次 pipeline 运行时会自动读取最新映射。")
 
 
