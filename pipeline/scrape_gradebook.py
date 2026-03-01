@@ -147,31 +147,52 @@ def fetch_gradebook(session: requests.Session, section_nid: str) -> dict:
 def fetch_gradesetup_weights(session: requests.Session, section_nid: str) -> dict:
     """抓取 gradesetup 页面，返回 {category_id: weight_pct} 映射。
     权重来自 <td class="weight_percentage"><span title="4.54545%">...，
-    category_id 来自同行 <span data-category-id="...">。
+    category_id 来自同行 <span data-category-id="..."> 或行内 href。
     """
     url = f"{BASE_URL}/course/{section_nid}/gradesetup"
     try:
         resp = session.get(url, timeout=30)
         if resp.status_code != 200 or resp.text.strip().startswith("{"):
+            print(f"  [gradesetup] HTTP {resp.status_code}，跳过")
             return {}
         html = resp.text
     except Exception as e:
         print(f"  [警告] gradesetup 获取失败: {e}")
         return {}
 
+    has_wp = "weight_percentage" in html
+    has_cat = "data-category-id" in html
+    print(f"  [gradesetup] has_weight_percentage={has_wp}, has_category_id={has_cat}, html_len={len(html)}")
+
     weights = {}
-    # 逐行匹配：找含 data-category-id 且含 weight_percentage 的 <tr>
-    for row_m in re.finditer(r'<tr\b[^>]*>(.*?)</tr>', html, re.DOTALL):
+
+    # 方案 A：按行匹配 <tr>...</tr>（最精确）
+    for row_m in re.finditer(r'<tr\b[^>]*>(.*?)</tr>', html, re.DOTALL | re.IGNORECASE):
         row_html = row_m.group(1)
-        cat_m    = re.search(r'data-category-id="(\d+)"', row_html)
-        wt_m     = re.search(r'class="weight_percentage"[^>]*>.*?<span[^>]*title="([\d.]+)%"', row_html, re.DOTALL)
+        cat_m = re.search(r'data-category-id="(\d+)"', row_html)
+        wt_m  = re.search(r'weight_percentage[^>]*>.*?<span[^>]*title="([\d.]+)%"', row_html, re.DOTALL)
         if cat_m and wt_m:
             try:
                 weights[cat_m.group(1)] = round(float(wt_m.group(1)), 4)
             except ValueError:
                 pass
+
+    # 方案 B：fallback — 全文按出现顺序匹配（href 中的 category id 与 weight span 一一对应）
+    if not weights and has_wp and has_cat:
+        cat_ids = re.findall(r'data-category-id="(\d+)"', html)
+        wt_vals = re.findall(r'weight_percentage[^>]*>.*?<span[^>]*title="([\d.]+)%"', html, re.DOTALL)
+        print(f"  [gradesetup fallback] cat_ids={cat_ids}, wt_vals={wt_vals}")
+        if len(cat_ids) == len(wt_vals):
+            for cid, wv in zip(cat_ids, wt_vals):
+                try:
+                    weights[cid] = round(float(wv), 4)
+                except ValueError:
+                    pass
+
     if weights:
-        print(f"  [gradesetup] 读取到 {len(weights)} 个分类权重")
+        print(f"  [gradesetup] 读取到 {len(weights)} 个分类权重: {weights}")
+    else:
+        print(f"  [gradesetup] 未能提取权重（方案 A+B 均无结果）")
     return weights
 
 
