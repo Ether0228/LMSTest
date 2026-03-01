@@ -144,6 +144,37 @@ def fetch_gradebook(session: requests.Session, section_nid: str) -> dict:
     return resp.json()
 
 
+def fetch_gradesetup_weights(session: requests.Session, section_nid: str) -> dict:
+    """抓取 gradesetup 页面，返回 {category_id: weight_pct} 映射。
+    权重来自 <td class="weight_percentage"><span title="4.54545%">...，
+    category_id 来自同行 <span data-category-id="...">。
+    """
+    url = f"{BASE_URL}/course/{section_nid}/gradesetup"
+    try:
+        resp = session.get(url, timeout=30)
+        if resp.status_code != 200 or resp.text.strip().startswith("{"):
+            return {}
+        html = resp.text
+    except Exception as e:
+        print(f"  [警告] gradesetup 获取失败: {e}")
+        return {}
+
+    weights = {}
+    # 逐行匹配：找含 data-category-id 且含 weight_percentage 的 <tr>
+    for row_m in re.finditer(r'<tr\b[^>]*>(.*?)</tr>', html, re.DOTALL):
+        row_html = row_m.group(1)
+        cat_m    = re.search(r'data-category-id="(\d+)"', row_html)
+        wt_m     = re.search(r'class="weight_percentage"[^>]*>.*?<span[^>]*title="([\d.]+)%"', row_html, re.DOTALL)
+        if cat_m and wt_m:
+            try:
+                weights[cat_m.group(1)] = round(float(wt_m.group(1)), 4)
+            except ValueError:
+                pass
+    if weights:
+        print(f"  [gradesetup] 读取到 {len(weights)} 个分类权重")
+    return weights
+
+
 # ──────────────────────────────────────────────
 # 解析：把 API 响应拍平成行列表
 # ──────────────────────────────────────────────
@@ -182,7 +213,8 @@ def parse_grading_period_dates(data: dict) -> dict:
     return {"start_date": start_str, "end_date": end_str, "session": session_name}
 
 
-def parse_gradebook(data: dict, section_nid: str, course_name: str = "") -> list[dict]:
+def parse_gradebook(data: dict, section_nid: str, course_name: str = "",
+                    category_weights: dict = None) -> list[dict]:
     """
     返回 list of flat dicts，每条 = 一个 (student, assignment)。
     键名直接对应飞书字段名。
@@ -195,7 +227,7 @@ def parse_gradebook(data: dict, section_nid: str, course_name: str = "") -> list
     grades_by_uid    = data.get("grades", {})
     user_data        = data.get("user_data", {})
     grading_categories = {
-        str(c["id"]): {"title": c.get("title", ""), "weight": c.get("weight")}
+        str(c["id"]): c.get("title", "")
         for c in data.get("grading_categories", [])
         if c["id"] not in ("all", "summary")
     }
@@ -228,9 +260,8 @@ def parse_gradebook(data: dict, section_nid: str, course_name: str = "") -> list
             pct = round(grade_val / max_points * 100, 1) if (grade_val is not None and max_points) else None
 
             category_id    = str(item.get("grading_category_id", ""))
-            cat_info       = grading_categories.get(category_id, {})
-            category_title  = cat_info.get("title", item.get("category_title", "")) if isinstance(cat_info, dict) else str(cat_info)
-            category_weight = cat_info.get("weight") if isinstance(cat_info, dict) else None
+            category_title  = grading_categories.get(category_id, item.get("category_title", ""))
+            category_weight = category_weights.get(category_id) if category_weights else None
 
             rows.append({
                 "学生姓名":   student_name,
@@ -619,8 +650,9 @@ def main():
     for nid, course_name in sections.items():
         print(f"\n── {course_name} ({nid}) ──")
         try:
+            category_weights = fetch_gradesetup_weights(session, nid)
             data = fetch_gradebook(session, nid)
-            rows = parse_gradebook(data, nid, course_name)
+            rows = parse_gradebook(data, nid, course_name, category_weights)
             print(f"  解析到 {len(rows)} 条 (学生×作业)")
             all_rows.extend(rows)
             # 从第一个有效 section 提取学期日期
