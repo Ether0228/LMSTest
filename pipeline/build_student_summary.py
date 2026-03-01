@@ -688,7 +688,7 @@ def cleanup_ignored_from_missing_table(token, conf, assignment_lookup, missing_r
 
     ignored_ids = {aid for aid, a in assignment_lookup.items() if a.get("nature") == "🚫 忽略"}
     if not ignored_ids:
-        print(">>> 无"忽略"作业，跳过缺交表清理")
+        print(">>> 无忽略作业，跳过缺交表清理")
         return
 
     to_delete = []
