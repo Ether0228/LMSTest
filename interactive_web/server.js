@@ -4,6 +4,33 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
+// ── PostgreSQL 读取缓存（可选，DATABASE_URL 设置时启用）──────────────────────
+// 依赖 pg 包（package.json 中已声明），DATABASE_URL 未设置时自动跳过，不影响原有流程。
+let pgPool = null;
+try {
+  if (process.env.DATABASE_URL) {
+    const { Pool } = require("pg");
+    pgPool = new Pool({ connectionString: process.env.DATABASE_URL });
+    console.log("[pg] pool initialized");
+  }
+} catch (e) {
+  console.warn("[pg] pg module not available, PostgreSQL cache disabled:", e.message);
+}
+
+async function pgCacheGet(tenantKey, studentName) {
+  if (!pgPool) return null;
+  try {
+    const res = await pgPool.query(
+      "SELECT data FROM student_summary WHERE tenant=$1 AND student_name=$2",
+      [tenantKey, studentName]
+    );
+    return res.rows[0]?.data ?? null;
+  } catch (e) {
+    console.warn("[pg] query error:", e.message);
+    return null;
+  }
+}
+
 function loadDotEnvIfPresent() {
   // Minimal .env loader to avoid adding dependencies (dotenv).
   const envPath = path.join(__dirname, ".env");
@@ -557,6 +584,16 @@ async function handleApiDashboard(req, res, parsedUrl) {
     const session = JSON.parse(data);
     studentName = (session.studentName || "").trim();
     if (!studentName) return json(res, 401, { error: "session missing studentName" });
+  }
+
+  // ── PostgreSQL 缓存（最快路径，pipeline 写入后 < 10ms）──────────────────────
+  if (!forceRefresh) {
+    const pgHit = await pgCacheGet(tenantKey, studentName);
+    if (pgHit) {
+      const ageMin = Math.round((Date.now() - (pgHit._cachedAt || 0)) / 60000);
+      console.log(`[pg] hit: ${tenantKey}/${studentName} (${ageMin}min ago)`);
+      return json(res, 200, pgHit);
+    }
   }
 
   // ── 磁盘缓存快速通道（pipeline 已写好文件，直接返回，< 5ms）────

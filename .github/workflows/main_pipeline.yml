@@ -35,7 +35,7 @@ jobs:
       - name: 3. 安装依赖库
         run: |
           python -m pip install --upgrade pip
-          pip install requests selenium webdriver-manager gspread oauth2client
+          pip install requests selenium webdriver-manager gspread oauth2client psycopg2-binary
 
       # === 阶段一：爬虫抓取 ===
       - name: 4. 运行爬虫 (Scraper)
@@ -126,6 +126,7 @@ jobs:
           FEISHU_GRADEBOOK_TABLE_ID: ${{ secrets.FEISHU_GRADEBOOK_TABLE_ID }}
           ACTIVE_SEMESTERS: ${{ secrets.ACTIVE_SEMESTERS }}
           CURRENT_SEMESTER: ${{ secrets.CURRENT_SEMESTER }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: python "pipeline/build_student_summary.py"
 
       # === 失败通知 ===

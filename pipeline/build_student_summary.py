@@ -714,6 +714,96 @@ def write_json_cache(summary_rows, cache_dir):
     print(f">>> JSON 缓存写入完成: {written} 个文件 → {cache_dir}")
 
 
+def write_pg_cache(summary_rows, database_url, tenant_key=None):
+    """把每个学生的汇总数据写入 PostgreSQL student_summary 表（作为读取缓存层）。
+    数据结构与 write_json_cache() 完全一致，server.js 可零改动读取。
+    env: CACHE_TENANT_KEY — 对应 server 的 tenantKey，默认 'default'
+    """
+    import re
+    try:
+        import psycopg2
+        import psycopg2.extras
+    except ImportError:
+        print("WARNING: psycopg2 未安装，跳过 PostgreSQL 写入。请 pip install psycopg2-binary")
+        return
+
+    if not database_url:
+        print("INFO: DATABASE_URL 未设置，跳过 PostgreSQL 写入")
+        return
+
+    if tenant_key is None:
+        tenant_key = os.environ.get("CACHE_TENANT_KEY", "default").strip()
+
+    def load(row, key, fallback):
+        v = row.get(key, "")
+        if not v:
+            return fallback
+        try:
+            return json.loads(v)
+        except Exception:
+            return fallback
+
+    rows_to_insert = []
+    for row in summary_rows:
+        student_name = row.get("学生姓名", "")
+        if not student_name:
+            continue
+        extra = row.get("_extra", {})
+        payload = {
+            "tenant":          tenant_key,
+            "studentName":     student_name,
+            "missingTotal":    row.get("缺交总数", 0),
+            "submittedTotal":  row.get("已提交总数", 0),
+            "courses":         load(row, "课程清单JSON", []),
+            "courseProgress":  load(row, "课程进度JSON", []),
+            "missingItems":    load(row, "缺交明细JSON", []),
+            "missingByCourse": load(row, "缺交按课程JSON", {}),
+            "recentSubmissions": load(row, "近期提交JSON", []),
+            "recommendations": load(row, "推荐JSON", []),
+            "attentionItems":  load(row, "关注列表JSON", []),
+            "schoolYear":      row.get("学年", ""),
+            "semesterNum":     row.get("学期号", ""),
+            "osslt":           row.get("OSSLT状态", ""),
+            "creditsEarned":   row.get("已获学分", None),
+            "creditsTarget":   row.get("目标学分", None),
+            "noticesRaw":      row.get("公告", ""),
+            "recentWeekLabel": extra.get("近期提交周", ""),
+            "semesterStart":   extra.get("学期开始日期", ""),
+            "semesterEnd":     extra.get("学期结束日期", ""),
+            "totalWeeks":      extra.get("学期总周数", None),
+            "currentWeek":     extra.get("当前第几周", None),
+            "_cachedAt":       int(time.time() * 1000),
+        }
+        rows_to_insert.append((tenant_key, student_name, psycopg2.extras.Json(payload)))
+
+    if not rows_to_insert:
+        print("INFO: 无学生数据，跳过 PostgreSQL 写入")
+        return
+
+    try:
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS student_summary (
+              tenant       TEXT NOT NULL,
+              student_name TEXT NOT NULL,
+              data         JSONB NOT NULL,
+              updated_at   TIMESTAMPTZ DEFAULT NOW(),
+              PRIMARY KEY (tenant, student_name)
+            )""")
+        psycopg2.extras.execute_values(cur,
+            """INSERT INTO student_summary(tenant, student_name, data) VALUES %s
+               ON CONFLICT(tenant, student_name)
+               DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()""",
+            rows_to_insert)
+        conn.commit()
+        cur.close()
+        conn.close()
+        print(f"  ✓ PostgreSQL 写入 {len(rows_to_insert)} 条 → tenant={tenant_key}")
+    except Exception as e:
+        print(f"WARNING: PostgreSQL 写入失败: {e}")
+
+
 def main():
     conf = get_env_config()
     token = get_feishu_token(conf)
@@ -796,6 +886,12 @@ def main():
     cache_dir = os.environ.get("CACHE_DIR", "").strip()
     if cache_dir:
         write_json_cache(summary_rows, cache_dir)
+
+    # 可选：写 PostgreSQL 缓存（设置 DATABASE_URL 后启用，作为最快读取路径）
+    database_url = os.environ.get("DATABASE_URL", "").strip()
+    if database_url:
+        tenant_key = os.environ.get("CACHE_TENANT_KEY", "default").strip()
+        write_pg_cache(summary_rows, database_url, tenant_key)
 
 
 if __name__ == "__main__":
