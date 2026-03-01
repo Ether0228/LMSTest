@@ -277,12 +277,23 @@ DEFAULT_COURSE_MAPPING = {
 def _upsert_config(tok, app_token, table_id, key, value):
     base = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}"
     headers = {"Authorization": f"Bearer {tok}", "Content-Type": "application/json"}
-    flt = json.dumps({"conjunction":"and","conditions":[{"field_name":"配置键","operator":"is","value":[key]}]})
-    r = requests.get(f"{base}/records", params={"filter": flt, "page_size": 5}, headers=headers).json()
-    items = r.get("data", {}).get("items", [])
+    # 全量拉取后 Python 端匹配，避免飞书文本字段 filter 不稳定
+    all_items = []
+    page_token = None
+    while True:
+        params = {"page_size": 100}
+        if page_token:
+            params["page_token"] = page_token
+        r = requests.get(f"{base}/records", params=params, headers=headers).json()
+        all_items.extend(r.get("data", {}).get("items", []))
+        if not r.get("data", {}).get("has_more"):
+            break
+        page_token = r["data"]["page_token"]
+    matched = [it for it in all_items
+               if str(it["fields"].get("配置键", "")).strip() == key]
     payload = {"fields": {"配置键": key, "配置值": value}}
-    if items:
-        record_id = items[0]["record_id"]
+    if matched:
+        record_id = matched[0]["record_id"]
         requests.put(f"{base}/records/{record_id}", json=payload, headers=headers)
         return "updated"
     else:

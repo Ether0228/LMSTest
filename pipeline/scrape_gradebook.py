@@ -532,19 +532,34 @@ def _fetch_course_mapping(token: str, app_token: str, table_id: str) -> dict:
 
 
 def _upsert_config(token: str, app_token: str, table_id: str, key: str, value: str):
-    """在系统配置表中 upsert 一行 (配置键=key, 配置值=value)。"""
+    """在系统配置表中 upsert 一行 (配置键=key, 配置值=value)。
+    全量拉取后在 Python 端匹配，避免飞书文本字段 filter 不稳定导致重复创建。
+    """
     base = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    # 先查是否已有这个 key
-    flt = json.dumps({"conjunction":"and","conditions":[{"field_name":"配置键","operator":"is","value":[key]}]})
-    r = requests.get(f"{base}/records", params={"filter": flt, "page_size": 5}, headers=headers)
-    items = r.json().get("data", {}).get("items", [])
+    # 全量拉取（配置表条数极少，通常 < 20 条）
+    all_items = []
+    page_token = None
+    while True:
+        params = {"page_size": 100}
+        if page_token:
+            params["page_token"] = page_token
+        r = requests.get(f"{base}/records", params=params, headers=headers).json()
+        all_items.extend(r.get("data", {}).get("items", []))
+        if not r.get("data", {}).get("has_more"):
+            break
+        page_token = r["data"]["page_token"]
+    # Python 端匹配 配置键
+    matched = [it for it in all_items
+               if str(it["fields"].get("配置键", "")).strip() == key]
     payload = {"fields": {"配置键": key, "配置值": value}}
-    if items:
-        record_id = items[0]["record_id"]
+    if matched:
+        record_id = matched[0]["record_id"]
         requests.put(f"{base}/records/{record_id}", json=payload, headers=headers)
+        print(f"  [config] 更新 '{key}'")
     else:
         requests.post(f"{base}/records", json=payload, headers=headers)
+        print(f"  [config] 新建 '{key}'")
 
 
 def main():
