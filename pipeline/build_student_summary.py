@@ -331,11 +331,13 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
             }
         )
         # 去重计数：同一作业多次提交只算 1 次（用作业链接作为唯一键，链接为空则用作业名）
-        sbc = students[name]["submitted_by_course"]
-        dedup_key = sub_link or f.get("作业名称", "") or ""
-        if course_name not in sbc:
-            sbc[course_name] = set()
-        sbc[course_name].add(dedup_key)
+        # 跳过"🚫 忽略"作业，与 expected_count 统计口径保持一致（否则会导致完成率 > 100%）
+        if assignment.get("nature") != "🚫 忽略":
+            sbc = students[name]["submitted_by_course"]
+            dedup_key = sub_link or f.get("作业名称", "") or ""
+            if course_name not in sbc:
+                sbc[course_name] = set()
+            sbc[course_name].add(dedup_key)
 
     # 3) 缺交记录聚合（按"关联学生" record_id）
     roster_id_to_name = {
@@ -441,7 +443,9 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
         _gb_rows_by_course = {}
         for gb_row in (_gb_by_student or {}).get(name, []):
             raw_name = str(gb_row.get("课程名", "")).strip()
-            c_key = _GRADEBOOK_COURSE_NAME_MAP.get(raw_name.lower(), raw_name)
+            # 标准化内部空白（Schoology 课程名可能含多余空格，如 "Grade 12     Data Management"）
+            normalized_name = re.sub(r'\s+', ' ', raw_name).lower()
+            c_key = _GRADEBOOK_COURSE_NAME_MAP.get(normalized_name, raw_name)
             if c_key:
                 _gb_rows_by_course.setdefault(c_key, []).append(gb_row)
 

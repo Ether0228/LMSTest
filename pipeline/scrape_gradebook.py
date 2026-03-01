@@ -582,22 +582,24 @@ def main():
     # 获取飞书 Token
     token = get_feishu_token(cfg["FEISHU_APP_ID"], cfg["FEISHU_APP_SECRET"])
 
-    # 读取课程名映射：优先从飞书系统配置表，fallback 到代码内置映射
+    # 读取课程名映射：以代码内置映射为基础，飞书配置表的条目优先覆盖
     config_table_id = cfg.get("FEISHU_CONFIG_TABLE_ID", "").strip()
-    course_mapping = None
+    course_mapping = dict(DEFAULT_COURSE_MAPPING)   # 始终以内置映射为底
     if config_table_id:
         try:
-            course_mapping = _fetch_course_mapping(token, cfg["FEISHU_APP_TOKEN"], config_table_id)
-            if course_mapping:
-                print(f"✅ 课程名映射已从飞书读取（{len(course_mapping)} 条）")
+            feishu_mapping = _fetch_course_mapping(token, cfg["FEISHU_APP_TOKEN"], config_table_id)
+            if feishu_mapping:
+                course_mapping.update(feishu_mapping)   # 飞书条目覆盖内置条目
+                print(f"✅ 课程名映射：内置 {len(DEFAULT_COURSE_MAPPING)} 条 + 飞书 {len(feishu_mapping)} 条覆盖")
+            else:
+                print(f"  [提示] 飞书课程名映射为空，仅使用内置映射（{len(course_mapping)} 条）")
         except Exception as e:
-            print(f"  [警告] 飞书课程映射读取失败，使用内置映射: {e}")
-    if not course_mapping:
-        course_mapping = DEFAULT_COURSE_MAPPING
+            print(f"  [警告] 飞书课程映射读取失败，仅使用内置映射: {e}")
+    else:
         print(f"  [提示] 使用内置课程名映射（{len(course_mapping)} 条）")
 
     sections = {
-        nid: course_mapping.get(name.lower().strip(), name)
+        nid: course_mapping.get(re.sub(r'\s+', ' ', name).lower().strip(), name)
         for nid, name in sections_raw.items()
     }
     print(f"课程 Section 数量: {len(sections)}")
