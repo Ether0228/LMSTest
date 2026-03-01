@@ -481,9 +481,10 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
                     if score is None or not max_score:
                         continue
                     aol_details.append({
-                        "name":  str(r.get("作业名", "")).strip(),
-                        "score": round(float(score), 1),
-                        "max":   round(float(max_score), 1),
+                        "name":   str(r.get("作业名", "")).strip(),
+                        "score":  round(float(score), 1),
+                        "max":    round(float(max_score), 1),
+                        "weight": r.get("分类权重%"),
                     })
                 # 若无 AoL 分类条目，回退：展示所有有成绩的作业
                 if not aol_details:
@@ -497,6 +498,7 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
                             "score":    round(float(score), 1),
                             "max":      round(float(max_score), 1),
                             "category": str(r.get("分类", "")).strip(),
+                            "weight":   r.get("分类权重%"),
                         })
 
             cp_entry = {
@@ -513,6 +515,41 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
             if aol_details:
                 cp_entry["aol_details"] = aol_details
             course_progress.append(cp_entry)
+
+        # DDL 日历：从 gradebook 提取未来截止日期
+        upcoming_deadlines = []
+        seen_ddl = set()
+        for gb_row in _gb_by_student.get(name, []):
+            due_ms = gb_row.get("截止日期")
+            if not due_ms or not isinstance(due_ms, (int, float)):
+                continue
+            due_ms = int(due_ms)
+            if due_ms <= now_ms:
+                continue
+            asgn_name = str(gb_row.get("作业名", "")).strip()
+            if not asgn_name:
+                continue
+            raw_course = str(gb_row.get("课程名", "")).strip()
+            normalized_course = re.sub(r'\s+', ' ', raw_course).lower()
+            course_code = _GRADEBOOK_COURSE_NAME_MAP.get(normalized_course, raw_course)
+            category = str(gb_row.get("分类", "")).strip()
+            ddl_key = f"{due_ms}_{asgn_name}_{course_code}"
+            if ddl_key in seen_ddl:
+                continue
+            seen_ddl.add(ddl_key)
+            entry = {
+                "date_ms":  due_ms,
+                "course":   course_code,
+                "name":     asgn_name,
+                "category": category,
+                "is_aol":   is_aol(category),
+            }
+            weight = gb_row.get("分类权重%")
+            if weight is not None:
+                entry["weight"] = weight
+            upcoming_deadlines.append(entry)
+        upcoming_deadlines.sort(key=lambda x: x["date_ms"])
+        upcoming_deadlines = upcoming_deadlines[:30]
 
         submitted_sorted = sorted(
             s["submitted"], key=lambda x: str(x.get("submittedAt", "")), reverse=True
@@ -602,6 +639,7 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
             "近期提交JSON": chunk_text_json(recent),
             "推荐JSON": chunk_text_json(recommendations),
             "关注列表JSON": chunk_text_json(attention_items, max_len=50000),
+            "DDL日历JSON":  json.dumps(upcoming_deadlines, ensure_ascii=False),
             "最后更新时间": now_ms,
             # 花名册透传字段：飞书汇总表建好对应列后自动生效
             "学年":      s.get("school_year", ""),
@@ -828,6 +866,7 @@ def write_pg_cache(summary_rows, database_url, tenant_key=None):
             "recentSubmissions": load(row, "近期提交JSON", []),
             "recommendations": load(row, "推荐JSON", []),
             "attentionItems":  load(row, "关注列表JSON", []),
+            "upcomingDeadlines": load(row, "DDL日历JSON", []),
             "schoolYear":      row.get("学年", ""),
             "semesterNum":     row.get("学期号", ""),
             "osslt":           row.get("OSSLT状态", ""),

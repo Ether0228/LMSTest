@@ -530,6 +530,50 @@ code { font-family: var(--mono); font-size: 12px; }
 }
 .combo__message:not(:empty)::before { content: '> '; color: var(--sub); }
 
+/* ─── DDL 日历 ──────────────────────────────────────────────── */
+.ddl-calendar__header {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--sub);
+  margin-bottom: 4px;
+  letter-spacing: .03em;
+}
+.ddl-calendar { display: flex; flex-direction: column; gap: 8px; }
+.ddl-empty    { font-size: 12px; color: var(--muted); font-style: italic; }
+
+.ddl-group { display: flex; flex-direction: column; gap: 3px; }
+.ddl-group__label {
+  font-size: 10px;
+  color: var(--sub);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 2px;
+  margin-bottom: 2px;
+}
+.ddl-item {
+  display: grid;
+  grid-template-columns: 9ch 5ch 1fr auto;
+  gap: 4px;
+  font-size: 12px;
+  align-items: baseline;
+  padding: 1px 0;
+}
+.ddl-item--urgent .ddl-date { color: var(--danger); font-weight: 700; }
+.ddl-item--urgent .ddl-name { color: var(--danger); }
+.ddl-date   { color: var(--sub);  white-space: nowrap; }
+.ddl-course { color: var(--text); font-weight: 600;    }
+.ddl-name   { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ddl-tags   { display: flex; gap: 3px; flex-shrink: 0; }
+.ddl-tag    { font-size: 10px; padding: 0 4px; border: 1px solid; border-radius: 2px; white-space: nowrap; }
+.ddl-tag--aol    { color: #b45309; border-color: #fde68a; background: #fffbeb; }
+.ddl-tag--weight { color: var(--sub); border-color: var(--border); }
+
+/* ─── AoL 评分详情：百分比 + 比重 ───────────────────────────── */
+.aol-pct    { color: var(--sub); font-size: 11px; }
+.aol-weight { font-size: 10px; color: var(--muted); border: 1px solid var(--border);
+              padding: 0 4px; border-radius: 2px; margin-left: 4px; }
+
 /* ─── 区域 B：今日待处理 ──────────────────────────────────────── */
 .area--tasks { display: flex; flex-direction: column; gap: 10px; }
 

@@ -195,7 +195,7 @@ def parse_gradebook(data: dict, section_nid: str, course_name: str = "") -> list
     grades_by_uid    = data.get("grades", {})
     user_data        = data.get("user_data", {})
     grading_categories = {
-        str(c["id"]): c["title"]
+        str(c["id"]): {"title": c.get("title", ""), "weight": c.get("weight")}
         for c in data.get("grading_categories", [])
         if c["id"] not in ("all", "summary")
     }
@@ -228,7 +228,9 @@ def parse_gradebook(data: dict, section_nid: str, course_name: str = "") -> list
             pct = round(grade_val / max_points * 100, 1) if (grade_val is not None and max_points) else None
 
             category_id    = str(item.get("grading_category_id", ""))
-            category_title = grading_categories.get(category_id, item.get("category_title", ""))
+            cat_info       = grading_categories.get(category_id, {})
+            category_title  = cat_info.get("title", item.get("category_title", "")) if isinstance(cat_info, dict) else str(cat_info)
+            category_weight = cat_info.get("weight") if isinstance(cat_info, dict) else None
 
             rows.append({
                 "学生姓名":   student_name,
@@ -238,6 +240,7 @@ def parse_gradebook(data: dict, section_nid: str, course_name: str = "") -> list
                 "作业NID":    nid,
                 "作业名":     item.get("title", ""),
                 "分类":       category_title,
+                "分类权重%":  category_weight,
                 "评分维度":   item.get("alignments", ""),
                 "得分":       grade_val,
                 "满分":       max_points,
@@ -311,7 +314,7 @@ def build_feishu_fields(row: dict) -> dict:
             continue
         fields[k] = v
     # 飞书数字字段不能是 Python float，要显式 float
-    for num_key in ("得分", "满分", "得分率", "课程总分%"):
+    for num_key in ("得分", "满分", "得分率", "课程总分%", "分类权重%"):
         if num_key in fields and isinstance(fields[num_key], (int, float)):
             fields[num_key] = float(fields[num_key])
     # 飞书日期字段须为 Unix 毫秒时间戳

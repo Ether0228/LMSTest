@@ -346,7 +346,7 @@ function renderSemester(data) {
   const { start_date, end_date, current_week, total_weeks } = data.semester
 
   // 日期显示
-  const today = data.combo?.today ? new Date(data.combo.today) : new Date()
+  const today = new Date()
   const dayNames = ['日','一','二','三','四','五','六']
   document.getElementById("headerDate").textContent =
     `今天  ${today.getMonth()+1}月${today.getDate()}日（周${dayNames[today.getDay()]}）`
@@ -479,12 +479,16 @@ function renderCourses(data) {
       // AoL 评分区块
       const aolItems = cp.aol_details || []
       const aolHTML = aolItems.length > 0
-        ? aolItems.map(a => `
-            <div class="detail-item detail-item--submitted">
-              <span class="detail-item__name">${esc(a.name)}${a.category ? ` <small style="opacity:.6">(${esc(a.category)})</small>` : ""}</span>
-              <span class="detail-item__date">${a.score} / ${a.max}</span>
-            </div>
-          `).join("")
+        ? aolItems.map(a => {
+            const pct = a.max > 0 ? Math.round(a.score / a.max * 100) : 0
+            const weightStr = a.weight != null ? ` <span class="aol-weight">${a.weight}%比重</span>` : ""
+            return `
+              <div class="detail-item detail-item--submitted">
+                <span class="detail-item__name">${esc(a.name)}${a.category ? ` <small style="opacity:.6">(${esc(a.category)})</small>` : ""}</span>
+                <span class="detail-item__date">${a.score} / ${a.max} <span class="aol-pct">(${pct}%)</span>${weightStr}</span>
+              </div>
+            `
+          }).join("")
         : `<div class="detail-empty">暂无 AoL 评分数据</div>`
 
       const gradeStr   = cp.current_grade != null ? `${cp.current_grade}%` : "—"
@@ -594,14 +598,61 @@ function buildHeatmapCells(monthData) {
   return cells
 }
 
-function renderCombo(data) {
-  const { current_streak, months } = data.combo
-  document.getElementById("comboCount").textContent = current_streak
-  document.getElementById("comboMessage").textContent = comboMessage(current_streak)
+function renderCalendar(data) {
+  const deadlines = data.upcoming_deadlines || []
+  const el = document.getElementById("ddlCalendar")
+  if (!el) return
 
-  // 所有月份合并显示
-  document.getElementById("heatmapGrid").innerHTML =
-    renderAllMonthsGrid(months)
+  if (deadlines.length === 0) {
+    el.innerHTML = `<div class="ddl-empty">暂无即将到来的 DDL</div>`
+    return
+  }
+
+  const todayStart = new Date(); todayStart.setHours(0,0,0,0)
+  const todayMs  = todayStart.getTime()
+  const dayMs    = 86400000
+  const weekMs   = 7 * dayMs
+
+  const groups = [
+    { label: "今天",   items: [], maxDiff: dayMs },
+    { label: "本周内", items: [], maxDiff: weekMs },
+    { label: "下一周", items: [], maxDiff: 2 * weekMs },
+    { label: "更远",   items: [], maxDiff: Infinity },
+  ]
+  for (const d of deadlines) {
+    const diff = d.date_ms - todayMs
+    if (diff < 0) continue
+    const g = groups.find(g => diff < g.maxDiff)
+    if (g) g.items.push(d)
+  }
+
+  const dayNames = ['日','一','二','三','四','五','六']
+  function fmtDate(ms) {
+    const d = new Date(ms)
+    return `${d.getMonth()+1}/${d.getDate()}（周${dayNames[d.getDay()]}）`
+  }
+
+  const html = groups
+    .filter(g => g.items.length > 0)
+    .map(g => {
+      const rows = g.items.map(d => {
+        const urgency = (d.date_ms - todayMs) < dayMs * 2 ? " ddl-item--urgent" : ""
+        const aolTag  = d.is_aol ? `<span class="ddl-tag ddl-tag--aol">AoL</span>` : ""
+        const wTag    = d.weight != null ? `<span class="ddl-tag ddl-tag--weight">${d.weight}%</span>` : ""
+        return `<div class="ddl-item${urgency}">
+          <span class="ddl-date">${fmtDate(d.date_ms)}</span>
+          <span class="ddl-course">${esc(d.course)}</span>
+          <span class="ddl-name">${esc(d.name)}</span>
+          <span class="ddl-tags">${aolTag}${wTag}</span>
+        </div>`
+      }).join("")
+      return `<div class="ddl-group">
+        <div class="ddl-group__label">${g.label}</div>
+        ${rows}
+      </div>`
+    }).join("")
+
+  el.innerHTML = html || `<div class="ddl-empty">暂无即将到来的 DDL</div>`
 }
 
 // ─── 区域 E：情境化指南 ───────────────────────────────────────
@@ -755,7 +806,13 @@ function normalizeApiResponse(raw) {
     completion:      cp.completion     || 0,
     current_grade:   cp.current_grade  || null,
     grade_updated_at: cp.grade_updated_at || null,
-    aol_details:     cp.aol_details    || [],
+    aol_details:     (cp.aol_details || []).map(a => ({
+      name:     a.name     || "",
+      score:    a.score    ?? 0,
+      max:      a.max      ?? 0,
+      category: a.category || "",
+      weight:   a.weight   ?? null,
+    })),
     aolSubmitted:    cp.aolSubmitted   || 0,
     aolMissing:      cp.aolMissing     || 0,
   }))
@@ -841,6 +898,7 @@ function normalizeApiResponse(raw) {
     missing_total:   missingTotal,
     submitted_total: raw.submittedTotal ?? 0,
     combo,
+    upcoming_deadlines: raw.upcomingDeadlines || [],
     alerts:          [...alerts, ...noticesFromServer, ...noticesFromRoster],
   }
 }
@@ -951,7 +1009,7 @@ function renderAll(data) {
   renderTasks(data)
   renderAttentionList(data)
   renderCourses(data)
-  renderCombo(data)
+  renderCalendar(data)
   renderGuideSnippet(data)
 }
 
