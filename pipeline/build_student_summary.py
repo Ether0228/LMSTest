@@ -5,6 +5,27 @@ import time
 import re
 from datetime import datetime, timedelta
 
+# Gradebook 课程全名 → 课程代码映射（与 scrape_gradebook.py DEFAULT_COURSE_MAPPING 保持一致）
+# 用于兼容飞书 Gradebook 表中存储的旧全名数据
+_GRADEBOOK_COURSE_NAME_MAP = {
+    "grade 11 physics":               "SPH3U",
+    "grade 12 physics":               "SPH4U",
+    "grade 12 data management":       "MDM4U",
+    "grade 12 advanced functions":    "MHF4U",
+    "grade 11 functions":             "MCR3U",
+    "grade 12 calculus & vectors":    "MCV4U",
+    "grade 12 canadian and world issues": "CGW4U",
+    "grade 12 english":               "ENG4U",
+    "grade 11 english":               "ENG3U",
+    "grade 12 nutrition & health":    "HFA4U",
+    "grade 12 visual arts":           "AVI4M",
+    "g10 canadian history since wwi": "CHC2D",
+    "esl level 5":                    "ESLEO",
+    "esl level 4":                    "ESLDO",
+    "esl level 3":                    "ESLCO",
+    "esl level 2":                    "ESLBO",
+}
+
 
 def get_current_week_start():
     """本周周一 00:00（pipeline 跑在 TZ=Asia/Shanghai 环境下）"""
@@ -419,7 +440,8 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
         # 按课程分组本学生的 gradebook 行，用于填充成绩数据
         _gb_rows_by_course = {}
         for gb_row in (_gb_by_student or {}).get(name, []):
-            c_key = str(gb_row.get("课程名", "")).strip()
+            raw_name = str(gb_row.get("课程名", "")).strip()
+            c_key = _GRADEBOOK_COURSE_NAME_MAP.get(raw_name.lower(), raw_name)
             if c_key:
                 _gb_rows_by_course.setdefault(c_key, []).append(gb_row)
 
