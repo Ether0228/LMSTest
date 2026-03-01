@@ -677,6 +677,43 @@ def sync_summary_table(token, conf, summary_rows):
     )
 
 
+def cleanup_ignored_from_missing_table(token, conf, assignment_lookup, missing_records):
+    """删除飞书缺交表中关联到"🚫 忽略"作业的行。
+
+    assignment_lookup: {record_id -> {nature, ...}} — 来自 build_assignment_lookup()
+    missing_records:   fetch_all_records() 拉取的缺交表原始行列表
+    """
+    app_token = conf["FEISHU_APP_TOKEN"]
+    table_id  = conf["FEISHU_MISSING_TABLE_ID"]
+
+    ignored_ids = {aid for aid, a in assignment_lookup.items() if a.get("nature") == "🚫 忽略"}
+    if not ignored_ids:
+        print(">>> 无"忽略"作业，跳过缺交表清理")
+        return
+
+    to_delete = []
+    for row in missing_records:
+        linked = extract_linked_record_ids(row.get("fields", {}).get("关联作业"))
+        if any(aid in ignored_ids for aid in linked):
+            to_delete.append(row["record_id"])
+
+    if not to_delete:
+        print(f">>> 缺交表清理：没有需要删除的忽略作业行")
+        return
+
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}/records/batch_delete"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    deleted = 0
+    for i in range(0, len(to_delete), 500):
+        chunk = to_delete[i:i+500]
+        resp = requests.post(url, headers=headers, json={"records": chunk}).json()
+        if resp.get("code") == 0:
+            deleted += len(chunk)
+        else:
+            print(f"  WARNING: 批量删除失败: {resp}")
+    print(f">>> 缺交表清理完成：删除 {deleted} 行（忽略作业）")
+
+
 def write_json_cache(summary_rows, cache_dir):
     """把每个学生的汇总数据写成独立 JSON 文件，供 Node.js 直接读取（< 5ms）。
     文件命名规则与 server.js diskCacheFile() 保持一致：
@@ -906,7 +943,9 @@ def main():
         roster, submissions, missing, assignment_lookup, assignment_by_link,
         gradebook_by_student, nid_to_lib, gp_info=gp_info,
     )
-    sync_summary_table(token, conf, summary_rows)
+
+    # 清理飞书缺交表中"🚫 忽略"作业的行
+    cleanup_ignored_from_missing_table(token, conf, assignment_lookup, missing)
 
     # 可选：同时写本地磁盘缓存（服务器上运行时设置 CACHE_DIR）
     cache_dir = os.environ.get("CACHE_DIR", "").strip()

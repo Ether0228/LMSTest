@@ -21,7 +21,7 @@ async function pgCacheGet(tenantKey, studentName) {
   if (!pgPool) return null;
   try {
     const res = await pgPool.query(
-      "SELECT data FROM student_summary WHERE tenant=$1 AND student_name=$2",
+      "SELECT data FROM student_summary WHERE tenant=$1 AND LOWER(student_name)=LOWER($2)",
       [tenantKey, studentName]
     );
     return res.rows[0]?.data ?? null;
@@ -604,48 +604,6 @@ async function handleApiDashboard(req, res, parsedUrl) {
       console.log(`[cache] hit: ${tenantKey}/${studentName} (${ageMin}min ago)`);
       return json(res, 200, hit);
     }
-  }
-  const rosterHint = await bitableFetchOneByTextField(
-    tenantKey,
-    token,
-    tenantConf.appToken,
-    tenantConf.rosterTableId,
-    "学生姓名",
-    studentName,
-    ["学生姓名"],
-    { forceRefresh },
-  );
-  const rosterHintId = rosterHint?.record_id || "";
-
-  // Fastest path: use precomputed summary table if configured.
-  const hasSummaryTable = !!(tenantConf.summaryTableId || "").trim();
-  const summaryPayload = await tryLoadFromSummaryTable(
-    tenantKey,
-    token,
-    tenantConf,
-    studentName,
-    forceRefresh,
-    rosterHintId,
-  );
-  if (summaryPayload) {
-    diskCacheSet(tenantKey, studentName, summaryPayload);
-    return json(res, 200, summaryPayload);
-  }
-  if (hasSummaryTable && !ALLOW_LIVE_FALLBACK_WHEN_SUMMARY_MISS) {
-    return json(res, 200, {
-      tenant: tenantKey,
-      studentName,
-      rosterRecordId: rosterHintId,
-      courses: [],
-      missingTotal: 0,
-      missingByCourse: {},
-      missingItems: [],
-      submittedTotal: 0,
-      recentSubmissions: [],
-      recommendations: [{ type: "guide", title: "未找到你的汇总数据，请联系老师刷新汇总", anchorText: "四、日常通关系统（把机制变成分数）" }],
-      missingSource: "summary_miss_fast_return",
-      ...computeSemesterProgress(await fetchGradingPeriod(tenantKey, tenantConf)),
-    });
   }
 
   // Speed strategy:
