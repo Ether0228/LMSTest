@@ -399,12 +399,8 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
         for item in s["missing"]:
             c = item["course"]
             missing_by_course[c] = missing_by_course.get(c, 0) + 1
-        all_courses = sorted(
-            set(s["courses"])
-            | set(s["submitted_by_course"].keys())
-            | set(missing_by_course.keys())
-            | set(s["expected_by_course"].keys())
-        )
+        # courseProgress 只显示花名册里的课程，跨学期宽限期提交不额外增加课程卡
+        all_courses = sorted(set(s["courses"]))
 
         # AoL 统计
         aol_submitted_by_course = {}
