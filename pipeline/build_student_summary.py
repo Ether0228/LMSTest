@@ -455,6 +455,19 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
                         "score": round(float(score), 1),
                         "max":   round(float(max_score), 1),
                     })
+                # 若无 AoL 分类条目，回退：展示所有有成绩的作业
+                if not aol_details:
+                    for r in gb_course_rows:
+                        score = r.get("得分")
+                        max_score = r.get("满分")
+                        if score is None or not max_score:
+                            continue
+                        aol_details.append({
+                            "name":     str(r.get("作业名", "")).strip(),
+                            "score":    round(float(score), 1),
+                            "max":      round(float(max_score), 1),
+                            "category": str(r.get("分类", "")).strip(),
+                        })
 
             cp_entry = {
                 "course":         c,

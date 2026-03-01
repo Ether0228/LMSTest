@@ -38,7 +38,7 @@ function computeSemesterProgress(gp) {
     const totalWeeks  = Math.max(1, Math.round(totalDays / 7));
     const elapsedDays = Math.floor((today - start) / 86400000);
     const currentWeek = Math.max(1, Math.min(totalWeeks, Math.floor(elapsedDays / 7) + 1));
-    return { semesterStart: gp.start_date, totalWeeks, currentWeek };
+    return { semesterStart: gp.start_date, semesterEnd: gp.end_date, totalWeeks, currentWeek };
   } catch { return { semesterStart: "", totalWeeks: null, currentWeek: null }; }
 }
 

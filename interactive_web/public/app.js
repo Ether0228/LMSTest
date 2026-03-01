@@ -343,7 +343,7 @@ function toggleDetail(btn) {
 // ─── 区域 A：学期进度 ─────────────────────────────────────────
 
 function renderSemester(data) {
-  const { start_date, current_week, total_weeks } = data.semester
+  const { start_date, end_date, current_week, total_weeks } = data.semester
 
   // 日期显示
   const today = data.combo?.today ? new Date(data.combo.today) : new Date()
@@ -363,10 +363,9 @@ function renderSemester(data) {
 
   const pct = Math.round((current_week / total_weeks) * 100)
 
-  // 距学期结束天数
-  if (start_date) {
-    const endDate = new Date(start_date)
-    endDate.setDate(endDate.getDate() + total_weeks * 7)
+  // 距学期结束天数：直接用 end_date，不再从 startDate + 周数 × 7 反推
+  if (end_date) {
+    const endDate = new Date(end_date + "T23:59:59")
     const daysLeft = Math.max(0, Math.ceil((endDate - today) / 86400000))
     document.getElementById("headerCountdown").textContent =
       daysLeft > 0 ? `距学期结束还有 ${daysLeft} 天` : `学期已结束`
@@ -482,14 +481,14 @@ function renderCourses(data) {
       const aolHTML = aolItems.length > 0
         ? aolItems.map(a => `
             <div class="detail-item detail-item--submitted">
-              <span class="detail-item__name">${esc(a.name)}</span>
+              <span class="detail-item__name">${esc(a.name)}${a.category ? ` <small style="opacity:.6">(${esc(a.category)})</small>` : ""}</span>
               <span class="detail-item__date">${a.score} / ${a.max}</span>
             </div>
           `).join("")
         : `<div class="detail-empty">暂无 AoL 评分数据</div>`
 
       const gradeStr   = cp.current_grade != null ? `${cp.current_grade}%` : "—"
-      const updatedStr = cp.grade_updated_at ? formatDate(cp.grade_updated_at) : ""
+      const updatedStr = cp.grade_updated_at ? formatDateTime(cp.grade_updated_at) : ""
 
       return `
         <div class="course-card">
@@ -642,8 +641,8 @@ function renderGuideSnippet(data) {
 // ─── 从提交记录推算 Combo 热力图 ──────────────────────────────
 // submissions: [{submittedAt, course, assignmentName, ...}]
 // todayStr: "YYYY-MM-DD"
-// 覆盖的月份范围：今天起往前 2 个自然月（确保至少有数据的那几个月都显示）
-function computeComboFromSubmissions(submissions, todayStr) {
+// semesterStart/semesterEnd: "YYYY-MM-DD"（可选；有值时按学期范围显示，否则显示当前月+前一月）
+function computeComboFromSubmissions(submissions, todayStr, semesterStart, semesterEnd) {
   const today = new Date(todayStr + "T00:00:00")
 
   // 按日期分组提交记录，建立 dayMap: "YYYY-MM-DD" → [{course, assignmentName}]
@@ -670,19 +669,30 @@ function computeComboFromSubmissions(submissions, todayStr) {
     else if (offset > 0) break
   }
 
-  // 生成月份列表：当前月 + 前一个月（共 2 个月）
+  // 生成月份列表：用学期起止日期；如无则回退到当前月+前一月
+  let firstMonth, lastMonth
+  if (semesterStart && semesterEnd) {
+    const start = new Date(semesterStart + "T00:00:00")
+    const end   = new Date(semesterEnd   + "T00:00:00")
+    firstMonth = { year: start.getFullYear(), month: start.getMonth() + 1 }
+    const cap  = end < today ? end : today
+    lastMonth  = { year: cap.getFullYear(),   month: cap.getMonth() + 1 }
+  } else {
+    const ref0 = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+    firstMonth = { year: ref0.getFullYear(), month: ref0.getMonth() + 1 }
+    lastMonth  = { year: today.getFullYear(), month: today.getMonth() + 1 }
+  }
+
   const months = []
-  for (let mOffset = 1; mOffset >= 0; mOffset--) {
-    const ref = new Date(today.getFullYear(), today.getMonth() - mOffset, 1)
-    const year = ref.getFullYear()
-    const month = ref.getMonth() + 1
-    const daysInMonth = new Date(year, month, 0).getDate()
-    const label = `${month}月`
+  let y = firstMonth.year, m = firstMonth.month
+  while (y < lastMonth.year || (y === lastMonth.year && m <= lastMonth.month)) {
+    const daysInMonth = new Date(y, m, 0).getDate()
+    const label = `${m}月`
     const days = {}
     const day_details = {}
     for (let d = 1; d <= daysInMonth; d++) {
-      const key = `${year}-${String(month).padStart(2,"0")}-${String(d).padStart(2,"0")}`
-      const dayDate = new Date(year, month - 1, d)
+      const key = `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`
+      const dayDate = new Date(y, m - 1, d)
       if (dayDate > today) {
         days[key] = "future"
       } else if (dayMap[key]) {
@@ -697,7 +707,9 @@ function computeComboFromSubmissions(submissions, todayStr) {
         days[key] = "no_assignment"
       }
     }
-    months.push({ label, year, month, days, day_details })
+    months.push({ label, year: y, month: m, days, day_details })
+    m++
+    if (m > 12) { m = 1; y++ }
   }
 
   return { current_streak: streak, today: todayStr, months }
@@ -781,7 +793,7 @@ function normalizeApiResponse(raw) {
 
   // combo
   const combo = raw.combo
-    || computeComboFromSubmissions(recentSubmitted, todayStr)
+    || computeComboFromSubmissions(recentSubmitted, todayStr, raw.semesterStart, raw.semesterEnd)
 
   // 自动生成学情提醒
   const missingTotal = raw.missingTotal ?? 0
@@ -815,6 +827,7 @@ function normalizeApiResponse(raw) {
     student,
     semester:        {
       start_date:   raw.semesterStart || "",
+      end_date:     raw.semesterEnd   || "",
       total_weeks:  raw.totalWeeks    || null,
       current_week: raw.currentWeek   || null,
     },
