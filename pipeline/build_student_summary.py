@@ -294,20 +294,27 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
         if not assignment:
             assignment = assignment_by_link.get(clean_schoology_url(normalize_link(f.get("作业链接"))), {})
         course_name = assignment.get("course", "").strip() or "未分类"
+        sub_link = (
+            (f.get("作业链接", {}) or {}).get("link", "")
+            if isinstance(f.get("作业链接"), dict)
+            else str(f.get("作业链接", ""))
+        )
         students[name]["submitted"].append(
             {
                 "assignmentName": f.get("作业名称", ""),
                 "status": f.get("提交状态", ""),
                 "submittedAt": f.get("提交时间", ""),
-                "link": (f.get("作业链接", {}) or {}).get("link", "")
-                if isinstance(f.get("作业链接"), dict)
-                else str(f.get("作业链接", "")),
+                "link": sub_link,
                 "course": course_name,
                 "nature": assignment.get("nature", ""),
             }
         )
+        # 去重计数：同一作业多次提交只算 1 次（用作业链接作为唯一键，链接为空则用作业名）
         sbc = students[name]["submitted_by_course"]
-        sbc[course_name] = sbc.get(course_name, 0) + 1
+        dedup_key = sub_link or f.get("作业名称", "") or ""
+        if course_name not in sbc:
+            sbc[course_name] = set()
+        sbc[course_name].add(dedup_key)
 
     # 3) 缺交记录聚合（按"关联学生" record_id）
     roster_id_to_name = {
@@ -424,7 +431,8 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
             expected_count = int(s["expected_by_course"].get(c, 0))
             missing_count = int(missing_by_course.get(c, 0))
             submitted_from_expected = max(expected_count - missing_count, 0) if expected_count > 0 else 0
-            submitted_count = int(s["submitted_by_course"].get(c, submitted_from_expected))
+            sbc_val = s["submitted_by_course"].get(c)
+            submitted_count = len(sbc_val) if sbc_val is not None else submitted_from_expected
             total = expected_count if expected_count > 0 else (submitted_count + missing_count)
             completion = round((submitted_count / total) * 100, 1) if total > 0 else 0.0
 
