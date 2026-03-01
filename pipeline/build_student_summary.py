@@ -255,7 +255,8 @@ def build_nid_lookup(lib_records):
 
 
 def build_summaries(roster, submissions, missing, assignment_lookup, assignment_by_link,
-                    gradebook_by_student=None, nid_to_lib=None, gp_info=None):
+                    gradebook_by_student=None, nid_to_lib=None, gp_info=None,
+                    cat_weights_by_section=None):
     # 1) 学生基础信息
     students = {}
     for r in roster:
@@ -484,7 +485,9 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
                         "name":   str(r.get("作业名", "")).strip(),
                         "score":  round(float(score), 1),
                         "max":    round(float(max_score), 1),
-                        "weight": r.get("分类权重%"),
+                        "weight": (cat_weights_by_section or {}).get(
+                            str(r.get("SectionNID", "")).strip(), {}
+                        ).get(str(r.get("分类", "")).strip()),
                     })
                 # 若无 AoL 分类条目，回退：展示所有有成绩的作业
                 if not aol_details:
@@ -498,7 +501,9 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
                             "score":    round(float(score), 1),
                             "max":      round(float(max_score), 1),
                             "category": str(r.get("分类", "")).strip(),
-                            "weight":   r.get("分类权重%"),
+                            "weight":   (cat_weights_by_section or {}).get(
+                                str(r.get("SectionNID", "")).strip(), {}
+                            ).get(str(r.get("分类", "")).strip()),
                         })
 
             cp_entry = {
@@ -982,9 +987,22 @@ def main():
             print("INFO: 未找到学期参数（grading_period.json 或 SCHOOLOGY_GRADING_PERIOD），学期进度条将不显示。"
                   "切换学期后请在 GitHub Secrets 中设置 SCHOOLOGY_GRADING_PERIOD。")
 
+    # 读取分类权重：由 scrape_gradebook.py 在同一 job 内写入
+    cat_weights_by_section = {}
+    cw_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "category_weights.json")
+    if os.path.exists(cw_path):
+        try:
+            with open(cw_path, "r", encoding="utf-8") as f:
+                cat_weights_by_section = json.load(f)
+            total_cats = sum(len(v) for v in cat_weights_by_section.values())
+            print(f">>> 分类权重 [本地文件]: {len(cat_weights_by_section)} 个 section，{total_cats} 个分类")
+        except Exception as e:
+            print(f"WARNING: 读取 category_weights.json 失败: {e}")
+
     summary_rows = build_summaries(
         roster, submissions, missing, assignment_lookup, assignment_by_link,
         gradebook_by_student, nid_to_lib, gp_info=gp_info,
+        cat_weights_by_section=cat_weights_by_section,
     )
 
     # 清理飞书缺交表中"🚫 忽略"作业的行

@@ -668,6 +668,7 @@ def main():
 
     all_rows = []
     gp_info = {}
+    all_cat_weights = {}   # nid → {category_title: weight}，汇总后写 category_weights.json
     for nid, course_name in sections.items():
         print(f"\n── {course_name} ({nid}) ──")
         try:
@@ -676,6 +677,20 @@ def main():
             rows = parse_gradebook(data, nid, course_name, category_weights)
             print(f"  解析到 {len(rows)} 条 (学生×作业)")
             all_rows.extend(rows)
+            # 构建 title→weight 映射，供 build_student_summary.py 使用
+            if category_weights:
+                grading_categories_local = {
+                    str(c["id"]): c.get("title", "")
+                    for c in data.get("grading_categories", [])
+                    if c["id"] not in ("all", "summary")
+                }
+                title_weight_map = {
+                    title: weight
+                    for cat_id, weight in category_weights.items()
+                    if (title := grading_categories_local.get(cat_id, ""))
+                }
+                if title_weight_map:
+                    all_cat_weights[nid] = title_weight_map
             # 从第一个有效 section 提取学期日期
             if not gp_info:
                 gp_info = parse_grading_period_dates(data)
@@ -689,6 +704,17 @@ def main():
         token, cfg["FEISHU_APP_TOKEN"], cfg["FEISHU_GRADEBOOK_TABLE_ID"],
         all_rows, existing
     )
+
+    # 分类权重写入本地文件，供 build_student_summary.py 读取
+    if all_cat_weights:
+        cw_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "category_weights.json")
+        try:
+            with open(cw_path, "w", encoding="utf-8") as f:
+                json.dump(all_cat_weights, f, ensure_ascii=False)
+            total_cats = sum(len(v) for v in all_cat_weights.values())
+            print(f">>> 分类权重已写入: {cw_path}（{len(all_cat_weights)} 个 section，{total_cats} 个分类）")
+        except Exception as e:
+            print(f"  [警告] 分类权重写入失败: {e}")
 
     # 学期元数据写入本地文件，供 build_student_summary.py 读取
     if gp_info:
