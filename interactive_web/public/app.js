@@ -256,8 +256,8 @@ function completionClass(pct) {
 // ─── ASCII 进度条 ───────────────────────────────────────────────
 
 function asciiBar(pct, width = 22) {
-  const filled = Math.round(pct / 100 * width)
-  const empty  = width - filled
+  const filled = Math.min(width, Math.round(pct / 100 * width))
+  const empty  = Math.max(0, width - filled)
   return '[' + '█'.repeat(filled) + '░'.repeat(empty) + '] ' + String(pct).padStart(3, ' ') + '%'
 }
 
