@@ -127,6 +127,7 @@ jobs:
           ACTIVE_SEMESTERS: ${{ secrets.ACTIVE_SEMESTERS }}
           CURRENT_SEMESTER: ${{ secrets.CURRENT_SEMESTER }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          CACHE_TENANT_KEY: ${{ secrets.CACHE_TENANT_KEY }}
         run: python "pipeline/build_student_summary.py"
 
       # === 失败通知 ===
