@@ -164,6 +164,11 @@ def fetch_gradesetup_weights(session: requests.Session, section_nid: str) -> dic
     has_cat = "data-category-id" in html
     print(f"  [gradesetup] has_weight_percentage={has_wp}, has_category_id={has_cat}, html_len={len(html)}")
 
+    # 打印第一个含 data-category-id 的上下文，帮助诊断 HTML 结构
+    m = re.search(r'.{0,200}data-category-id.{0,200}', html, re.DOTALL)
+    if m:
+        print(f"  [gradesetup html样本] {repr(m.group(0))}")
+
     weights = {}   # title → weight_pct
 
     # 按行匹配 <tr>...</tr>：同一行内有 data-category-id 和 weight_percentage
