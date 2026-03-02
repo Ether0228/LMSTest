@@ -679,19 +679,20 @@ def main():
             all_rows.extend(rows)
             # 构建 title→weight 映射，供 build_student_summary.py 使用
             if category_weights:
-                grading_categories_local = {
-                    str(c["id"]): c.get("title", "")
-                    for c in data.get("grading_categories", [])
-                    if c["id"] not in ("all", "summary")
-                }
-                print(f"  [debug] gradesetup ids: {list(category_weights.keys())[:5]}")
-                print(f"  [debug] gradebook ids:  {list(grading_categories_local.keys())[:5]}")
+                # grading_categories 可能为空；改从 grade_item_data 每条作业的
+                # category_title 字段提取，与 parse_gradebook() 的 fallback 一致
+                grading_categories_local = {}
+                for item in data.get("grade_item_data", {}).values():
+                    cat_id = str(item.get("grading_category_id", ""))
+                    cat_title = item.get("category_title", "")
+                    if cat_id and cat_title:
+                        grading_categories_local[cat_id] = cat_title
                 title_weight_map = {
                     title: weight
                     for cat_id, weight in category_weights.items()
                     if (title := grading_categories_local.get(cat_id, ""))
                 }
-                print(f"  [debug] title_weight_map: {title_weight_map}")
+                print(f"  [gradesetup] title→weight: {title_weight_map}")
                 if title_weight_map:
                     all_cat_weights[nid] = title_weight_map
             # 从第一个有效 section 提取学期日期
