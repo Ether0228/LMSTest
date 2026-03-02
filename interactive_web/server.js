@@ -31,7 +31,32 @@ async function pgCacheGet(tenantKey, studentName) {
   }
 }
 
-function loadDotEnvIfPresent() {
+async function pgCacheGetAll(tenantKey) {
+  if (!pgPool) return null;
+  try {
+    const r = await pgPool.query(
+      "SELECT student_name, data FROM student_summary WHERE tenant=$1 ORDER BY student_name",
+      [tenantKey]
+    );
+    return r.rows.map(row => ({ studentName: row.student_name, ...row.data }));
+  } catch (e) {
+    console.warn("[pg] admin query error:", e.message);
+    return null;
+  }
+}
+
+async function handleApiAdmin(req, res, parsedUrl) {
+  const { key: tenantKey, conf: tenantConf } = getTenantFromQuery(parsedUrl);
+  if (!tenantKey || !tenantConf) return json(res, 400, { error: "invalid tenant" });
+  const adminKey = (process.env.ADMIN_KEY || "").trim();
+  if (adminKey && (parsedUrl.query.key || "").toString().trim() !== adminKey)
+    return json(res, 401, { error: "unauthorized" });
+  const rows = await pgCacheGetAll(tenantKey);
+  if (!rows) return json(res, 503, { error: "PostgreSQL not available" });
+  return json(res, 200, rows);
+}
+
+
   // Minimal .env loader to avoid adding dependencies (dotenv).
   const envPath = path.join(__dirname, ".env");
   if (!fs.existsSync(envPath)) return;
@@ -735,6 +760,7 @@ const server = http.createServer(async (req, res) => {
     const query = Object.fromEntries(parsedUrl.searchParams.entries());
     const reqLike = { pathname: parsedUrl.pathname, query };
     if ((reqLike.pathname || "").startsWith("/api/dashboard")) return await handleApiDashboard(req, res, reqLike);
+    if ((reqLike.pathname || "") === "/api/admin") return await handleApiAdmin(req, res, reqLike);
     if ((reqLike.pathname || "") === "/api/guide.md") return await handleGuideMd(req, res);
     return serveStatic(req, res, reqLike);
   } catch (e) {

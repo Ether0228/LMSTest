@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>学生总览 · 通关指南</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f7; color: #1d1d1f; font-size: 14px; }
+
+    .topbar { background: #1d1d1f; color: #fff; padding: 12px 20px; display: flex; align-items: center; gap: 16px; }
+    .topbar h1 { font-size: 16px; font-weight: 600; }
+    .topbar .meta { font-size: 12px; color: #aaa; margin-left: auto; }
+
+    .controls { padding: 12px 20px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: #fff; border-bottom: 1px solid #e5e5ea; }
+    .controls input { padding: 6px 10px; border: 1px solid #d1d1d6; border-radius: 6px; font-size: 13px; width: 200px; }
+    .controls select { padding: 6px 10px; border: 1px solid #d1d1d6; border-radius: 6px; font-size: 13px; background: #fff; }
+    .controls label { font-size: 12px; color: #666; }
+    .badge-count { background: #e5e5ea; border-radius: 10px; padding: 2px 8px; font-size: 12px; color: #555; }
+
+    .table-wrap { overflow-x: auto; padding: 16px 20px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+    th { background: #f2f2f7; text-align: left; padding: 10px 12px; font-size: 12px; font-weight: 600; color: #555; cursor: pointer; white-space: nowrap; user-select: none; }
+    th:hover { background: #e5e5ea; }
+    th .sort-arrow { margin-left: 4px; color: #aaa; }
+    td { padding: 10px 12px; border-top: 1px solid #f2f2f7; vertical-align: middle; }
+    tr:hover td { background: #fafafa; }
+    tr.urgent td { background: #fff5f5; }
+    tr.warn td { background: #fffbf0; }
+
+    .name-cell { font-weight: 600; white-space: nowrap; }
+    .name-cell a { color: #1d1d1f; text-decoration: none; }
+    .name-cell a:hover { color: #007aff; }
+
+    .course-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip { display: inline-flex; flex-direction: column; gap: 2px; background: #f2f2f7; border-radius: 8px; padding: 5px 8px; min-width: 90px; }
+    .chip-name { font-size: 11px; font-weight: 700; color: #555; }
+    .chip-grade { font-size: 14px; font-weight: 700; }
+    .chip-grade.grade-hi  { color: #34c759; }
+    .chip-grade.grade-mid { color: #ff9500; }
+    .chip-grade.grade-lo  { color: #ff3b30; }
+    .chip-grade.grade-na  { color: #aaa; font-size: 12px; font-weight: 400; }
+    .chip-bar { height: 3px; border-radius: 2px; background: #e5e5ea; width: 100%; }
+    .chip-bar-fill { height: 100%; border-radius: 2px; background: #007aff; transition: width .3s; }
+
+    .missing-cell { text-align: center; font-weight: 700; font-size: 15px; }
+    .missing-hi { color: #ff3b30; }
+    .missing-mid { color: #ff9500; }
+    .missing-ok { color: #34c759; }
+
+    .updated-cell { font-size: 11px; color: #aaa; white-space: nowrap; }
+
+    .empty { text-align: center; padding: 60px; color: #aaa; font-size: 14px; }
+    .loading { text-align: center; padding: 60px; color: #aaa; }
+
+    .summary-bar { display: flex; gap: 20px; padding: 12px 20px; background: #fff; border-bottom: 1px solid #e5e5ea; flex-wrap: wrap; }
+    .stat { display: flex; flex-direction: column; gap: 2px; }
+    .stat-val { font-size: 20px; font-weight: 700; }
+    .stat-label { font-size: 11px; color: #888; }
+    .stat-val.red { color: #ff3b30; }
+    .stat-val.green { color: #34c759; }
+    .stat-val.blue { color: #007aff; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>学生总览</h1>
+  <span class="meta" id="metaInfo">加载中…</span>
+</div>
+
+<div class="summary-bar" id="summaryBar" style="display:none">
+  <div class="stat"><span class="stat-val blue" id="statTotal">—</span><span class="stat-label">学生总数</span></div>
+  <div class="stat"><span class="stat-val red"  id="statHighMissing">—</span><span class="stat-label">缺交 ≥5</span></div>
+  <div class="stat"><span class="stat-val green" id="statNoMissing">—</span><span class="stat-label">零缺交</span></div>
+  <div class="stat"><span class="stat-val blue"  id="statAvgGrade">—</span><span class="stat-label">平均成绩</span></div>
+</div>
+
+<div class="controls">
+  <input type="text" id="searchInput" placeholder="搜索学生姓名…" oninput="applyFilter()" />
+  <label>排序：</label>
+  <select id="sortSelect" onchange="applyFilter()">
+    <option value="name">姓名</option>
+    <option value="missing-desc">缺交（多→少）</option>
+    <option value="missing-asc">缺交（少→多）</option>
+    <option value="grade-desc">成绩（高→低）</option>
+    <option value="grade-asc">成绩（低→高）</option>
+    <option value="updated">最近更新</option>
+  </select>
+  <label>筛选：</label>
+  <select id="filterSelect" onchange="applyFilter()">
+    <option value="all">全部学生</option>
+    <option value="urgent">缺交 ≥5</option>
+    <option value="warn">缺交 1–4</option>
+    <option value="ok">零缺交</option>
+    <option value="no-grade">无成绩</option>
+  </select>
+  <span class="badge-count" id="shownCount">0 人</span>
+</div>
+
+<div class="table-wrap">
+  <div class="loading" id="loadingEl">数据加载中…</div>
+  <table id="mainTable" style="display:none">
+    <thead>
+      <tr>
+        <th onclick="sortBy('name')">姓名 <span class="sort-arrow">↕</span></th>
+        <th>课程 · 成绩 · 完成度</th>
+        <th onclick="sortBy('missing-desc')">缺交 <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('updated')">更新时间 <span class="sort-arrow">↕</span></th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+  <div class="empty" id="emptyEl" style="display:none">没有匹配的学生</div>
+</div>
+
+<script>
+const params = new URLSearchParams(location.search)
+const tenant = params.get('t') || 'default'
+const adminKey = params.get('key') || ''
+
+let allStudents = []
+let sortState = 'name'
+
+function timeAgo(ms) {
+  if (!ms) return '—'
+  const diff = Date.now() - ms
+  if (diff < 60000) return '刚刚'
+  if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前'
+  if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前'
+  return Math.floor(diff / 86400000) + '天前'
+}
+
+function gradeClass(g) {
+  if (g == null) return 'grade-na'
+  if (g >= 80) return 'grade-hi'
+  if (g >= 65) return 'grade-mid'
+  return 'grade-lo'
+}
+
+function avgGrade(courseProgress) {
+  const grades = (courseProgress || []).map(c => c.current_grade).filter(g => g != null)
+  if (!grades.length) return null
+  return grades.reduce((a, b) => a + b, 0) / grades.length
+}
+
+function renderRow(s) {
+  const cp = s.courseProgress || []
+  const missing = s.missingTotal ?? 0
+  const urgentClass = missing >= 5 ? 'urgent' : missing > 0 ? 'warn' : ''
+  const missingClass = missing >= 5 ? 'missing-hi' : missing > 0 ? 'missing-mid' : 'missing-ok'
+  const updatedAt = s._cachedAt || null
+
+  const dashUrl = `/index.html?t=${encodeURIComponent(tenant)}&student=${encodeURIComponent(s.studentName)}`
+
+  const chips = cp.map(c => {
+    const g = c.current_grade
+    const gStr = g != null ? g.toFixed(1) + '%' : '待出分'
+    const comp = Math.min(c.completion || 0, 100)
+    return `<div class="chip">
+      <span class="chip-name">${esc(c.course)}</span>
+      <span class="chip-grade ${gradeClass(g)}">${gStr}</span>
+      <div class="chip-bar"><div class="chip-bar-fill" style="width:${comp}%"></div></div>
+    </div>`
+  }).join('')
+
+  return `<tr class="${urgentClass}" data-missing="${missing}" data-grade="${avgGrade(cp) ?? -1}" data-updated="${updatedAt || 0}" data-name="${s.studentName}">
+    <td class="name-cell"><a href="${dashUrl}" target="_blank">${esc(s.studentName)}</a></td>
+    <td><div class="course-chips">${chips || '<span style="color:#aaa;font-size:12px">暂无课程数据</span>'}</div></td>
+    <td class="missing-cell"><span class="${missingClass}">${missing}</span></td>
+    <td class="updated-cell">${timeAgo(updatedAt)}</td>
+  </tr>`
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+}
+
+function applyFilter() {
+  const q = document.getElementById('searchInput').value.trim().toLowerCase()
+  const sort = document.getElementById('sortSelect').value
+  const filter = document.getElementById('filterSelect').value
+  sortState = sort
+
+  let students = allStudents.filter(s => {
+    if (q && !s.studentName.toLowerCase().includes(q)) return false
+    const m = s.missingTotal ?? 0
+    const g = avgGrade(s.courseProgress)
+    if (filter === 'urgent' && m < 5) return false
+    if (filter === 'warn' && (m < 1 || m >= 5)) return false
+    if (filter === 'ok' && m !== 0) return false
+    if (filter === 'no-grade' && g != null) return false
+    return true
+  })
+
+  students = students.slice().sort((a, b) => {
+    if (sort === 'name') return a.studentName.localeCompare(b.studentName, 'zh')
+    if (sort === 'missing-desc') return (b.missingTotal ?? 0) - (a.missingTotal ?? 0)
+    if (sort === 'missing-asc') return (a.missingTotal ?? 0) - (b.missingTotal ?? 0)
+    if (sort === 'grade-desc') return (avgGrade(b.courseProgress) ?? -1) - (avgGrade(a.courseProgress) ?? -1)
+    if (sort === 'grade-asc') return (avgGrade(a.courseProgress) ?? 999) - (avgGrade(b.courseProgress) ?? 999)
+    if (sort === 'updated') return (b._cachedAt || 0) - (a._cachedAt || 0)
+    return 0
+  })
+
+  document.getElementById('tableBody').innerHTML = students.map(renderRow).join('')
+  document.getElementById('shownCount').textContent = students.length + ' 人'
+  document.getElementById('emptyEl').style.display = students.length === 0 ? '' : 'none'
+  document.getElementById('mainTable').style.display = students.length === 0 ? 'none' : ''
+}
+
+function sortBy(s) {
+  document.getElementById('sortSelect').value = s
+  applyFilter()
+}
+
+async function load() {
+  let url = `/api/admin?t=${encodeURIComponent(tenant)}`
+  if (adminKey) url += `&key=${encodeURIComponent(adminKey)}`
+  try {
+    const r = await fetch(url)
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}))
+      document.getElementById('loadingEl').textContent = '加载失败：' + (e.error || r.status)
+      return
+    }
+    allStudents = await r.json()
+    document.getElementById('loadingEl').style.display = 'none'
+    document.getElementById('mainTable').style.display = ''
+
+    // Summary stats
+    const total = allStudents.length
+    const highMissing = allStudents.filter(s => (s.missingTotal ?? 0) >= 5).length
+    const noMissing = allStudents.filter(s => (s.missingTotal ?? 0) === 0).length
+    const grades = allStudents.flatMap(s => (s.courseProgress || []).map(c => c.current_grade).filter(g => g != null))
+    const avgG = grades.length ? (grades.reduce((a, b) => a + b, 0) / grades.length).toFixed(1) + '%' : '—'
+    document.getElementById('statTotal').textContent = total
+    document.getElementById('statHighMissing').textContent = highMissing
+    document.getElementById('statNoMissing').textContent = noMissing
+    document.getElementById('statAvgGrade').textContent = avgG
+    document.getElementById('summaryBar').style.display = ''
+
+    const now = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+    document.getElementById('metaInfo').textContent = `${total} 名学生 · 数据于 ${now} 加载`
+
+    applyFilter()
+  } catch (e) {
+    document.getElementById('loadingEl').textContent = '网络错误：' + e.message
+  }
+}
+
+load()
+</script>
+</body>
+</html>
