@@ -145,9 +145,9 @@ def fetch_gradebook(session: requests.Session, section_nid: str) -> dict:
 
 
 def fetch_gradesetup_weights(session: requests.Session, section_nid: str) -> dict:
-    """抓取 gradesetup 页面，返回 {category_id: weight_pct} 映射。
+    """抓取 gradesetup 页面，返回 {category_title: weight_pct} 映射。
     权重来自 <td class="weight_percentage"><span title="4.54545%">...，
-    category_id 来自同行 <span data-category-id="..."> 或行内 href。
+    category title 来自同行含 data-category-id 的元素的文本内容。
     """
     url = f"{BASE_URL}/course/{section_nid}/gradesetup"
     try:
@@ -164,35 +164,29 @@ def fetch_gradesetup_weights(session: requests.Session, section_nid: str) -> dic
     has_cat = "data-category-id" in html
     print(f"  [gradesetup] has_weight_percentage={has_wp}, has_category_id={has_cat}, html_len={len(html)}")
 
-    weights = {}
+    weights = {}   # title → weight_pct
 
-    # 方案 A：按行匹配 <tr>...</tr>（最精确）
+    # 按行匹配 <tr>...</tr>：同一行内有 data-category-id 和 weight_percentage
     for row_m in re.finditer(r'<tr\b[^>]*>(.*?)</tr>', html, re.DOTALL | re.IGNORECASE):
         row_html = row_m.group(1)
-        cat_m = re.search(r'data-category-id="(\d+)"', row_html)
-        wt_m  = re.search(r'weight_percentage[^>]*>.*?<span[^>]*title="([\d.]+)%"', row_html, re.DOTALL)
-        if cat_m and wt_m:
-            try:
-                weights[cat_m.group(1)] = round(float(wt_m.group(1)), 4)
-            except ValueError:
-                pass
-
-    # 方案 B：fallback — 全文按出现顺序匹配（href 中的 category id 与 weight span 一一对应）
-    if not weights and has_wp and has_cat:
-        cat_ids = re.findall(r'data-category-id="(\d+)"', html)
-        wt_vals = re.findall(r'weight_percentage[^>]*>.*?<span[^>]*title="([\d.]+)%"', html, re.DOTALL)
-        print(f"  [gradesetup fallback] cat_ids={cat_ids}, wt_vals={wt_vals}")
-        if len(cat_ids) == len(wt_vals):
-            for cid, wv in zip(cat_ids, wt_vals):
+        wt_m = re.search(r'weight_percentage[^>]*>.*?<span[^>]*title="([\d.]+)%"', row_html, re.DOTALL)
+        if not wt_m:
+            continue
+        # 提取分类名：data-category-id 元素的文本内容
+        name_m = re.search(r'data-category-id="\d+"[^>]*>\s*([^<]+?)\s*</(?:a|span|td)', row_html, re.DOTALL)
+        if name_m:
+            title = re.sub(r'\s+', ' ', name_m.group(1)).strip()
+            if title:
                 try:
-                    weights[cid] = round(float(wv), 4)
+                    weights[title] = round(float(wt_m.group(1)), 4)
                 except ValueError:
                     pass
 
     if weights:
         print(f"  [gradesetup] 读取到 {len(weights)} 个分类权重: {weights}")
     else:
-        print(f"  [gradesetup] 未能提取权重（方案 A+B 均无结果）")
+        print(f"  [gradesetup] 未能提取权重（尝试 fallback）")
+
     return weights
 
 
@@ -282,7 +276,8 @@ def parse_gradebook(data: dict, section_nid: str, course_name: str = "",
 
             category_id    = str(item.get("grading_category_id", ""))
             category_title  = grading_categories.get(category_id, item.get("category_title", ""))
-            category_weight = category_weights.get(category_id) if category_weights else None
+            # category_weights 现在是 {title: weight}，按 title 查
+            category_weight = category_weights.get(category_title) if category_weights else None
 
             rows.append({
                 "学生姓名":   student_name,
@@ -678,23 +673,9 @@ def main():
             print(f"  解析到 {len(rows)} 条 (学生×作业)")
             all_rows.extend(rows)
             # 构建 title→weight 映射，供 build_student_summary.py 使用
+            # fetch_gradesetup_weights 现在直接返回 {title: weight}，可直接存储
             if category_weights:
-                # grading_categories 可能为空；改从 grade_item_data 每条作业的
-                # category_title 字段提取，与 parse_gradebook() 的 fallback 一致
-                grading_categories_local = {}
-                for item in data.get("grade_item_data", {}).values():
-                    cat_id = str(item.get("grading_category_id", ""))
-                    cat_title = item.get("category_title", "")
-                    if cat_id and cat_title:
-                        grading_categories_local[cat_id] = cat_title
-                title_weight_map = {
-                    title: weight
-                    for cat_id, weight in category_weights.items()
-                    if (title := grading_categories_local.get(cat_id, ""))
-                }
-                print(f"  [gradesetup] title→weight: {title_weight_map}")
-                if title_weight_map:
-                    all_cat_weights[nid] = title_weight_map
+                all_cat_weights[nid] = category_weights
             # 从第一个有效 section 提取学期日期
             if not gp_info:
                 gp_info = parse_grading_period_dates(data)
