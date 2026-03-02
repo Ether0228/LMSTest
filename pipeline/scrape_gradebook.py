@@ -684,11 +684,14 @@ def main():
                     for c in data.get("grading_categories", [])
                     if c["id"] not in ("all", "summary")
                 }
+                print(f"  [debug] gradesetup ids: {list(category_weights.keys())[:5]}")
+                print(f"  [debug] gradebook ids:  {list(grading_categories_local.keys())[:5]}")
                 title_weight_map = {
                     title: weight
                     for cat_id, weight in category_weights.items()
                     if (title := grading_categories_local.get(cat_id, ""))
                 }
+                print(f"  [debug] title_weight_map: {title_weight_map}")
                 if title_weight_map:
                     all_cat_weights[nid] = title_weight_map
             # 从第一个有效 section 提取学期日期
