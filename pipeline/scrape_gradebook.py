@@ -164,28 +164,40 @@ def fetch_gradesetup_weights(session: requests.Session, section_nid: str) -> dic
     has_cat = "data-category-id" in html
     print(f"  [gradesetup] has_weight_percentage={has_wp}, has_category_id={has_cat}, html_len={len(html)}")
 
-    # 打印第一个含 data-category-id 的上下文，帮助诊断 HTML 结构
-    m = re.search(r'.{0,200}data-category-id.{0,200}', html, re.DOTALL)
-    if m:
-        print(f"  [gradesetup html样本] {repr(m.group(0))}")
-
     weights = {}   # title → weight_pct
 
-    # 按行匹配 <tr>...</tr>：同一行内有 data-category-id 和 weight_percentage
+    # HTML 结构（已确认）：
+    #   <input id="edit-categories-{id}-weight" value="{weight}">
+    #   <td class="weight_percentage"><span title="10.00000%">10.00</span>%</td>
+    #   <span data-category-id="{id}" href="/grading_category/.../course/{nid}/{id}" ...>（无文字）
+    # 分类名在同行更早位置的 <a> 链接文本中，href 含同一 category id
     for row_m in re.finditer(r'<tr\b[^>]*>(.*?)</tr>', html, re.DOTALL | re.IGNORECASE):
         row_html = row_m.group(1)
+
+        # 提取权重
         wt_m = re.search(r'weight_percentage[^>]*>.*?<span[^>]*title="([\d.]+)%"', row_html, re.DOTALL)
         if not wt_m:
             continue
-        # 提取分类名：data-category-id 元素的文本内容
-        name_m = re.search(r'data-category-id="\d+"[^>]*>\s*([^<]+?)\s*</(?:a|span|td)', row_html, re.DOTALL)
-        if name_m:
-            title = re.sub(r'\s+', ' ', name_m.group(1)).strip()
-            if title:
-                try:
-                    weights[title] = round(float(wt_m.group(1)), 4)
-                except ValueError:
-                    pass
+
+        # 从 input id 提取 category id
+        cid_m = re.search(r'edit-categories-(\d+)-weight', row_html)
+        if not cid_m:
+            continue
+        cat_id = cid_m.group(1)
+
+        # 从同行 href 含该 category id 的 <a> 提取分类名
+        name_m = re.search(
+            rf'href="[^"]*/{cat_id}[^"]*"[^>]*>\s*([^<]+?)\s*</a>',
+            row_html, re.DOTALL
+        )
+        if not name_m:
+            continue
+        title = re.sub(r'\s+', ' ', name_m.group(1)).strip()
+        if title:
+            try:
+                weights[title] = round(float(wt_m.group(1)), 4)
+            except ValueError:
+                pass
 
     if weights:
         print(f"  [gradesetup] 读取到 {len(weights)} 个分类权重: {weights}")
