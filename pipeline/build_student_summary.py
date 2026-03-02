@@ -485,7 +485,7 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
                         "name":   str(r.get("作业名", "")).strip(),
                         "score":  round(float(score), 1),
                         "max":    round(float(max_score), 1),
-                        "weight": (cat_weights_by_section or {}).get(str(r.get("分类", "")).strip()),
+                        "weight": r.get("分类权重%") or (cat_weights_by_section or {}).get(str(r.get("分类", "")).strip()),
                     })
                 # 若无 AoL 分类条目，回退：展示所有有成绩的作业
                 if not aol_details:
@@ -499,7 +499,7 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
                             "score":    round(float(score), 1),
                             "max":      round(float(max_score), 1),
                             "category": str(r.get("分类", "")).strip(),
-                            "weight":   (cat_weights_by_section or {}).get(str(r.get("分类", "")).strip()),
+                            "weight":   r.get("分类权重%") or (cat_weights_by_section or {}).get(str(r.get("分类", "")).strip()),
                         })
 
             cp_entry = {
