@@ -57,6 +57,7 @@ async function handleApiAdmin(req, res, parsedUrl) {
 }
 
 
+function loadDotEnvIfPresent() {
   // Minimal .env loader to avoid adding dependencies (dotenv).
   const envPath = path.join(__dirname, ".env");
   if (!fs.existsSync(envPath)) return;
