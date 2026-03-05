@@ -266,11 +266,22 @@ def parse_gradebook(data: dict, section_nid: str, course_name: str = "",
 
     print(f"  [debug] user_data: {len(user_data)} 人, grade_item_data: {len(grade_item_data)} 项")
 
+    # Debug：打印第一个学生的 grades 结构，帮助诊断总成绩为空的问题
+    _debug_printed = False
     rows = []
     for uid, student in user_data.items():
         student_name    = student.get("name", "")
         overall_numeric = None
-        overall_raw = (student.get("grades") or {}).get("overall") or {}
+        grades_in_user  = student.get("grades") or {}
+
+        if not _debug_printed:
+            print(f"  [debug] grades keys in user_data sample: {list(grades_in_user.keys())[:10]}")
+            overall_sample = grades_in_user.get("overall") or grades_in_user.get("all") or {}
+            print(f"  [debug] overall/all sample: {str(overall_sample)[:200]}")
+            _debug_printed = True
+
+        # 兼容 "overall" 和 "all" 两种 key（Schoology API 版本差异）
+        overall_raw = grades_in_user.get("overall") or grades_in_user.get("all") or {}
         if isinstance(overall_raw, dict):
             overall_numeric = overall_raw.get("numeric")
 
@@ -340,7 +351,7 @@ def get_feishu_token(app_id: str, app_secret: str) -> str:
 # ──────────────────────────────────────────────
 
 def fetch_existing_records(token: str, app_token: str, table_id: str) -> dict:
-    """返回 {_key: record_id} 映射，用于 upsert。"""
+    """返回 {_key: (record_id, section_nid)} 映射，用于 upsert。"""
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}/records"
     headers = {"Authorization": f"Bearer {token}"}
     existing = {}
@@ -355,8 +366,9 @@ def fetch_existing_records(token: str, app_token: str, table_id: str) -> dict:
             break
         for item in resp.get("data", {}).get("items", []):
             key = item.get("fields", {}).get("_key", "")
+            nid = str(item.get("fields", {}).get("SectionNID", "")).strip()
             if key:
-                existing[key] = item["record_id"]
+                existing[key] = (item["record_id"], nid)
         if not resp.get("data", {}).get("has_more"):
             break
         page_token = resp["data"].get("page_token")
@@ -400,6 +412,8 @@ def batch_upsert(token: str, app_token: str, table_id: str,
     to_insert = []
     to_update = []   # list of (record_id, fields)
     current_keys = set()
+    # 本次爬取涉及的 section NIDs（只删这些 section 内消失的行，不碰其他 section）
+    current_nids = {str(row.get("SectionNID", "")).strip() for row in rows}
 
     for row in rows:
         key    = row["_key"]
@@ -408,12 +422,17 @@ def batch_upsert(token: str, app_token: str, table_id: str,
         current_keys.add(key)
 
         if key in existing:
-            to_update.append((existing[key], fields))
+            record_id, _ = existing[key]
+            to_update.append((record_id, fields))
         else:
             to_insert.append(fields)
 
-    # ── delete（Schoology 已删除的作业） ──
-    to_delete = [existing[k] for k in existing if k not in current_keys]
+    # ── delete：只删本次爬取的 section 内已消失的作业行 ──
+    # 其他 section（如上学期）的行保持不动
+    to_delete = [
+        existing[k][0] for k in existing
+        if k not in current_keys and existing[k][1] in current_nids
+    ]
     chunk = 100
     if to_delete:
         del_url = (f"https://open.feishu.cn/open-apis/bitable/v1/apps"
@@ -666,7 +685,10 @@ def main():
         print(f"  [提示] 使用内置课程名映射（{len(course_mapping)} 条）")
 
     sections = {
-        nid: course_mapping.get(re.sub(r'\s+', ' ', name).lower().strip(), name)
+        nid: course_mapping.get(
+            re.sub(r'\s+', ' ', name.split(":")[0]).lower().strip(),  # 取冒号前的课程名做映射
+            name.split(":")[0].strip()                                  # 映射失败时也只保留课程名
+        )
         for nid, name in sections_raw.items()
     }
     print(f"课程 Section 数量: {len(sections)}")
@@ -681,6 +703,7 @@ def main():
     all_rows = []
     gp_info = {}
     all_cat_weights = {}   # nid → {category_title: weight}，汇总后写 category_weights.json
+    section_gp = {}        # nid → gp_info，每个 section 独立学期信息
     for nid, course_name in sections.items():
         print(f"\n── {course_name} ({nid}) ──")
         try:
@@ -693,11 +716,13 @@ def main():
             # fetch_gradesetup_weights 现在直接返回 {title: weight}，可直接存储
             if category_weights:
                 all_cat_weights[nid] = category_weights
-            # 从第一个有效 section 提取学期日期
-            if not gp_info:
-                gp_info = parse_grading_period_dates(data)
-                if gp_info:
-                    print(f"  学期: {gp_info['session']}  {gp_info['start_date']} → {gp_info['end_date']}")
+            # 每个 section 单独提取学期信息
+            gp = parse_grading_period_dates(data)
+            if gp:
+                section_gp[nid] = gp
+                print(f"  学期: {gp['session']}  {gp['start_date']} → {gp['end_date']}")
+                if not gp_info:
+                    gp_info = gp
         except Exception as e:
             print(f"  [错误] {e}")
 
@@ -717,6 +742,16 @@ def main():
             print(f">>> 分类权重已写入: {cw_path}（{len(all_cat_weights)} 个 section，{total_cats} 个分类）")
         except Exception as e:
             print(f"  [警告] 分类权重写入失败: {e}")
+
+    # Section 学期映射写入本地文件，供 build_student_summary.py 区分多学期同名课程
+    if section_gp:
+        ss_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "section_semesters.json")
+        try:
+            with open(ss_path, "w", encoding="utf-8") as f:
+                json.dump(section_gp, f, ensure_ascii=False)
+            print(f">>> Section 学期映射已写入: {ss_path}（{len(section_gp)} 个 section）")
+        except Exception as e:
+            print(f"  [警告] Section 学期映射写入失败: {e}")
 
     # 学期元数据写入本地文件，供 build_student_summary.py 读取
     if gp_info:

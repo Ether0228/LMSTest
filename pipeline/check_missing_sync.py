@@ -6,6 +6,32 @@ import hashlib
 import time
 from datetime import datetime, timedelta
 
+
+def _get_active_semesters_from_calendar(grace_days=14):
+    """从 config/academic_calendar.json 自动推断当前活跃学期（含宽限期）。"""
+    base = os.path.dirname(os.path.abspath(__file__))
+    calendar_path = os.path.join(base, "..", "config", "academic_calendar.json")
+    if not os.path.exists(calendar_path):
+        return set()
+    try:
+        with open(calendar_path, encoding="utf-8") as f:
+            calendar = json.load(f)
+    except Exception:
+        return set()
+    today = datetime.now().date()
+    active = set()
+    for sem, dates in calendar.items():
+        try:
+            start = datetime.strptime(dates["start"], "%Y-%m-%d").date()
+            end   = datetime.strptime(dates["end"],   "%Y-%m-%d").date()
+        except Exception:
+            continue
+        if start <= today <= end:
+            active.add(sem)
+        elif end < today and (today - end).days <= grace_days:
+            active.add(sem)
+    return active
+
 # ================= 配置与工具函数 =================
 def get_env_config():
     keys = ["FEISHU_APP_ID", "FEISHU_APP_SECRET", "FEISHU_APP_TOKEN", 
@@ -57,9 +83,18 @@ def start_missing_sync():
     submissions = fetch_all_records(token, app_token, conf["FEISHU_TABLE_ID"])
     current_missing_table = fetch_all_records(token, app_token, conf["FEISHU_MISSING_TABLE_ID"])
 
-    # 学期过滤：只有活跃学期（或无标签旧数据）的作业参与缺交考核
+    # 学期过滤：优先读环境变量，未设置时从 academic_calendar.json 自动推断（宽限期 14 天）
     active_semesters_raw = os.environ.get("ACTIVE_SEMESTERS", "").strip()
-    active_semesters = {s.strip() for s in active_semesters_raw.split(",") if s.strip()} if active_semesters_raw else set()
+    if active_semesters_raw:
+        active_semesters = {s.strip() for s in active_semesters_raw.split(",") if s.strip()}
+        print(f">>> 活跃学期 [环境变量]: {sorted(active_semesters)}")
+    else:
+        active_semesters = _get_active_semesters_from_calendar()
+        if active_semesters:
+            print(f">>> 活跃学期 [日历自动推断]: {sorted(active_semesters)}")
+        else:
+            print("INFO: ACTIVE_SEMESTERS 未设置，所有非忽略作业计入考核（向后兼容模式）")
+
     if active_semesters:
         lib_before = len(lib)
         lib = [
@@ -68,8 +103,6 @@ def start_missing_sync():
             or str(rec.get("fields", {}).get("学期", "")).strip() in active_semesters
         ]
         print(f">>> 学期过滤 ({', '.join(sorted(active_semesters))}): {lib_before} → {len(lib)} 条作业参与考核")
-    else:
-        print("INFO: ACTIVE_SEMESTERS 未设置，所有非忽略作业计入考核（向后兼容模式）")
 
     # 【关键修正】使用 Unix 绝对时间戳，解决时区显示问题
     absolute_now_ms = int(time.time() * 1000)

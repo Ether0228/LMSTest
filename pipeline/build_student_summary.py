@@ -256,7 +256,7 @@ def build_nid_lookup(lib_records):
 
 def build_summaries(roster, submissions, missing, assignment_lookup, assignment_by_link,
                     gradebook_by_student=None, nid_to_lib=None, gp_info=None,
-                    cat_weights_by_section=None):
+                    cat_weights_by_section=None, section_semesters=None, active_section_nids=None):
     # 1) 学生基础信息
     students = {}
     for r in roster:
@@ -275,6 +275,7 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
             "missing": [],
             "missing_items": [],
             "submitted_by_course": {},
+            "submitted_by_course_sem": {},  # {(course, semester): set}
             "expected_by_course": {},
             # 花名册额外字段（需在飞书花名册表中添加对应列）
             "school_year":   str(f.get("学年", "")).strip(),
@@ -287,6 +288,7 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
 
     # 1.5) 每个学生每科"应交总数"（基于作业库，忽略标记为🚫 忽略）
     lib_by_course = {}
+    lib_by_course_sem = {}  # {(course, semester): count} 用于多学期精确统计
     for _, item in assignment_lookup.items():
         course = (item.get("course") or "").strip()
         if not course:
@@ -294,6 +296,8 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
         if item.get("nature") == "🚫 忽略":
             continue
         lib_by_course[course] = lib_by_course.get(course, 0) + 1
+        sem = (item.get("semester") or "").strip()
+        lib_by_course_sem[(course, sem)] = lib_by_course_sem.get((course, sem), 0) + 1
     for _, s in students.items():
         for course in s["courses"]:
             c = str(course).strip()
@@ -339,6 +343,14 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
             if course_name not in sbc:
                 sbc[course_name] = set()
             sbc[course_name].add(dedup_key)
+            # 同步写入学期维度：用于多学期精确完成度计算
+            sem_label = (assignment.get("semester") or "").strip()
+            if sem_label:
+                sbc_sem = students[name]["submitted_by_course_sem"]
+                key_sem = (course_name, sem_label)
+                if key_sem not in sbc_sem:
+                    sbc_sem[key_sem] = set()
+                sbc_sem[key_sem].add(dedup_key)
 
     # 3) 缺交记录聚合（按"关联学生" record_id）
     roster_id_to_name = {
@@ -373,9 +385,11 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
                 missing_links_unmatched += 1
                 continue
             missing_links_matched += 1
+            miss_sem = (assignment.get("semester") or "").strip()
             students[name]["missing"].append(
                 {
                     "course": course_name,
+                    "semester": miss_sem,
                 }
             )
             students[name]["missing_items"].append(
@@ -420,9 +434,12 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
     rows = []
     for name, s in students.items():
         missing_by_course = {}
+        missing_by_course_sem = {}  # {(course, semester): count}
         for item in s["missing"]:
             c = item["course"]
             missing_by_course[c] = missing_by_course.get(c, 0) + 1
+            sem = item.get("semester", "")
+            missing_by_course_sem[(c, sem)] = missing_by_course_sem.get((c, sem), 0) + 1
         # courseProgress 只显示花名册里的课程，跨学期宽限期提交不额外增加课程卡
         all_courses = sorted(set(s["courses"]))
 
@@ -441,81 +458,162 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
 
         course_progress = []
         # 按课程分组本学生的 gradebook 行，用于填充成绩数据
+        # _gb_rows_by_course: {course_code: [rows]}（兼容无 SectionNID 的情况）
+        # _gb_rows_by_course_section: {(course_code, nid): [rows]}（多学期分离）
         _gb_rows_by_course = {}
+        _gb_rows_by_course_section = {}
         for gb_row in (_gb_by_student or {}).get(name, []):
             raw_name = str(gb_row.get("课程名", "")).strip()
             # 标准化内部空白（Schoology 课程名可能含多余空格，如 "Grade 12     Data Management"）
             normalized_name = re.sub(r'\s+', ' ', raw_name).lower()
             c_key = _GRADEBOOK_COURSE_NAME_MAP.get(normalized_name, raw_name)
-            if c_key:
-                _gb_rows_by_course.setdefault(c_key, []).append(gb_row)
+            if not c_key:
+                continue
+            _gb_rows_by_course.setdefault(c_key, []).append(gb_row)
+            nid = str(gb_row.get("SectionNID", "")).strip()
+            if nid:
+                _gb_rows_by_course_section.setdefault((c_key, nid), []).append(gb_row)
 
-        for c in all_courses:
-            expected_count = int(s["expected_by_course"].get(c, 0))
-            missing_count = int(missing_by_course.get(c, 0))
-            submitted_from_expected = max(expected_count - missing_count, 0) if expected_count > 0 else 0
-            sbc_val = s["submitted_by_course"].get(c)
-            submitted_count = len(sbc_val) if sbc_val is not None else submitted_from_expected
-            total = expected_count if expected_count > 0 else (submitted_count + missing_count)
-            completion = round((submitted_count / total) * 100, 1) if total > 0 else 0.0
+        _section_semesters = section_semesters or {}
+        _active_nids       = active_section_nids or set()
 
-            # 从 gradebook 补充成绩字段
-            gb_course_rows = _gb_rows_by_course.get(c, [])
+        def _extract_grade_and_aol(gb_course_rows):
+            """从 gradebook 行中提取 current_grade 和 aol_details。"""
             current_grade = None
             grade_updated_at = None
             aol_details = []
-            if gb_course_rows:
-                # 课程总分%：取第一个非空值（同一学生同一课程该值应一致）
+            if not gb_course_rows:
+                return current_grade, grade_updated_at, aol_details
+            # 课程总分%：取第一个非空值
+            for r in gb_course_rows:
+                v = r.get("课程总分%")
+                if v is not None:
+                    current_grade = round(float(v), 1)
+                    grade_updated_at = now_ms
+                    break
+            # AoL 评分明细：分类名含 "aol" 或 "assessment of learning"
+            for r in gb_course_rows:
+                cat = str(r.get("分类", "")).lower()
+                if "aol" not in cat and "assessment of learning" not in cat:
+                    continue
+                score = r.get("得分")
+                max_score = r.get("满分")
+                if score is None or not max_score:
+                    continue
+                aol_details.append({
+                    "name":   str(r.get("作业名", "")).strip(),
+                    "score":  round(float(score), 1),
+                    "max":    round(float(max_score), 1),
+                    "weight": r.get("分类权重%") or (cat_weights_by_section or {}).get(str(r.get("分类", "")).strip()),
+                })
+            # 若无 AoL 分类条目，回退：展示所有有成绩的作业
+            if not aol_details:
                 for r in gb_course_rows:
-                    v = r.get("课程总分%")
-                    if v is not None:
-                        current_grade = round(float(v), 1)
-                        grade_updated_at = now_ms
-                        break
-                # AoL 评分明细：分类名含 "aol" 或 "assessment of learning"
-                for r in gb_course_rows:
-                    cat = str(r.get("分类", "")).lower()
-                    if "aol" not in cat and "assessment of learning" not in cat:
-                        continue
                     score = r.get("得分")
                     max_score = r.get("满分")
                     if score is None or not max_score:
                         continue
                     aol_details.append({
-                        "name":   str(r.get("作业名", "")).strip(),
-                        "score":  round(float(score), 1),
-                        "max":    round(float(max_score), 1),
-                        "weight": r.get("分类权重%") or (cat_weights_by_section or {}).get(str(r.get("分类", "")).strip()),
+                        "name":     str(r.get("作业名", "")).strip(),
+                        "score":    round(float(score), 1),
+                        "max":      round(float(max_score), 1),
+                        "category": str(r.get("分类", "")).strip(),
+                        "weight":   r.get("分类权重%") or (cat_weights_by_section or {}).get(str(r.get("分类", "")).strip()),
                     })
-                # 若无 AoL 分类条目，回退：展示所有有成绩的作业
-                if not aol_details:
-                    for r in gb_course_rows:
-                        score = r.get("得分")
-                        max_score = r.get("满分")
-                        if score is None or not max_score:
-                            continue
-                        aol_details.append({
-                            "name":     str(r.get("作业名", "")).strip(),
-                            "score":    round(float(score), 1),
-                            "max":      round(float(max_score), 1),
-                            "category": str(r.get("分类", "")).strip(),
-                            "weight":   r.get("分类权重%") or (cat_weights_by_section or {}).get(str(r.get("分类", "")).strip()),
-                        })
+            return current_grade, grade_updated_at, aol_details
 
-            cp_entry = {
-                "course":         c,
-                "submittedCount": submitted_count,
-                "missingCount":   missing_count,
-                "completion":     completion,
-                "aolSubmitted":   aol_submitted_by_course.get(c, 0),
-                "aolMissing":     aol_missing_by_course.get(c, 0),
-            }
-            if current_grade is not None:
-                cp_entry["current_grade"]    = current_grade
-                cp_entry["grade_updated_at"] = grade_updated_at
-            if aol_details:
-                cp_entry["aol_details"] = aol_details
-            course_progress.append(cp_entry)
+        for c in all_courses:
+            # 找出此课程在 gradebook 里的所有 SectionNID
+            matched_nids = sorted(
+                {nid for (cc, nid) in _gb_rows_by_course_section if cc == c},
+                key=lambda nid: (0 if nid in _active_nids else 1, nid)
+            )
+
+            if not matched_nids:
+                # 无 NID 分组（无 gradebook 数据或所有行 NID 为空）→ 原始单条逻辑
+                expected_count = int(s["expected_by_course"].get(c, 0))
+                missing_count  = int(missing_by_course.get(c, 0))
+                submitted_from_expected = max(expected_count - missing_count, 0) if expected_count > 0 else 0
+                sbc_val = s["submitted_by_course"].get(c)
+                submitted_count = len(sbc_val) if sbc_val is not None else submitted_from_expected
+                total = expected_count if expected_count > 0 else (submitted_count + missing_count)
+                completion = round((submitted_count / total) * 100, 1) if total > 0 else 0.0
+                current_grade, grade_updated_at, aol_details = _extract_grade_and_aol(
+                    _gb_rows_by_course.get(c, [])
+                )
+                cp_entry = {
+                    "course":         c,
+                    "submittedCount": submitted_count,
+                    "missingCount":   missing_count,
+                    "completion":     completion,
+                    "aolSubmitted":   aol_submitted_by_course.get(c, 0),
+                    "aolMissing":     aol_missing_by_course.get(c, 0),
+                }
+                if current_grade is not None:
+                    cp_entry["current_grade"]    = current_grade
+                    cp_entry["grade_updated_at"] = grade_updated_at
+                if aol_details:
+                    cp_entry["aol_details"] = aol_details
+                course_progress.append(cp_entry)
+                continue
+
+            # 有 NID 分组：每个 section 产生一个 cp_entry
+            has_multi = len(matched_nids) > 1
+            for nid in matched_nids:
+                gb_course_rows = _gb_rows_by_course_section.get((c, nid), [])
+                is_current = (not _active_nids) or (nid in _active_nids)
+                sem_info   = _section_semesters.get(nid, {})
+                sem_label  = sem_info.get("session", "")
+
+                current_grade, grade_updated_at, aol_details = _extract_grade_and_aol(gb_course_rows)
+
+                if is_current:
+                    # 当前学期：按学期精确统计提交/缺交，避免多学期重叠时分母错误
+                    if sem_label and (c, sem_label) in lib_by_course_sem:
+                        expected_count = int(lib_by_course_sem[(c, sem_label)])
+                        missing_count  = int(missing_by_course_sem.get((c, sem_label), 0))
+                        sbc_sem_val = s["submitted_by_course_sem"].get((c, sem_label))
+                        if sbc_sem_val is not None:
+                            submitted_count = len(sbc_sem_val)
+                        else:
+                            submitted_count = max(expected_count - missing_count, 0) if expected_count > 0 else 0
+                    else:
+                        # 无学期标签（旧数据兼容）：退回课程维度统计
+                        expected_count = int(s["expected_by_course"].get(c, 0))
+                        missing_count  = int(missing_by_course.get(c, 0))
+                        sbc_val = s["submitted_by_course"].get(c)
+                        submitted_count = len(sbc_val) if sbc_val is not None else max(expected_count - missing_count, 0) if expected_count > 0 else 0
+                    total = expected_count if expected_count > 0 else (submitted_count + missing_count)
+                    completion = round((submitted_count / total) * 100, 1) if total > 0 else 0.0
+                    aol_submitted = aol_submitted_by_course.get(c, 0)
+                    aol_missing   = aol_missing_by_course.get(c, 0)
+                else:
+                    # 上学期：只展示成绩，不计入提交/缺交统计
+                    submitted_count = 0
+                    missing_count   = 0
+                    completion      = 0.0
+                    aol_submitted   = 0
+                    aol_missing     = 0
+
+                cp_entry = {
+                    "course":         c,
+                    "submittedCount": submitted_count,
+                    "missingCount":   missing_count,
+                    "completion":     completion,
+                    "aolSubmitted":   aol_submitted,
+                    "aolMissing":     aol_missing,
+                    "isCurrentSemester": is_current,
+                }
+                if has_multi and sem_label:
+                    cp_entry["semester"] = sem_label
+                if nid:
+                    cp_entry["sectionNid"] = nid
+                if current_grade is not None:
+                    cp_entry["current_grade"]    = current_grade
+                    cp_entry["grade_updated_at"] = grade_updated_at
+                if aol_details:
+                    cp_entry["aol_details"] = aol_details
+                course_progress.append(cp_entry)
 
         # DDL 日历：从 gradebook 提取未来截止日期
         upcoming_deadlines = []
@@ -911,6 +1009,48 @@ def write_pg_cache(summary_rows, database_url, tenant_key=None):
         print(f"WARNING: PostgreSQL 写入失败: {e}")
 
 
+def load_academic_calendar():
+    """从 config/academic_calendar.json 加载全年学期日历。
+    文件路径：repo_root/config/academic_calendar.json
+    返回 {semester_label: {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}} 或空字典。
+    """
+    base = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(base, "..", "config", "academic_calendar.json"),
+        os.path.join(base, "academic_calendar.json"),
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            try:
+                with open(path, encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"WARNING: 读取 academic_calendar.json 失败: {e}")
+    return {}
+
+
+def get_active_semesters_from_calendar(calendar, grace_days=14):
+    """从日历自动推断当前活跃学期。
+    active = 今天所在学期 + grace_days 内刚结束的学期（补交宽限期）
+    返回 (active_set, current_semester_label)
+    """
+    today = datetime.now().date()
+    active = set()
+    current = None
+    for sem, dates in calendar.items():
+        try:
+            start = datetime.strptime(dates["start"], "%Y-%m-%d").date()
+            end   = datetime.strptime(dates["end"],   "%Y-%m-%d").date()
+        except Exception:
+            continue
+        if start <= today <= end:
+            active.add(sem)
+            current = sem
+        elif end < today and (today - end).days <= grace_days:
+            active.add(sem)
+    return active, current
+
+
 def main():
     conf = get_env_config()
     token = get_feishu_token(conf)
@@ -936,9 +1076,25 @@ def main():
         f">>> 数据加载完成: roster={len(roster)}, submissions={len(submissions)}, lib={len(lib)}, missing={len(missing)}"
     )
 
+    # 加载全年学期日历（repo_root/config/academic_calendar.json）
+    calendar = load_academic_calendar()
+    if calendar:
+        print(f">>> 日历加载: {len(calendar)} 个学期 ({', '.join(sorted(calendar))})")
+    else:
+        print("INFO: academic_calendar.json 未找到，依赖手动配置的环境变量")
+
     # 学期过滤：只有 ACTIVE_SEMESTERS 里的学期（或无标签的旧数据）参与缺交考核
+    # 优先使用环境变量显式配置；未设置时从日历自动推断（当前学期 + 2 周宽限期）
     active_semesters_raw = os.environ.get("ACTIVE_SEMESTERS", "").strip()
-    active_semesters = {s.strip() for s in active_semesters_raw.split(",") if s.strip()} if active_semesters_raw else set()
+    current_semester_from_calendar = None
+    if active_semesters_raw:
+        active_semesters = {s.strip() for s in active_semesters_raw.split(",") if s.strip()}
+        print(f">>> 活跃学期 [环境变量]: {sorted(active_semesters)}")
+    elif calendar:
+        active_semesters, current_semester_from_calendar = get_active_semesters_from_calendar(calendar)
+        print(f">>> 活跃学期 [日历自动推断]: {sorted(active_semesters)}, 当前: {current_semester_from_calendar}")
+    else:
+        active_semesters = set()
     if active_semesters:
         lib_before = len(lib)
         lib = [
@@ -983,6 +1139,20 @@ def main():
             print("INFO: 未找到学期参数（grading_period.json 或 SCHOOLOGY_GRADING_PERIOD），学期进度条将不显示。"
                   "切换学期后请在 GitHub Secrets 中设置 SCHOOLOGY_GRADING_PERIOD。")
 
+    # 如果 gp_info 仍为空，尝试从日历文件推断（不依赖 Schoology 爬取结果）
+    if not gp_info and calendar:
+        sem_key = current_semester_from_calendar
+        if not sem_key and active_semesters:
+            sem_key = sorted(active_semesters)[-1]  # 取最新学期
+        if sem_key and sem_key in calendar:
+            sem_dates = calendar[sem_key]
+            gp_info = {
+                "session":    sem_key,
+                "start_date": sem_dates["start"],
+                "end_date":   sem_dates["end"],
+            }
+            print(f">>> 学期参数 [日历]: {sem_key} {sem_dates['start']} → {sem_dates['end']}")
+
     # 读取分类权重：由 scrape_gradebook.py 在同一 job 内写入
     # 转为扁平映射 {category_title: weight}，避免依赖飞书行是否有 SectionNID 列
     cat_weights_flat = {}
@@ -997,10 +1167,33 @@ def main():
         except Exception as e:
             print(f"WARNING: 读取 category_weights.json 失败: {e}")
 
+    # 读取 Section 学期映射：由 scrape_gradebook.py 在同一 job 内写入
+    # 用于区分同名课程在不同学期的 gradebook 行
+    section_semesters = {}
+    ss_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "section_semesters.json")
+    if os.path.exists(ss_path):
+        try:
+            with open(ss_path, "r", encoding="utf-8") as f:
+                section_semesters = json.load(f)
+            print(f">>> Section 学期映射 [本地文件]: {len(section_semesters)} 个 section → {list(section_semesters.keys())[:5]}")
+        except Exception as e:
+            print(f"WARNING: 读取 section_semesters.json 失败: {e}")
+
+    # 确定"当前学期"的 section nids：end_date >= 今天
+    today_str = datetime.now().date().isoformat()
+    active_section_nids = {
+        nid for nid, gp in section_semesters.items()
+        if gp.get("end_date", "") >= today_str
+    }
+    if section_semesters:
+        print(f">>> 当前有效 sections: {active_section_nids or '（全部视为当前）'}")
+
     summary_rows = build_summaries(
         roster, submissions, missing, assignment_lookup, assignment_by_link,
         gradebook_by_student, nid_to_lib, gp_info=gp_info,
         cat_weights_by_section=cat_weights_flat,
+        section_semesters=section_semesters,
+        active_section_nids=active_section_nids,
     )
 
     # 清理飞书缺交表中"🚫 忽略"作业的行

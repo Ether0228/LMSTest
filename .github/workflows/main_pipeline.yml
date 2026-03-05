@@ -50,7 +50,6 @@ jobs:
           TZ: Asia/Shanghai
           TARGET_DATE: ${{ github.event.inputs.target_date }}
           MAX_PAGES: ${{ github.event.inputs.max_pages }}
-          CURRENT_SEMESTER: ${{ secrets.CURRENT_SEMESTER }}
         run: python "pipeline/scraper_cloud_feishu.py"
 
       # === 阶段二：补全课程信息 ===
@@ -61,6 +60,7 @@ jobs:
           FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
           FEISHU_APP_TOKEN: ${{ secrets.FEISHU_APP_TOKEN }}
           FEISHU_LIB_TABLE_ID: ${{ secrets.FEISHU_LIB_TABLE_ID }}
+          FEISHU_CONFIG_TABLE_ID: ${{ secrets.FEISHU_CONFIG_TABLE_ID }}
           SCHOOLOGY_COOKIES: ${{ secrets.SCHOOLOGY_COOKIES }}
         run: python "pipeline/fill_course_info.py"
 
@@ -75,7 +75,6 @@ jobs:
           FEISHU_ROSTER_TABLE_ID: ${{ secrets.FEISHU_ROSTER_TABLE_ID }}
           FEISHU_LIB_TABLE_ID: ${{ secrets.FEISHU_LIB_TABLE_ID }}
           FEISHU_MISSING_TABLE_ID: ${{ secrets.FEISHU_MISSING_TABLE_ID }}
-          ACTIVE_SEMESTERS: ${{ secrets.ACTIVE_SEMESTERS }}
         run: python "pipeline/check_missing_sync.py"
 
       # === 阶段三·五：抓取 Gradebook（写 grading_period 供汇总读取）===
@@ -88,10 +87,9 @@ jobs:
           FEISHU_APP_TOKEN: ${{ secrets.FEISHU_APP_TOKEN }}
           FEISHU_GRADEBOOK_TABLE_ID: ${{ secrets.FEISHU_GRADEBOOK_TABLE_ID }}
           FEISHU_LIB_TABLE_ID: ${{ secrets.FEISHU_LIB_TABLE_ID }}
+          FEISHU_CONFIG_TABLE_ID: ${{ secrets.FEISHU_CONFIG_TABLE_ID }}
           SCHOOLOGY_COOKIES: ${{ secrets.SCHOOLOGY_COOKIES }}
           SCHOOLOGY_SECTION_NIDS: ${{ secrets.SCHOOLOGY_SECTION_NIDS }}
-          CURRENT_SEMESTER: ${{ secrets.CURRENT_SEMESTER }}
-          FEISHU_CONFIG_TABLE_ID: ${{ secrets.FEISHU_CONFIG_TABLE_ID }}
           FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
         run: python pipeline/scrape_gradebook.py
 
@@ -124,8 +122,6 @@ jobs:
           FEISHU_MISSING_TABLE_ID: ${{ secrets.FEISHU_MISSING_TABLE_ID }}
           FEISHU_SUMMARY_TABLE_ID: ${{ secrets.FEISHU_SUMMARY_TABLE_ID }}
           FEISHU_GRADEBOOK_TABLE_ID: ${{ secrets.FEISHU_GRADEBOOK_TABLE_ID }}
-          ACTIVE_SEMESTERS: ${{ secrets.ACTIVE_SEMESTERS }}
-          CURRENT_SEMESTER: ${{ secrets.CURRENT_SEMESTER }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           CACHE_TENANT_KEY: ${{ secrets.CACHE_TENANT_KEY }}
         run: python "pipeline/build_student_summary.py"
