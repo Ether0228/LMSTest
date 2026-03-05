@@ -134,24 +134,34 @@ def build_session(cookies_json: list) -> requests.Session:
 def fetch_gradebook(session: requests.Session, section_nid: str) -> dict:
     url = f"{BASE_URL}/iapi/grades/grader_header_data/{section_nid}"
     print(f"  → GET {url}")
-    resp = session.get(url, timeout=30, allow_redirects=True)
-    print(f"  ← HTTP {resp.status_code}  final_url={resp.url}")
+    for attempt in range(3):
+        resp = session.get(url, timeout=30, allow_redirects=True)
+        print(f"  ← HTTP {resp.status_code}  final_url={resp.url}")
+        if resp.status_code == 429:
+            wait = 30 * (attempt + 1)
+            print(f"  [429] 请求限速，等待 {wait}s 后重试 ({attempt+1}/3)...")
+            time.sleep(wait)
+            continue
+        break
     if not resp.text.strip():
         raise ValueError("响应为空（cookies 可能已过期，请更新 SCHOOLOGY_COOKIES）")
     if resp.text.strip().startswith("<"):
-        # 返回了 HTML，说明被重定向到登录页
         raise ValueError(f"返回 HTML 而非 JSON（被重定向到登录页）: {resp.text[:200]}")
     return resp.json()
 
 
 def fetch_gradesetup_weights(session: requests.Session, section_nid: str) -> dict:
-    """抓取 gradesetup 页面，返回 {category_title: weight_pct} 映射。
-    权重来自 <td class="weight_percentage"><span title="4.54545%">...，
-    category title 来自同行含 data-category-id 的元素的文本内容。
-    """
+    """抓取 gradesetup 页面，返回 {category_title: weight_pct} 映射。"""
     url = f"{BASE_URL}/course/{section_nid}/gradesetup"
     try:
-        resp = session.get(url, timeout=30)
+        for attempt in range(3):
+            resp = session.get(url, timeout=30)
+            if resp.status_code == 429:
+                wait = 30 * (attempt + 1)
+                print(f"  [gradesetup] 429 限速，等待 {wait}s 后重试 ({attempt+1}/3)...")
+                time.sleep(wait)
+                continue
+            break
         if resp.status_code != 200 or resp.text.strip().startswith("{"):
             print(f"  [gradesetup] HTTP {resp.status_code}，跳过")
             return {}
@@ -264,6 +274,9 @@ def parse_gradebook(data: dict, section_nid: str, course_name: str = "",
         if c["id"] not in ("all", "summary")
     }
 
+    # 构建大小写不敏感的权重查找表，规避 gradesetup HTML 与 API 返回的分类名细微差异
+    _cat_w = {k.strip().lower(): v for k, v in (category_weights or {}).items()}
+
     print(f"  [debug] user_data: {len(user_data)} 人, grade_item_data: {len(grade_item_data)} 项")
 
     # Debug：打印第一个学生的 grades 结构，帮助诊断总成绩为空的问题
@@ -304,8 +317,11 @@ def parse_gradebook(data: dict, section_nid: str, course_name: str = "",
 
             category_id    = str(item.get("grading_category_id", ""))
             category_title  = grading_categories.get(category_id, item.get("category_title", ""))
-            # category_weights 现在是 {title: weight}，按 title 查
-            category_weight = category_weights.get(category_title) if category_weights else None
+            # 大小写不敏感匹配，避免 gradesetup HTML 与 API 分类名细微差异导致权重丢失
+            category_weight = _cat_w.get(category_title.strip().lower()) if _cat_w else None
+            if category_weights and category_title and category_weight is None:
+                print(f"  [debug] 分类权重未匹配: API分类名={category_title!r}, "
+                      f"gradesetup已有keys={list(category_weights.keys())[:5]}")
 
             rows.append({
                 "学生姓名":   student_name,
@@ -692,6 +708,14 @@ def main():
         for nid, name in sections_raw.items()
     }
     print(f"课程 Section 数量: {len(sections)}")
+
+    # 校验 NID 格式：Schoology NID 应为纯数字，否则极可能是 JSON 里 NID 和课程名顺序写反
+    for nid in list(sections.keys()):
+        if not re.match(r'^\d+$', str(nid).strip()):
+            print(f"  [错误] NID 格式异常: {nid!r}（应为纯数字）。"
+                  f"请检查 SCHOOLOGY_SECTION_NIDS 是否把课程名和 NID 的顺序写反了，"
+                  f"正确格式: {{\"NID\": \"课程名: Section XXXX\"}}。跳过此 Section。")
+            del sections[nid]
 
     # 读取飞书现有记录（用于 upsert）
     print("\n读取飞书 Gradebook 表现有记录...")
