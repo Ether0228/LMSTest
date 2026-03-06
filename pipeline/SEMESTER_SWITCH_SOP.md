@@ -6,12 +6,12 @@
 
 ## 前置：明确哪些东西会变
 
-| 类别 | 每学期变 | 每学期不变 |
-|---|---|---|
-| Schoology | Section NID（每门课每学期不同）、作业列表、学期日期 | App Token、Cookies（到期独立处理） |
-| 飞书 | 花名册课程字段、配置表 grading_period（自动更新） | 所有 Table ID、App Token、作业库（保留历史）、课程名映射 |
+| 类别             | 每学期变                                                           | 每学期不变                                                |
+| -------------- | -------------------------------------------------------------- | ---------------------------------------------------- |
+| Schoology      | Section NID（每门课每学期不同）、作业列表、学期日期                                | App Token、Cookies（到期独立处理）                            |
+| 飞书             | 花名册课程字段、配置表 grading_period（自动更新）                               | 所有 Table ID、App Token、作业库（保留历史）、课程名映射                |
 | GitHub Secrets | `SCHOOLOGY_SECTION_NIDS`、`CURRENT_SEMESTER`、`ACTIVE_SEMESTERS` | 所有 Feishu 相关 Secret、`SCHOOLOGY_GRADING_PERIOD`（现为备用） |
-| 代码 | 无需改代码 | — |
+| 代码             | 无需改代码                                                          | —                                                    |
 
 ---
 
@@ -158,24 +158,24 @@ ACTIVE_SEMESTERS = 2026-S4
 
 ## 附录 A：GitHub Secrets 完整一览
 
-| Secret | 每学期是否变 | 说明 |
-|---|---|---|
-| `FEISHU_APP_ID` | 否 | |
-| `FEISHU_APP_SECRET` | 否 | |
-| `FEISHU_APP_TOKEN` | 否 | |
-| `FEISHU_TABLE_ID` | 否 | 提交记录表 |
-| `FEISHU_ROSTER_TABLE_ID` | 否 | 花名册 |
-| `FEISHU_LIB_TABLE_ID` | 否 | 作业库 |
-| `FEISHU_MISSING_TABLE_ID` | 否 | 缺交表 |
-| `FEISHU_SUMMARY_TABLE_ID` | 否 | 汇总表 |
-| `FEISHU_GRADEBOOK_TABLE_ID` | 否 | Gradebook 表 |
-| `FEISHU_CONFIG_TABLE_ID` | 否 | 系统配置表（course_mapping / grading_period） |
-| `FEISHU_WEBHOOK_URL` | 否 | 飞书群通知机器人 |
-| `SCHOOLOGY_COOKIES` | 到期更换 | Selenium 格式 JSON 数组 |
-| `SCHOOLOGY_SECTION_NIDS` | **每学期** | `{"nid":"课程英文名", ...}` |
-| `SCHOOLOGY_GRADING_PERIOD` | **可选备用** | Pipeline 自动更新飞书配置表，此 Secret 仅在飞书读取失败时作 fallback |
-| `CURRENT_SEMESTER` | **每学期** | 新建档作业的学期标签，如 `2026-S4` |
-| `ACTIVE_SEMESTERS` | **每学期** + 宽限期结束时再改一次 | 参与考核的学期，如 `2026-S3,2026-S4` 或 `2026-S4` |
+| Secret                      | 每学期是否变               | 说明                                              |
+| --------------------------- | -------------------- | ----------------------------------------------- |
+| `FEISHU_APP_ID`             | 否                    |                                                 |
+| `FEISHU_APP_SECRET`         | 否                    |                                                 |
+| `FEISHU_APP_TOKEN`          | 否                    |                                                 |
+| `FEISHU_TABLE_ID`           | 否                    | 提交记录表                                           |
+| `FEISHU_ROSTER_TABLE_ID`    | 否                    | 花名册                                             |
+| `FEISHU_LIB_TABLE_ID`       | 否                    | 作业库                                             |
+| `FEISHU_MISSING_TABLE_ID`   | 否                    | 缺交表                                             |
+| `FEISHU_SUMMARY_TABLE_ID`   | 否                    | 汇总表                                             |
+| `FEISHU_GRADEBOOK_TABLE_ID` | 否                    | Gradebook 表                                     |
+| `FEISHU_CONFIG_TABLE_ID`    | 否                    | 系统配置表（course_mapping / grading_period）          |
+| `FEISHU_WEBHOOK_URL`        | 否                    | 飞书群通知机器人                                        |
+| `SCHOOLOGY_COOKIES`         | 到期更换                 | Selenium 格式 JSON 数组                             |
+| `SCHOOLOGY_SECTION_NIDS`    | **每学期**              | `{"nid":"课程英文名", ...}`                          |
+| `SCHOOLOGY_GRADING_PERIOD`  | **可选备用**             | Pipeline 自动更新飞书配置表，此 Secret 仅在飞书读取失败时作 fallback |
+| `CURRENT_SEMESTER`          | **每学期**              | 新建档作业的学期标签，如 `2026-S4`                          |
+| `ACTIVE_SEMESTERS`          | **每学期** + 宽限期结束时再改一次 | 参与考核的学期，如 `2026-S3,2026-S4` 或 `2026-S4`         |
 
 ---
 

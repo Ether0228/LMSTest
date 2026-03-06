@@ -449,6 +449,7 @@ function renderCourses(data) {
       const barCls  = completionClass(pct)
       const missing = missingByCourse[cp.course] || []
       const submitted = submittedByCourse[cp.course] || []
+      const isPrev  = cp.isCurrentSemester === false
 
       // 未提交区块
       const missingHTML = missing.length > 0
@@ -495,16 +496,17 @@ function renderCourses(data) {
       const updatedStr = cp.grade_updated_at ? formatDateTime(cp.grade_updated_at) : ""
 
       return `
-        <div class="course-card">
+        <div class="course-card${isPrev ? " course-card--previous" : ""}">
 
           <div class="course-card__header">
-            <div class="course-card__name">${esc(cp.course)}</div>
+            <div class="course-card__name">${esc(cp.course)}${cp.semester ? ` <span class="course-sem-badge">${esc(cp.semester)}</span>` : ""}</div>
             <div class="course-card__grade">
               <span class="grade__score">${gradeStr}</span>
               ${updatedStr ? `<span class="grade__updated">更新于 ${updatedStr}</span>` : ""}
             </div>
           </div>
 
+          ${!isPrev ? `
           <div class="course-prog">
             <div class="ascii-course-bar ascii-course-bar--${barCls}">${asciiBar(pct)}</div>
             <div class="course-prog__counts">
@@ -513,6 +515,7 @@ function renderCourses(data) {
               <span class="${cp.missingCount > 0 ? "count--miss" : "count--ok"}">缺交 ${cp.missingCount}${cp.aolMissing > 0 ? ` <span class="tag-aol tag-aol--miss">含 ${cp.aolMissing} AoL</span>` : ""}</span>
             </div>
           </div>
+          ` : `<div class="course-prev-label">上学期存档</div>`}
 
           <div class="course-detail">
             <button class="course-detail__toggle" onclick="toggleDetail(this)">
@@ -525,6 +528,7 @@ function renderCourses(data) {
             </div>
           </div>
 
+          ${!isPrev ? `
           <div class="course-detail">
             <button class="course-detail__toggle" onclick="toggleDetail(this)">
               <span class="toggle-icon">[+]</span>
@@ -549,6 +553,7 @@ function renderCourses(data) {
               ${submittedHTML}
             </div>
           </div>
+          ` : ""}
 
         </div>
       `
@@ -815,6 +820,9 @@ function normalizeApiResponse(raw) {
     })),
     aolSubmitted:    cp.aolSubmitted   || 0,
     aolMissing:      cp.aolMissing     || 0,
+    semester:        cp.semester       || null,
+    sectionNid:      cp.sectionNid     || null,
+    isCurrentSemester: cp.isCurrentSemester !== false,
   }))
 
   const finalCourseProgress = courseProgress.length > 0

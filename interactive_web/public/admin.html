@@ -139,7 +139,9 @@ function gradeClass(g) {
 }
 
 function avgGrade(courseProgress) {
-  const grades = (courseProgress || []).map(c => c.current_grade).filter(g => g != null)
+  const grades = (courseProgress || [])
+    .filter(c => c.isCurrentSemester !== false)
+    .map(c => c.current_grade).filter(g => g != null)
   if (!grades.length) return null
   return grades.reduce((a, b) => a + b, 0) / grades.length
 }
@@ -157,10 +159,12 @@ function renderRow(s) {
     const g = c.current_grade
     const gStr = g != null ? g.toFixed(1) + '%' : '待出分'
     const comp = Math.min(c.completion || 0, 100)
-    return `<div class="chip">
-      <span class="chip-name">${esc(c.course)}</span>
+    const isPrev = c.isCurrentSemester === false
+    const semBadge = c.semester ? ` <span style="font-size:9px;background:#e5e5ea;border-radius:3px;padding:1px 4px;vertical-align:middle">${esc(c.semester)}</span>` : ''
+    return `<div class="chip" style="${isPrev ? 'opacity:0.6;border:1px dashed #ccc' : ''}">
+      <span class="chip-name">${esc(c.course)}${semBadge}</span>
       <span class="chip-grade ${gradeClass(g)}">${gStr}</span>
-      <div class="chip-bar"><div class="chip-bar-fill" style="width:${comp}%"></div></div>
+      ${!isPrev ? `<div class="chip-bar"><div class="chip-bar-fill" style="width:${comp}%"></div></div>` : ''}
     </div>`
   }).join('')
 
