@@ -180,9 +180,19 @@ def scrape_course_name(driver, url, course_mapping):
             breadcrumb_element = driver.find_element(By.XPATH, "//nav[@aria-label='Breadcrumb']//ol/li[2]//a")
             raw_name = breadcrumb_element.text.strip()
             if raw_name:
-                print(f"   -> [Quiz策略] 抓取到: {raw_name}")
+                print(f"   -> [Quiz策略A1] 抓取到: {raw_name}")
         except:
             pass
+
+        # === 策略 A2: Quiz 页面 nav 无 aria-label，用 main 内第一个 nav 的 li[2] ===
+        if not raw_name:
+            try:
+                breadcrumb_element = driver.find_element(By.XPATH, "//main//nav//ol/li[2]/a")
+                raw_name = breadcrumb_element.text.strip()
+                if raw_name:
+                    print(f"   -> [Quiz策略A2] 抓取到: {raw_name}")
+            except:
+                pass
 
         # === 策略 B: 针对普通作业的旧版 Breadcrumb (span.course-title) ===
         if not raw_name:
@@ -220,8 +230,8 @@ def scrape_course_name(driver, url, course_mapping):
                 print(f"   -> 匹配成功: {raw_name} -> {code}")
                 return code, semester
 
-        print(f"   -> 未匹配简称，返回原名: {raw_name}")
-        return raw_name.split(":")[0].strip(), semester
+        print(f"   -> 未匹配到课程简称，跳过 (raw={raw_name.split(':')[0].strip()[:40]})")
+        return None, ""
 
     except Exception as e:
         print(f"   -> 运行出错: {e}")
