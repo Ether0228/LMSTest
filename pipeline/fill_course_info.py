@@ -104,45 +104,41 @@ def parse_semester_from_section_id(text):
         return f"{start_year}-{sem}"    # "2025-S3"
     return ""
 
-# === 1. 获取所有“所属课程”为空的记录 ===
+# === 1. 获取所有有 Schoology 链接的记录（全量重爬模式）===
 def get_empty_course_records(token, app_token, table_id):
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}/records"
     headers = {"Authorization": f"Bearer {token}"}
-    
-    # 筛选条件：所属课程 为空 (根据飞书API，空值筛选比较复杂，我们简单点：拉全部回来在代码里筛)
-    # 如果数据量巨大，建议加 filter 参数
+
     records_to_process = []
     page_token = None
-    
-    print(">>> 正在查找未分类的作业...")
+
+    print(">>> 正在拉取作业库全量记录...")
     while True:
         params = {"page_size": 500}
         if page_token: params["page_token"] = page_token
-        
+
         resp = requests.get(url, headers=headers, params=params).json()
         if resp.get("code") != 0: break
-        
+
         for item in resp.get("data", {}).get("items", []):
             fields = item.get("fields", {})
             record_id = item.get("record_id")
-            
-            # 假设列名叫 "所属课程" 和 "作业链接"
-            # 检查课程是否为空
-            course = fields.get("所属课程")
-            link_obj = fields.get("作业链接") # 可能是文本，也可能是超链接对象
-            
+
+            link_obj = fields.get("作业链接")
+
             # 提取链接字符串
             link_str = ""
             if isinstance(link_obj, dict): link_str = link_obj.get("link", "")
             elif isinstance(link_obj, str): link_str = link_obj
-            
-            # 如果课程为空 且 有链接，加入待处理列表
-            if not course and link_str and "schoology" in link_str:
+
+            # 有 Schoology 链接的记录全部重爬
+            if link_str and "schoology" in link_str:
                 records_to_process.append({"id": record_id, "url": link_str})
-                
+
         if not resp.get("data", {}).get("has_more"): break
         page_token = resp.get("data", {}).get("page_token")
-        
+
+    print(f">>> 共 {len(records_to_process)} 条记录待处理")
     return records_to_process
 
 # === 2. 更新飞书记录 ===
@@ -154,9 +150,13 @@ def update_feishu_record(token, app_token, table_id, record_id, course_name, sem
     if semester:
         fields["学期"] = semester
 
-    requests.put(url, json={"fields": fields}, headers=headers)
+    resp = requests.put(url, json={"fields": fields}, headers=headers)
+    rj = resp.json()
     semester_tag = f" | 学期={semester}" if semester else ""
-    print(f"   -> 已更新飞书: {course_name}{semester_tag}")
+    if rj.get("code") == 0:
+        print(f"   -> 已更新飞书: {course_name}{semester_tag}")
+    else:
+        print(f"   -> ✗ 飞书写入失败: {rj.get('msg', '')} | 详情: {rj}")
 
 # === 3. 核心：去网页抓取课程名 ===
 def scrape_course_name(driver, url, course_mapping):
