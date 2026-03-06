@@ -85,15 +85,15 @@ def fetch_course_mapping(token, app_token, config_table_id):
 
 def parse_semester_from_section_id(text):
     """从课程标题中提取学期标签。
-    如 "ESL Level 5: Section 2526S4N"       → "2026-S4"
-       "Grade 12 Data Management: Section 2526S3N" → "2026-S3"
-    解析规则：2526S4N → start=2025, end=2026, sem=S4 → "2026-S4"
+    如 "ESL Level 5: Section 2526S4N"       → "2025-S4"
+       "Grade 12 Data Management: Section 2526S3N" → "2025-S3"
+    解析规则：2526S3N → start=2025, end=2026, sem=S3 → "2025-S3"（取开始学年）
     """
     m = re.search(r'[Ss]ection\s+(\d{2})(\d{2})(S\d+)N', text, re.IGNORECASE)
     if m:
-        end_year = "20" + m.group(2)   # "26" → "2026"
-        sem = m.group(3).upper()        # "S4"
-        return f"{end_year}-{sem}"      # "2026-S4"
+        start_year = "20" + m.group(1)  # "25" → "2025"
+        sem = m.group(3).upper()        # "S3"
+        return f"{start_year}-{sem}"    # "2025-S3"
     return ""
 
 # === 1. 获取所有“所属课程”为空的记录 ===

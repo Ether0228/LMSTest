@@ -8,22 +8,30 @@ from datetime import datetime, timedelta
 # Gradebook 课程全名 → 课程代码映射（与 scrape_gradebook.py DEFAULT_COURSE_MAPPING 保持一致）
 # 用于兼容飞书 Gradebook 表中存储的旧全名数据
 _GRADEBOOK_COURSE_NAME_MAP = {
-    "grade 11 physics":               "SPH3U",
-    "grade 12 physics":               "SPH4U",
-    "grade 12 data management":       "MDM4U",
-    "grade 12 advanced functions":    "MHF4U",
-    "grade 11 functions":             "MCR3U",
-    "grade 12 calculus & vectors":    "MCV4U",
-    "grade 12 canadian and world issues": "CGW4U",
-    "grade 12 english":               "ENG4U",
-    "grade 11 english":               "ENG3U",
-    "grade 12 nutrition & health":    "HFA4U",
-    "grade 12 visual arts":           "AVI4M",
-    "g10 canadian history since wwi": "CHC2D",
-    "esl level 5":                    "ESLEO",
-    "esl level 4":                    "ESLDO",
-    "esl level 3":                    "ESLCO",
-    "esl level 2":                    "ESLBO",
+    "grade 11 physics":                    "SPH3U",
+    "grade 12 physics":                    "SPH4U",
+    "grade 11 chemistry":                  "SCH3U",
+    "grade 12 chemistry":                  "SCH4U",
+    "grade 11 computer science":           "ICS3U",
+    "grade 12 data management":            "MDM4U",
+    "grade 12 advanced functions":         "MHF4U",
+    "grade 11 functions":                  "MCR3U",
+    "grade 12 calculus & vectors":         "MCV4U",
+    "grade 12 english":                    "ENG4U",
+    "grade 11 english":                    "ENG3U",
+    "grade 11 food and culture":           "HFC3M",
+    "grade 12 nutrition & health":         "HFA4U",
+    "grade 11 visual arts":                "AVI3M",
+    "grade 12 visual arts":                "AVI4M",
+    "grade 12 fashion":                    "HNB4M",
+    "g10 canadian history since wwi":      "CHC2D",
+    "grade 12 canadian and world issues":  "CGW4U",
+    "grade 12 business leadership":        "BOH4M",
+    "g12 analysing current economic issues": "CIA4U",
+    "esl level 5":                         "ESLEO",
+    "esl level 4":                         "ESLDO",
+    "esl level 3":                         "ESLCO",
+    "esl level 2":                         "ESLBO",
 }
 
 
@@ -285,6 +293,37 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
             "credits_target": f.get("目标学分", ""),
             "notices_raw":   str(f.get("公告", "")).strip(),
         }
+
+    # 1b) 从 Gradebook 自动推断每个学生的选课（替代花名册"所属课程"字段）
+    if gradebook_by_student:
+        for gb_name, gb_rows in gradebook_by_student.items():
+            gb_courses = sorted({
+                str(row.get("课程名", "")).strip()
+                for row in gb_rows
+                if str(row.get("课程名", "")).strip()
+            })
+            if gb_name in students:
+                if gb_courses:
+                    students[gb_name]["courses"] = gb_courses
+            else:
+                # Gradebook 里有但花名册缺失的学生（新生或花名册未同步）
+                students[gb_name] = {
+                    "name": gb_name,
+                    "roster_record_id": None,
+                    "courses": gb_courses,
+                    "submitted": [],
+                    "missing": [],
+                    "missing_items": [],
+                    "submitted_by_course": {},
+                    "submitted_by_course_sem": {},
+                    "expected_by_course": {},
+                    "school_year": "",
+                    "semester_num": "",
+                    "osslt": "",
+                    "credits_earned": "",
+                    "credits_target": "",
+                    "notices_raw": "",
+                }
 
     # 1.5) 每个学生每科"应交总数"（基于作业库，忽略标记为🚫 忽略）
     lib_by_course = {}
