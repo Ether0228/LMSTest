@@ -104,7 +104,7 @@ def parse_semester_from_section_id(text):
         return f"{start_year}-{sem}"    # "2025-S3"
     return ""
 
-# === 1. 获取所有有 Schoology 链接的记录（全量重爬模式）===
+# === 1. 获取所有"所属课程"为空的记录 ===
 def get_empty_course_records(token, app_token, table_id):
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}/records"
     headers = {"Authorization": f"Bearer {token}"}
@@ -112,7 +112,7 @@ def get_empty_course_records(token, app_token, table_id):
     records_to_process = []
     page_token = None
 
-    print(">>> 正在拉取作业库全量记录...")
+    print(">>> 正在查找未分类的作业...")
     while True:
         params = {"page_size": 500}
         if page_token: params["page_token"] = page_token
@@ -124,6 +124,7 @@ def get_empty_course_records(token, app_token, table_id):
             fields = item.get("fields", {})
             record_id = item.get("record_id")
 
+            course = fields.get("所属课程")
             link_obj = fields.get("作业链接")
 
             # 提取链接字符串
@@ -131,14 +132,14 @@ def get_empty_course_records(token, app_token, table_id):
             if isinstance(link_obj, dict): link_str = link_obj.get("link", "")
             elif isinstance(link_obj, str): link_str = link_obj
 
-            # 有 Schoology 链接的记录全部重爬
-            if link_str and "schoology" in link_str:
+            # 仅处理课程为空且有 Schoology 链接的记录
+            if not course and link_str and "schoology" in link_str:
                 records_to_process.append({"id": record_id, "url": link_str})
 
         if not resp.get("data", {}).get("has_more"): break
         page_token = resp.get("data", {}).get("page_token")
 
-    print(f">>> 共 {len(records_to_process)} 条记录待处理")
+    print(f">>> 共 {len(records_to_process)} 条待补全")
     return records_to_process
 
 # === 2. 更新飞书记录 ===
