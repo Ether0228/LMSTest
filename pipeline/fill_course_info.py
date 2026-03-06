@@ -28,7 +28,7 @@ DEFAULT_COURSE_MAPPING = {
     "grade 12 calculus & vectors": "MCV4U",
     "grade 12 english": "ENG4U",
     "grade 11 english": "ENG3U",
-    "grade 11 food and culture": "HFC3M"
+    "grade 11 food and culture": "HFC3M",
     "grade 12 nutrition & health": "HFA4U",
     "grade 11 visual arts": "AVI3M",
     "grade 12 visual arts": "AVI4M",
@@ -40,8 +40,7 @@ DEFAULT_COURSE_MAPPING = {
     "esl level 5": "ESLEO",
     "esl level 4": "ESLDO",
     "esl level 3": "ESLCO",
-    "esl level 2": "ESLBO",
-    ""
+    "esl level 2": "ESLBO"
 }
 
 def get_env_config():
