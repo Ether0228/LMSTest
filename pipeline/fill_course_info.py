@@ -19,20 +19,29 @@ LOGIN_URL = "https://queenscanada.schoology.com"
 DEFAULT_COURSE_MAPPING = {
     "grade 11 physics": "SPH3U",
     "grade 12 physics": "SPH4U",
+    "grade 11 chemistry": "SCH3U",
+    "grade 12 chemistry": "SCH4U",
+    "grade 11 computer science": "ICS3U",
     "grade 12 data management": "MDM4U",
     "grade 12 advanced functions": "MHF4U",
     "grade 11 functions": "MCR3U",
     "grade 12 calculus & vectors": "MCV4U",
-    "grade 12 canadian and world issues": "CGW4U",
     "grade 12 english": "ENG4U",
     "grade 11 english": "ENG3U",
+    "grade 11 food and culture": "HFC3M"
     "grade 12 nutrition & health": "HFA4U",
+    "grade 11 visual arts": "AVI3M",
     "grade 12 visual arts": "AVI4M",
+    "grade 12 fashion": "HNB4M",
     "g10 canadian history since wwi": "CHC2D",
+    "grade 12 canadian and world issues": "CGW4U",
+    "grade 12 business leadership": "BOH4M",
+    "g12 analysing current economic issues": "CIA4U",
     "esl level 5": "ESLEO",
     "esl level 4": "ESLDO",
     "esl level 3": "ESLCO",
     "esl level 2": "ESLBO",
+    ""
 }
 
 def get_env_config():
