@@ -194,6 +194,16 @@ def scrape_course_name(driver, url, course_mapping):
             except:
                 pass
 
+        # === 策略 A3: 直接找 href 以 /course/ 开头的链接（React 渲染页面通用）===
+        if not raw_name:
+            try:
+                course_link = driver.find_element(By.XPATH, "//a[starts-with(@href, '/course/')]")
+                raw_name = course_link.text.strip()
+                if raw_name:
+                    print(f"   -> [课程链接策略A3] 抓取到: {raw_name}")
+            except:
+                pass
+
         # === 策略 B: 针对普通作业的旧版 Breadcrumb (span.course-title) ===
         if not raw_name:
             try:
