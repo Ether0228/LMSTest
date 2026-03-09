@@ -822,10 +822,12 @@ def main():
             print(f"  解析到 {len(rows)} 条 (学生×作业)")
             all_rows.extend(rows)
             # 从 user_data 收集选课（无论有没有 grade_item_data 都有学生名单）
+            # API 响应可能包在 body 里，与 parse_gradebook 保持一致
+            user_data_src = data.get("body", data)
             sem_short = nid_to_sem.get(str(nid), "")
             if sem_short:
                 sem_bucket = enrollment_by_sem.setdefault(sem_short, {})
-                for uid, student in data.get("user_data", {}).items():
+                for uid, student in user_data_src.get("user_data", {}).items():
                     name = str(student.get("name", "")).strip()
                     if name:
                         sem_bucket.setdefault(name, set()).add(course_name)
