@@ -30,4 +30,5 @@ jobs:
           FEISHU_CONFIG_TABLE_ID: ${{ secrets.FEISHU_CONFIG_TABLE_ID }}
           SCHOOLOGY_COOKIES: ${{ secrets.SCHOOLOGY_COOKIES }}
           SCHOOLOGY_SECTION_NIDS: ${{ secrets.SCHOOLOGY_SECTION_NIDS }}
+          FEISHU_ROSTER_TABLE_ID: ${{ secrets.FEISHU_ROSTER_TABLE_ID }}
         run: python pipeline/scrape_gradebook.py
