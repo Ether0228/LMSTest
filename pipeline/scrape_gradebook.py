@@ -274,6 +274,9 @@ def parse_gradebook(data: dict, section_nid: str, course_name: str = "",
     if "body" in data:
         data = data["body"]
 
+    if not data.get("user_data"):
+        print(f"  [debug] user_data 为空，API 顶层 keys: {list(data.keys())}")
+
     grade_item_data  = data.get("grade_item_data") or {}
     grades_by_uid    = data.get("grades") or {}
     user_data        = data.get("user_data") or {}
