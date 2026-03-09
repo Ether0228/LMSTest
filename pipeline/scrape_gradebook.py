@@ -65,7 +65,8 @@ def get_env_config():
     ]
     # FEISHU_LIB_TABLE_ID 可选：有则在 scrape 后同步更新作业库
     # FEISHU_CONFIG_TABLE_ID 可选：有则把学期区间写入飞书系统配置表
-    optional_keys = ["FEISHU_LIB_TABLE_ID", "FEISHU_CONFIG_TABLE_ID"]
+    # FEISHU_ROSTER_TABLE_ID 可选：有则在 scrape 后把选课写入花名册"所属课程"字段
+    optional_keys = ["FEISHU_LIB_TABLE_ID", "FEISHU_CONFIG_TABLE_ID", "FEISHU_ROSTER_TABLE_ID"]
     cfg = {k: os.environ.get(k, "").strip() for k in required_keys + optional_keys}
     missing = [k for k in required_keys if not cfg[k]]
     if missing:
@@ -500,6 +501,72 @@ def batch_upsert(token: str, app_token: str, table_id: str,
         time.sleep(0.3)
 
 
+
+# ──────────────────────────────────────────────
+# 飞书：同步选课到花名册"所属课程"字段
+# ──────────────────────────────────────────────
+
+def sync_enrollment_to_roster(
+    token: str, app_token: str, roster_table_id: str,
+    enrollment: dict  # {student_name: set(course_name)}
+):
+    """把从 Gradebook user_data 推断的选课写入花名册"所属课程"文本字段（换行分隔，合并不覆盖）。"""
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{roster_table_id}/records"
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 拉取花名册全量，建 {姓名: (record_id, 现有课程集合)} 索引
+    records = []
+    page_token = None
+    while True:
+        params = {"page_size": 500}
+        if page_token:
+            params["page_token"] = page_token
+        resp = requests.get(url, headers=headers, params=params).json()
+        if resp.get("code") != 0:
+            print(f"  [警告] 读取花名册失败: {resp}")
+            return
+        for item in resp.get("data", {}).get("items", []):
+            records.append(item)
+        if not resp.get("data", {}).get("has_more"):
+            break
+        page_token = resp["data"].get("page_token")
+
+    roster_index = {}
+    for item in records:
+        f = item.get("fields", {})
+        name = str(f.get("学生姓名", "")).strip()
+        existing_text = str(f.get("所属课程", "") or "").strip()
+        existing_courses = set(filter(None, (c.strip() for c in existing_text.splitlines())))
+        if name:
+            roster_index[name] = (item["record_id"], existing_courses)
+
+    # 只更新有变化的行
+    to_update = []
+    for name, new_courses in enrollment.items():
+        if name not in roster_index:
+            print(f"  [提示] 花名册未找到学生: {name}，跳过选课同步")
+            continue
+        record_id, existing_courses = roster_index[name]
+        merged = existing_courses | new_courses
+        if merged != existing_courses:
+            to_update.append({
+                "record_id": record_id,
+                "fields": {"所属课程": "\n".join(sorted(merged))},
+            })
+
+    if not to_update:
+        print("  选课同步：无需更新（花名册所属课程已是最新）")
+        return
+
+    upd_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{roster_table_id}/records/batch_update"
+    for i in range(0, len(to_update), 100):
+        batch = to_update[i:i + 100]
+        resp = requests.post(upd_url, json={"records": batch}, headers=headers).json()
+        if resp.get("code") != 0:
+            print(f"  [警告] 花名册选课更新失败: {resp.get('msg')}")
+    print(f"  选课同步完成：更新 {len(to_update)} 名学生的所属课程")
+
+
 # ──────────────────────────────────────────────
 # 飞书：同步更新作业库
 # ──────────────────────────────────────────────
@@ -736,6 +803,7 @@ def main():
     gp_info = {}
     all_cat_weights = {}   # nid → {category_title: weight}，汇总后写 category_weights.json
     section_gp = {}        # nid → gp_info，每个 section 独立学期信息
+    enrollment = {}        # {student_name: set(course_name)}，从 user_data 收集，写花名册用
     for nid, course_name in sections.items():
         print(f"\n── {course_name} ({nid}) ──")
         try:
@@ -744,6 +812,11 @@ def main():
             rows = parse_gradebook(data, nid, course_name, category_weights)
             print(f"  解析到 {len(rows)} 条 (学生×作业)")
             all_rows.extend(rows)
+            # 从 user_data 收集选课（无论有没有 grade_item_data 都有学生名单）
+            for uid, student in data.get("user_data", {}).items():
+                name = str(student.get("name", "")).strip()
+                if name:
+                    enrollment.setdefault(name, set()).add(course_name)
             # 构建 title→weight 映射，供 build_student_summary.py 使用
             # fetch_gradesetup_weights 现在直接返回 {title: weight}，可直接存储
             if category_weights:
@@ -763,6 +836,14 @@ def main():
         token, cfg["FEISHU_APP_TOKEN"], cfg["FEISHU_GRADEBOOK_TABLE_ID"],
         all_rows, existing
     )
+
+    # 选课同步到花名册（基于 user_data，即使 grade_item_data 为空也能覆盖）
+    roster_table_id = cfg.get("FEISHU_ROSTER_TABLE_ID", "").strip()
+    if roster_table_id and enrollment:
+        print(f"\n>>> 同步选课到花名册（{len(enrollment)} 名学生）...")
+        sync_enrollment_to_roster(token, cfg["FEISHU_APP_TOKEN"], roster_table_id, enrollment)
+    elif not roster_table_id:
+        print("\n  [提示] FEISHU_ROSTER_TABLE_ID 未设置，跳过选课同步")
 
     # 分类权重写入本地文件，供 build_student_summary.py 读取
     if all_cat_weights:

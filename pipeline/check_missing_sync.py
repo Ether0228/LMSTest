@@ -34,12 +34,14 @@ def _get_active_semesters_from_calendar(grace_days=14):
 
 # ================= 配置与工具函数 =================
 def get_env_config():
-    keys = ["FEISHU_APP_ID", "FEISHU_APP_SECRET", "FEISHU_APP_TOKEN", 
-            "FEISHU_TABLE_ID", "FEISHU_ROSTER_TABLE_ID", 
+    keys = ["FEISHU_APP_ID", "FEISHU_APP_SECRET", "FEISHU_APP_TOKEN",
+            "FEISHU_TABLE_ID", "FEISHU_ROSTER_TABLE_ID",
             "FEISHU_LIB_TABLE_ID", "FEISHU_MISSING_TABLE_ID"]
     conf = {k: os.environ.get(k, "").strip() for k in keys}
     if not all(conf.values()):
         raise ValueError("GitHub Secrets 配置不完整，请检查 Table ID 和 API 密钥")
+    # 可选：Gradebook 表（用于推断学生选课，替代花名册"所属课程"字段）
+    conf["FEISHU_GRADEBOOK_TABLE_ID"] = os.environ.get("FEISHU_GRADEBOOK_TABLE_ID", "").strip()
     return conf
 
 def get_feishu_token(conf):
@@ -82,6 +84,40 @@ def start_missing_sync():
     lib = fetch_all_records(token, app_token, conf["FEISHU_LIB_TABLE_ID"])
     submissions = fetch_all_records(token, app_token, conf["FEISHU_TABLE_ID"])
     current_missing_table = fetch_all_records(token, app_token, conf["FEISHU_MISSING_TABLE_ID"])
+
+    # 从 Gradebook 推断每个学生的选课（替代花名册"所属课程"字段）
+    # student_courses: {学生姓名: set(课程名)}
+    # roster_name_to_id: {学生姓名: 花名册 record_id}（写缺交表关联字段用）
+    student_courses = {}
+    if conf["FEISHU_GRADEBOOK_TABLE_ID"]:
+        gradebook = fetch_all_records(token, app_token, conf["FEISHU_GRADEBOOK_TABLE_ID"])
+        for row in gradebook:
+            f = row.get("fields", {})
+            name = str(f.get("学生姓名", "")).strip()
+            course = str(f.get("课程名", "")).strip()
+            if name and course:
+                student_courses.setdefault(name, set()).add(course)
+        print(f">>> Gradebook 推断选课：{len(student_courses)} 名学生")
+    else:
+        print("WARNING: FEISHU_GRADEBOOK_TABLE_ID 未设置，回退到花名册所属课程字段（可能为空）")
+        for s_rec in roster:
+            s_f = s_rec.get("fields", {})
+            name = str(s_f.get("学生姓名", "")).strip()
+            raw = s_f.get("所属课程", "") or ""
+            # 文本字段：换行分隔；兼容旧版列表类型
+            if isinstance(raw, list):
+                s_courses = [str(c).strip() for c in raw]
+            else:
+                s_courses = [c.strip() for c in str(raw).splitlines()]
+            if name:
+                student_courses[name] = set(filter(None, s_courses))
+
+    roster_name_to_id = {}
+    for s_rec in roster:
+        s_f = s_rec.get("fields", {})
+        name = str(s_f.get("学生姓名", "")).strip()
+        if name:
+            roster_name_to_id[name] = s_rec.get("record_id")
 
     # 学期过滤：优先读环境变量，未设置时从 academic_calendar.json 自动推断（宽限期 14 天）
     active_semesters_raw = os.environ.get("ACTIVE_SEMESTERS", "").strip()
@@ -148,13 +184,9 @@ def start_missing_sync():
         
         if not a_url or not a_course: continue
 
-        for s_rec in roster:
-            s_f = s_rec.get("fields", {})
-            s_name = s_f.get("学生姓名")
-            s_id = s_rec.get("record_id")
-            s_courses = s_f.get("所属课程", [])
-            if not isinstance(s_courses, list): s_courses = [s_courses]
-            
+        for s_name, s_courses in student_courses.items():
+            s_id = roster_name_to_id.get(s_name)
+
             # 判断逻辑：学生选了这门课
             if a_course in s_courses:
                 match_key = f"{s_name}_{a_url}"
