@@ -515,6 +515,16 @@ def parse_sem_short(title: str) -> str:
     return m.group(1) if m else ""
 
 
+def parse_semester_label(title: str) -> str:
+    """从 section 标题提取完整学期标签，如 'ESL Level 5: Section 2526S4N' → '2025-S4'。"""
+    m = re.search(r'(\d{2})(\d{2})(S\d)N', title)
+    if not m:
+        return ""
+    year = "20" + m.group(1)   # 25 → 2025
+    sem  = m.group(3)           # S4
+    return f"{year}-{sem}"
+
+
 def sync_enrollment_to_roster(
     token: str, app_token: str, roster_table_id: str,
     enrollment_by_sem: dict,  # {sem_short: {student_name: set(course_name)}}
@@ -795,6 +805,8 @@ def main():
 
     # NID → 学期短码（S1～S6），从标题解析
     nid_to_sem = {nid: parse_sem_short(title) for nid, title in sections_raw.items()}
+    # NID → 完整学期标签（如 2025-S4），供写入飞书 Gradebook "学期" 字段
+    nid_to_semester_label = {nid: parse_semester_label(title) for nid, title in sections_raw.items()}
 
     # 校验 NID 格式：Schoology NID 应为纯数字，否则极可能是 JSON 里 NID 和课程名顺序写反
     for nid in list(sections.keys()):
@@ -822,6 +834,11 @@ def main():
             category_weights = fetch_gradesetup_weights(session, nid)
             data = fetch_gradebook(session, nid)
             rows = parse_gradebook(data, nid, course_name, category_weights)
+            # 追加学期字段（从 section 标题解析，如 2025-S4）
+            sem_label = nid_to_semester_label.get(str(nid), "")
+            if sem_label:
+                for row in rows:
+                    row["学期"] = sem_label
             print(f"  解析到 {len(rows)} 条 (学生×作业)")
             all_rows.extend(rows)
             # 从 user_data 收集选课（无论有没有 grade_item_data 都有学生名单）
