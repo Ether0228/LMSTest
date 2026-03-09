@@ -1,0 +1,33 @@
+name: Check Missing Sync
+
+on:
+  workflow_dispatch:   # 仅手动触发
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 Python 环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: 安装依赖
+        run: pip install requests
+
+      - name: 同步缺交表
+        env:
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          FEISHU_APP_TOKEN: ${{ secrets.FEISHU_APP_TOKEN }}
+          FEISHU_TABLE_ID: ${{ secrets.FEISHU_TABLE_ID }}
+          FEISHU_ROSTER_TABLE_ID: ${{ secrets.FEISHU_ROSTER_TABLE_ID }}
+          FEISHU_LIB_TABLE_ID: ${{ secrets.FEISHU_LIB_TABLE_ID }}
+          FEISHU_MISSING_TABLE_ID: ${{ secrets.FEISHU_MISSING_TABLE_ID }}
+          FEISHU_GRADEBOOK_TABLE_ID: ${{ secrets.FEISHU_GRADEBOOK_TABLE_ID }}
+        run: python pipeline/check_missing_sync.py
