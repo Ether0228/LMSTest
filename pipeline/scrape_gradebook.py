@@ -274,12 +274,12 @@ def parse_gradebook(data: dict, section_nid: str, course_name: str = "",
     if "body" in data:
         data = data["body"]
 
-    grade_item_data  = data.get("grade_item_data", {})
-    grades_by_uid    = data.get("grades", {})
-    user_data        = data.get("user_data", {})
+    grade_item_data  = data.get("grade_item_data") or {}
+    grades_by_uid    = data.get("grades") or {}
+    user_data        = data.get("user_data") or {}
     grading_categories = {
         str(c["id"]): c.get("title", "")
-        for c in data.get("grading_categories", [])
+        for c in (data.get("grading_categories") or [])
         if c["id"] not in ("all", "summary")
     }
 
@@ -827,7 +827,7 @@ def main():
             sem_short = nid_to_sem.get(str(nid), "")
             if sem_short:
                 sem_bucket = enrollment_by_sem.setdefault(sem_short, {})
-                for uid, student in user_data_src.get("user_data", {}).items():
+                for uid, student in (user_data_src.get("user_data") or {}).items():
                     name = str(student.get("name", "")).strip()
                     if name:
                         sem_bucket.setdefault(name, set()).add(course_name)
