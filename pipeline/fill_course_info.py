@@ -160,11 +160,12 @@ def update_feishu_record(token, app_token, table_id, record_id, course_name, sem
         print(f"   -> ✗ 飞书写入失败: {rj.get('msg', '')} | 详情: {rj}")
 
 # === 3. 核心：去网页抓取课程名 ===
-def scrape_course_name(driver, url, course_mapping):
+def scrape_course_name(driver, url, course_mapping, nid_to_course=None):
     """
     抓取课程名称并解析学期，兼容普通作业和 Quiz/Assessment 页面。
     返回 (course_code, semester)，失败时返回 (None, "")。
     course_mapping: {课程全名小写: 课程代码} 映射表，由调用方传入。
+    nid_to_course:  {section_nid: (course_code, semester)} 映射表（可选）。
     """
     try:
         print(f"   -> 正在打开页面...")
@@ -172,6 +173,17 @@ def scrape_course_name(driver, url, course_mapping):
 
         # 给 React 页面一点渲染时间
         time.sleep(5)
+
+        # === 策略 A0: 从重定向后的 URL 提取 Section NID，直接查映射表（最快最准）===
+        if nid_to_course:
+            final_url = driver.current_url
+            m = re.search(r'/course/(\d+)/', final_url)
+            if m:
+                nid = m.group(1)
+                if nid in nid_to_course:
+                    course_code, semester = nid_to_course[nid]
+                    print(f"   -> [策略A0-NID] {nid} → {course_code} ({semester})")
+                    return course_code, semester
 
         raw_name = ""
 
@@ -265,6 +277,24 @@ def start_course_filler():
             except Exception as e:
                 print(f">>> 飞书映射读取失败，使用内置映射: {e}")
 
+        # 从 SCHOOLOGY_SECTION_NIDS 建立 NID → (course_code, semester) 映射（Strategy A0 用）
+        nid_to_course = {}
+        section_nids_raw = os.environ.get("SCHOOLOGY_SECTION_NIDS", "").strip()
+        if section_nids_raw:
+            try:
+                sections_raw = json.loads(section_nids_raw)
+                for nid, title in sections_raw.items():
+                    course_raw = title.split(":")[0].strip().lower()
+                    course_raw = re.sub(r'\s+', ' ', course_raw)
+                    code = course_mapping.get(course_raw, title.split(":")[0].strip())
+                    # 解析学期标签（如 2025-S4）
+                    sm = re.search(r'(\d{2})(\d{2})(S\d)N', title)
+                    sem = f"20{sm.group(1)}-{sm.group(3)}" if sm else ""
+                    nid_to_course[str(nid)] = (code, sem)
+                print(f">>> NID→课程映射：{len(nid_to_course)} 个 section")
+            except Exception as e:
+                print(f">>> SCHOOLOGY_SECTION_NIDS 解析失败: {e}")
+
         # 1. 获取任务列表
         tasks = get_empty_course_records(token, app_token, lib_table_id)
         print(f">>> 发现 {len(tasks)} 个作业缺少课程信息")
@@ -294,7 +324,7 @@ def start_course_filler():
         for i, task in enumerate(tasks):
             print(f"[{i+1}/{len(tasks)}] 处理: {task['url']}")
 
-            course_code, semester = scrape_course_name(driver, task['url'], course_mapping)
+            course_code, semester = scrape_course_name(driver, task['url'], course_mapping, nid_to_course)
 
             if course_code:
                 update_feishu_record(token, app_token, lib_table_id, task['id'], course_code, semester)
