@@ -503,18 +503,24 @@ def batch_upsert(token: str, app_token: str, table_id: str,
 
 
 # ──────────────────────────────────────────────
-# 飞书：同步选课到花名册"所属课程"字段
+# 飞书：同步选课到花名册 S1～S6 所属课程字段
 # ──────────────────────────────────────────────
+
+def parse_sem_short(title: str) -> str:
+    """从 section 标题提取学期短码，如 'ESL Level 5: Section 2526S4N' → 'S4'。"""
+    m = re.search(r'\d{4}(S\d)N', title)
+    return m.group(1) if m else ""
+
 
 def sync_enrollment_to_roster(
     token: str, app_token: str, roster_table_id: str,
-    enrollment: dict  # {student_name: set(course_name)}
+    enrollment_by_sem: dict,  # {sem_short: {student_name: set(course_name)}}
 ):
-    """把从 Gradebook user_data 推断的选课写入花名册"所属课程"文本字段（换行分隔，合并不覆盖）。"""
+    """把选课写入花名册 S1～S6 所属课程文本字段（每学期覆盖，不跨学期混淆）。"""
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{roster_table_id}/records"
     headers = {"Authorization": f"Bearer {token}"}
 
-    # 拉取花名册全量，建 {姓名: (record_id, 现有课程集合)} 索引
+    # 拉取花名册全量
     records = []
     page_token = None
     while True:
@@ -531,40 +537,40 @@ def sync_enrollment_to_roster(
             break
         page_token = resp["data"].get("page_token")
 
-    roster_index = {}
-    for item in records:
-        f = item.get("fields", {})
-        name = str(f.get("学生姓名", "")).strip()
-        existing_text = str(f.get("所属课程", "") or "").strip()
-        existing_courses = set(filter(None, (c.strip() for c in existing_text.splitlines())))
-        if name:
-            roster_index[name] = (item["record_id"], existing_courses)
+    # 建索引：{姓名: record_id}
+    roster_index = {
+        str(item.get("fields", {}).get("学生姓名", "")).strip(): item["record_id"]
+        for item in records
+        if str(item.get("fields", {}).get("学生姓名", "")).strip()
+    }
+    all_names = set(roster_index.keys())
 
-    # 只更新有变化的行
-    to_update = []
-    for name, new_courses in enrollment.items():
-        if name not in roster_index:
-            print(f"  [提示] 花名册未找到学生: {name}，跳过选课同步")
-            continue
-        record_id, existing_courses = roster_index[name]
-        merged = existing_courses | new_courses
-        if merged != existing_courses:
-            to_update.append({
-                "record_id": record_id,
-                "fields": {"所属课程": "\n".join(sorted(merged))},
-            })
+    # 按学期构建每个学生的更新 payload
+    # {record_id: {field: value}}
+    updates = {}
+    for sem_short, name_courses in enrollment_by_sem.items():
+        field = f"{sem_short}所属课程"
+        # 在册学生：写入课程；不在该学期的学生：清空（覆盖旧数据）
+        for name in all_names:
+            rid = roster_index[name]
+            updates.setdefault(rid, {})
+            if name in name_courses:
+                updates[rid][field] = "\n".join(sorted(name_courses[name]))
+            else:
+                updates[rid][field] = ""
 
-    if not to_update:
-        print("  选课同步：无需更新（花名册所属课程已是最新）")
+    if not updates:
+        print("  选课同步：无数据")
         return
 
+    to_update = [{"record_id": rid, "fields": fields} for rid, fields in updates.items()]
     upd_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{roster_table_id}/records/batch_update"
     for i in range(0, len(to_update), 100):
         batch = to_update[i:i + 100]
         resp = requests.post(upd_url, json={"records": batch}, headers=headers).json()
         if resp.get("code") != 0:
             print(f"  [警告] 花名册选课更新失败: {resp.get('msg')}")
-    print(f"  选课同步完成：更新 {len(to_update)} 名学生的所属课程")
+    print(f"  选课同步完成：{len(to_update)} 名学生，学期={sorted(enrollment_by_sem.keys())}")
 
 
 # ──────────────────────────────────────────────
@@ -784,6 +790,9 @@ def main():
     }
     print(f"课程 Section 数量: {len(sections)}")
 
+    # NID → 学期短码（S1～S6），从标题解析
+    nid_to_sem = {nid: parse_sem_short(title) for nid, title in sections_raw.items()}
+
     # 校验 NID 格式：Schoology NID 应为纯数字，否则极可能是 JSON 里 NID 和课程名顺序写反
     for nid in list(sections.keys()):
         if not re.match(r'^\d+$', str(nid).strip()):
@@ -803,7 +812,7 @@ def main():
     gp_info = {}
     all_cat_weights = {}   # nid → {category_title: weight}，汇总后写 category_weights.json
     section_gp = {}        # nid → gp_info，每个 section 独立学期信息
-    enrollment = {}        # {student_name: set(course_name)}，从 user_data 收集，写花名册用
+    enrollment_by_sem = {} # {sem_short: {student_name: set(course_name)}}，写花名册用
     for nid, course_name in sections.items():
         print(f"\n── {course_name} ({nid}) ──")
         try:
@@ -813,10 +822,15 @@ def main():
             print(f"  解析到 {len(rows)} 条 (学生×作业)")
             all_rows.extend(rows)
             # 从 user_data 收集选课（无论有没有 grade_item_data 都有学生名单）
-            for uid, student in data.get("user_data", {}).items():
-                name = str(student.get("name", "")).strip()
-                if name:
-                    enrollment.setdefault(name, set()).add(course_name)
+            sem_short = nid_to_sem.get(str(nid), "")
+            if sem_short:
+                sem_bucket = enrollment_by_sem.setdefault(sem_short, {})
+                for uid, student in data.get("user_data", {}).items():
+                    name = str(student.get("name", "")).strip()
+                    if name:
+                        sem_bucket.setdefault(name, set()).add(course_name)
+            else:
+                print(f"  [提示] 无法解析 {nid} 的学期短码，跳过选课同步")
             # 构建 title→weight 映射，供 build_student_summary.py 使用
             # fetch_gradesetup_weights 现在直接返回 {title: weight}，可直接存储
             if category_weights:
@@ -839,9 +853,9 @@ def main():
 
     # 选课同步到花名册（基于 user_data，即使 grade_item_data 为空也能覆盖）
     roster_table_id = cfg.get("FEISHU_ROSTER_TABLE_ID", "").strip()
-    if roster_table_id and enrollment:
-        print(f"\n>>> 同步选课到花名册（{len(enrollment)} 名学生）...")
-        sync_enrollment_to_roster(token, cfg["FEISHU_APP_TOKEN"], roster_table_id, enrollment)
+    if roster_table_id and enrollment_by_sem:
+        print(f"\n>>> 同步选课到花名册（{sum(len(v) for v in enrollment_by_sem.values())} 名学生，学期={sorted(enrollment_by_sem.keys())}）...")
+        sync_enrollment_to_roster(token, cfg["FEISHU_APP_TOKEN"], roster_table_id, enrollment_by_sem)
     elif not roster_table_id:
         print("\n  [提示] FEISHU_ROSTER_TABLE_ID 未设置，跳过选课同步")
 
