@@ -1,0 +1,2715 @@
+<!DOCTYPE html><html lang="zh-CN"><head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>通关指南</title>
+    <style>
+:root {
+  --bg: #f2eee6;
+  --panel: rgba(255, 252, 247, 0.68);
+  --panel-strong: #fffdf8;
+  --panel-muted: #efe7d7;
+  --ink: #1a1916;
+  --muted: #6f6658;
+  --line: rgba(49, 43, 33, 0.11);
+  --line-strong: rgba(49, 43, 33, 0.22);
+  --accent: #b55233;
+  --accent-soft: rgba(181, 82, 51, 0.14);
+  --ok: #2d7c5d;
+  --ok-soft: rgba(45, 124, 93, 0.14);
+  --warn: #b67a10;
+  --warn-soft: rgba(182, 122, 16, 0.14);
+  --danger: #a63d32;
+  --danger-soft: rgba(166, 61, 50, 0.14);
+  --shadow: 0 4px 14px rgba(40, 31, 17, 0.04);
+  --radius: 18px;
+  --font-body: "IBM Plex Sans", "Avenir Next", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-mono: "IBM Plex Mono", "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+  --space-1: 4px;
+  --space-2: 6px;
+  --space-3: 8px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top left, rgba(181, 82, 51, 0.18), transparent 28%),
+    radial-gradient(circle at top right, rgba(45, 124, 93, 0.12), transparent 24%),
+    linear-gradient(180deg, #f7f1e5 0%, #f2eee6 50%, #ece4d6 100%);
+  overflow: hidden;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font: inherit;
+}
+
+.loading-screen,
+.error-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.loading-screen__inner,
+.error-screen__inner {
+  width: min(460px, 100%);
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(16px);
+}
+
+.loading-screen__eyebrow,
+.panel__eyebrow,
+.hero__eyebrow,
+.notice-modal__eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.loading-screen__title {
+  margin-top: 10px;
+  font-size: clamp(24px, 4vw, 34px);
+  font-weight: 700;
+}
+
+.loading-screen__line {
+  margin-top: 18px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(26, 25, 22, 0.06);
+  overflow: hidden;
+}
+
+.loading-screen__line span {
+  display: block;
+  width: 35%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), #e29d3b);
+  animation: preview-loading 1.35s ease-in-out infinite;
+}
+
+@keyframes preview-loading {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(320%); }
+}
+
+.shell {
+  height: 100vh;
+  padding: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.shell__topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 auto 12px;
+  max-width: 1500px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 252, 247, 0.76);
+  backdrop-filter: blur(8px);
+  box-shadow: none;
+}
+
+.shell__brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.shell__brand-mark {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #1f1d18, #564636);
+  color: #f5efe2;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.shell__brand-name {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.shell__brand-sub {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.shell__topbar-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.shell__link {
+  padding: 11px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.44);
+  transition: 0.2s ease;
+}
+
+.shell__link:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+  transform: translateY(-1px);
+}
+
+.shell__link--strong {
+  background: linear-gradient(135deg, var(--accent-soft), rgba(255, 255, 255, 0.72));
+  color: var(--accent);
+}
+
+.mobile-tab-input,
+.mobile-tabs {
+  display: none;
+}
+
+.shell__body {
+  max-width: 1500px;
+  margin: 0 auto;
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr) minmax(260px, 320px);
+  gap: 8px;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.rail,
+.main-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+  overscroll-behavior: contain;
+  min-width: 0;
+}
+
+.rail--profile,
+.rail--sidebar,
+.main-column {
+  position: relative;
+}
+
+.rail--profile {
+  z-index: 4;
+}
+
+.main-column {
+  z-index: 2;
+}
+
+.rail--sidebar {
+  z-index: 1;
+}
+
+.rail::-webkit-scrollbar,
+.main-column::-webkit-scrollbar {
+  width: 3px;
+  height: 3px;
+}
+
+.rail::-webkit-scrollbar-thumb,
+.main-column::-webkit-scrollbar-thumb {
+  background: rgba(49, 43, 33, 0.08);
+  border-radius: 999px;
+}
+
+.rail::-webkit-scrollbar-track,
+.main-column::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.panel,
+.hero {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  backdrop-filter: blur(6px);
+  box-shadow: none;
+  min-width: 0;
+}
+
+.panel {
+  padding: 9px;
+}
+
+.panel--profile {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(255, 252, 247, 0.9)),
+    linear-gradient(135deg, rgba(181, 82, 51, 0.1), transparent 55%);
+}
+
+.profile-avatar {
+  width: 72px;
+  height: 72px;
+  margin-top: var(--space-3);
+  border-radius: 16px;
+  background: linear-gradient(135deg, #231f18, #65503a);
+  color: #f8f2e8;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.profile-name {
+  margin-top: var(--space-3);
+  font-size: 21px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.profile-meta,
+.panel__small,
+.section-head__meta {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.meter {
+  margin-top: var(--space-3);
+}
+
+.meter__label,
+.streak-header,
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  gap: var(--space-3);
+}
+
+.meter__label {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.meter__track {
+  margin-top: var(--space-2);
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(26, 25, 22, 0.08);
+}
+
+.meter__fill {
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #26211a, #6d5a42);
+}
+
+.meter__fill--accent {
+  background: linear-gradient(90deg, var(--accent), #f0a13c);
+}
+
+.meter__hint {
+  margin-top: var(--space-1);
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.stat--hero {
+  margin-top: var(--space-3);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.stage-chip {
+  display: inline-flex;
+  margin-top: 10px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(26, 25, 22, 0.06);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.combo-grid {
+  margin-top: var(--space-3);
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.combo-cell {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: rgba(26, 25, 22, 0.05);
+  z-index: 1;
+}
+
+.combo-cell--hit {
+  background: rgba(45, 124, 93, 0.18);
+  border-color: rgba(45, 124, 93, 0.25);
+}
+
+.combo-cell--idle {
+  background: rgba(26, 25, 22, 0.06);
+}
+
+.combo-cell--no_assignment {
+  background: rgba(26, 25, 22, 0.06);
+}
+
+.combo-cell--future {
+  background: rgba(26, 25, 22, 0.025);
+  border-style: dashed;
+  border-color: rgba(26, 25, 22, 0.12);
+}
+
+.combo-cell--empty {
+  background: transparent;
+}
+
+.combo-cell--miss {
+  background: rgba(166, 61, 50, 0.14);
+  border-color: rgba(166, 61, 50, 0.28);
+}
+
+.combo-cell__tip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  min-width: max-content;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: #27231d;
+  color: #f7f2e9;
+  font-size: 11px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 20;
+}
+
+.combo-cell:hover .combo-cell__tip {
+  opacity: 1;
+}
+
+.combo-cell:hover {
+  z-index: 10;
+}
+
+.combo-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.combo-legend__dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.combo-legend__dot--hit { background: rgba(45, 124, 93, 0.75); }
+.combo-legend__dot--idle { background: rgba(26, 25, 22, 0.18); }
+.combo-legend__dot--future { background: rgba(26, 25, 22, 0.08); border: 1px dashed rgba(26, 25, 22, 0.18); }
+
+.hero {
+  display: block;
+  padding: 10px;
+  background:
+    linear-gradient(135deg, rgba(181, 82, 51, 0.09), rgba(255, 255, 255, 0.65)),
+    linear-gradient(180deg, rgba(255, 252, 247, 0.92), rgba(255, 252, 247, 0.74));
+}
+
+.hero__title {
+  margin: var(--space-1) 0 var(--space-2);
+  font-size: clamp(22px, 2.6vw, 32px);
+  line-height: 1.04;
+  letter-spacing: -0.04em;
+}
+
+.hero__subtitle {
+  margin: 0;
+  max-width: 760px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.panel--focus {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.52), rgba(255, 252, 247, 0.84)),
+    linear-gradient(135deg, rgba(45, 124, 93, 0.08), transparent 45%);
+}
+
+.focus-list,
+.stack-list,
+.recommendation-list,
+.course-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.stack-list {
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.focus-item,
+.alert-card,
+.recommendation-card,
+.upcoming-item {
+  padding: 7px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.focus-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-2);
+  align-items: start;
+}
+
+.focus-item__content {
+  min-width: 0;
+}
+
+.focus-item__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.focus-item__badge,
+.alert-card__tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 58px;
+  padding: 4px 7px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.focus-item__badge--danger,
+.alert-card__tag--urgent {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.focus-item__badge--warn,
+.alert-card__tag--warn {
+  color: var(--warn);
+  background: var(--warn-soft);
+}
+
+.focus-item__badge--ok,
+.alert-card__tag--ok {
+  color: var(--ok);
+  background: var(--ok-soft);
+}
+
+.focus-item__badge--info,
+.alert-card__tag--info {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.alert-card__tag--guide {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.focus-item__title,
+.recommendation-card__title,
+.course-card__title,
+.calendar-detail__title {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.focus-item__meta,
+.alert-card__body,
+.recommendation-card__body,
+.calendar-detail__meta,
+.upcoming-item__meta {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.focus-item__cta,
+.recommendation-card__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+  font-weight: 700;
+  white-space: nowrap;
+  font-size: 10px;
+}
+
+.terminal-card {
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.terminal-card--danger {
+  border-color: rgba(166, 61, 50, 0.18);
+}
+
+.terminal-card--warn {
+  border-color: rgba(182, 122, 16, 0.18);
+}
+
+.terminal-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 9px 9px 7px;
+}
+
+.course-card__title-block {
+  min-width: 0;
+}
+
+.course-card__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.course-card__code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.course-card__chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.course-card__chip {
+  padding: 3px 5px;
+  border-radius: 999px;
+  background: rgba(26, 25, 22, 0.06);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.course-card__chip--danger {
+  color: var(--danger);
+  background: rgba(166, 61, 50, 0.1);
+}
+
+.course-card__chip--warn {
+  color: var(--warn);
+  background: rgba(182, 122, 16, 0.12);
+}
+
+.course-card__chip--ok {
+  color: var(--ok);
+  background: rgba(45, 124, 93, 0.1);
+}
+
+.course-card__chip--muted {
+  color: var(--muted);
+}
+
+.course-card__grade {
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+  text-align: right;
+}
+
+.course-card__grade-sub {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.terminal-card__body {
+  padding: 0 9px 9px;
+}
+
+.course-card__progress-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.course-card__progress-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.course-card__progress-head strong {
+  color: var(--ink);
+  font-size: 11px;
+}
+
+.progress-bar {
+  margin-top: 4px;
+}
+
+.progress-bar__rail {
+  height: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(26, 25, 22, 0.08);
+}
+
+.progress-bar__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #24201a, var(--accent));
+}
+
+.course-card__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.course-card__stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: rgba(26, 25, 22, 0.05);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.course-card__stat strong {
+  color: var(--ink);
+  font-size: 10px;
+}
+
+.terminal-sections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.terminal-section {
+  border-top: 1px dashed var(--line-strong);
+  padding-top: var(--space-2);
+}
+
+.terminal-section__toggle {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.terminal-section__toggle-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.terminal-section__icon {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: rgba(26, 25, 22, 0.06);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.terminal-section__label {
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.terminal-section__count {
+  padding: 3px 5px;
+  border-radius: 999px;
+  background: rgba(26, 25, 22, 0.06);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.terminal-section__body {
+  display: none;
+  margin-top: var(--space-2);
+  padding: 7px;
+  border-radius: 8px;
+  background: rgba(26, 25, 22, 0.035);
+}
+
+.terminal-section.is-open .terminal-section__body {
+  display: block;
+}
+
+.terminal-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.terminal-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.terminal-row__main {
+  min-width: 0;
+}
+
+.terminal-row__title {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.terminal-row__sub {
+  margin-top: 1px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.terminal-row__side {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.terminal-row__score {
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.terminal-row__status {
+  margin-top: 1px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.terminal-empty {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.terminal-table {
+  margin-top: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.terminal-table__head,
+.terminal-table__row {
+  display: grid;
+  grid-template-columns: minmax(90px, 0.9fr) minmax(0, 1.8fr) minmax(110px, 0.8fr) minmax(86px, 0.7fr);
+  gap: var(--space-2);
+  align-items: center;
+  padding: 7px 8px;
+}
+
+.terminal-table__head {
+  background: rgba(26, 25, 22, 0.05);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.terminal-table__row {
+  border-top: 1px solid rgba(49, 43, 33, 0.09);
+  font-size: 11px;
+}
+
+.terminal-table__row:nth-child(2n) {
+  background: rgba(255, 255, 255, 0.46);
+}
+
+.terminal-table__course {
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.terminal-table__status {
+  justify-self: end;
+  padding: 3px 5px;
+  border-radius: 999px;
+  background: rgba(45, 124, 93, 0.12);
+  color: var(--ok);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.alert-card {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.alert-card__title,
+.alert-card__title-link {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.alert-card__title-link:hover {
+  color: var(--accent);
+}
+
+.alert-card--guide-group {
+  gap: var(--space-1);
+}
+
+.alert-guide-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.alert-guide-list__link {
+  display: block;
+  padding: 2px 0;
+}
+
+.alert-guide-list__link + .alert-guide-list__link {
+  border-top: 1px dashed rgba(49, 43, 33, 0.12);
+}
+
+.alert-guide-list__title {
+  display: block;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.alert-guide-list__meta {
+  display: block;
+  margin-top: 1px;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.3;
+}
+
+.alert-guide-list__link:hover .alert-guide-list__title {
+  color: var(--accent);
+}
+
+.notice-empty {
+  padding: 8px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.panel__divider {
+  height: 1px;
+  margin: var(--space-2) 0;
+  background: linear-gradient(90deg, transparent, var(--line-strong), transparent);
+}
+
+.upcoming-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.upcoming-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-2);
+  align-items: start;
+}
+
+.upcoming-item__date {
+  min-width: 56px;
+  padding: 5px 6px;
+  border-radius: 8px;
+  background: rgba(181, 82, 51, 0.1);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-align: center;
+}
+
+.upcoming-item__title {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.upcoming-item__pill {
+  display: inline-flex;
+  margin-top: var(--space-1);
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: rgba(26, 25, 22, 0.06);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.calendar-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.calendar-nav__btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.54);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.calendar-nav__label {
+  min-width: 7em;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.calendar-grid {
+  margin-top: var(--space-2);
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.calendar-grid__weekday {
+  padding-bottom: 4px;
+  text-align: center;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.calendar-day {
+  position: relative;
+  min-height: 34px;
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: rgba(26, 25, 22, 0.045);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.calendar-day--empty {
+  background: transparent;
+  cursor: default;
+}
+
+.calendar-day--today {
+  border-color: var(--line-strong);
+}
+
+.calendar-day--has-event {
+  background: rgba(181, 82, 51, 0.08);
+}
+
+.calendar-day--selected {
+  border-color: rgba(181, 82, 51, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(181, 82, 51, 0.2);
+}
+
+.calendar-day__number {
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.calendar-day__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.calendar-day__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 4px;
+  border-radius: 999px;
+  background: rgba(181, 82, 51, 0.12);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  line-height: 1.2;
+}
+
+.calendar-day__badge--aol {
+  background: rgba(166, 61, 50, 0.12);
+  color: var(--danger);
+}
+
+.calendar-day__dots {
+  display: flex;
+  gap: 3px;
+  margin-top: 3px;
+  flex-wrap: wrap;
+}
+
+.calendar-day__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.calendar-day__dot--aol {
+  background: var(--danger);
+}
+
+.calendar-day__tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  width: min(240px, 60vw);
+  padding: 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(39, 35, 29, 0.4);
+  background: rgba(39, 35, 29, 0.96);
+  box-shadow: 0 14px 28px rgba(20, 14, 7, 0.18);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 12;
+}
+
+.calendar-day:hover .calendar-day__tooltip,
+.calendar-day:focus-visible .calendar-day__tooltip {
+  opacity: 1;
+}
+
+.calendar-tooltip__item + .calendar-tooltip__item {
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.calendar-tooltip__title {
+  font-size: 10px;
+  font-weight: 700;
+  color: #f7f2e9;
+}
+
+.calendar-tooltip__meta {
+  margin-top: 2px;
+  color: rgba(247, 242, 233, 0.72);
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.calendar-tooltip__pill {
+  display: inline-flex;
+  margin-top: 4px;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #f7f2e9;
+  font-family: var(--font-mono);
+  font-size: 8px;
+}
+
+.recommendation-card__body {
+  margin-top: 6px;
+}
+
+.recommendation-card__link {
+  margin-top: 8px;
+}
+
+.notice-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+}
+
+.notice-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(27, 23, 17, 0.42);
+  backdrop-filter: blur(4px);
+}
+
+.notice-modal__panel {
+  position: relative;
+  width: min(520px, calc(100vw - 32px));
+  margin: min(10vh, 88px) auto 0;
+  padding: 24px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 252, 247, 0.94);
+  box-shadow: 0 30px 60px rgba(16, 11, 5, 0.24);
+}
+
+.notice-modal__title {
+  margin: 8px 0 16px;
+  font-size: 30px;
+  line-height: 1;
+}
+
+.notice-modal__list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.notice-modal__item {
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(26, 25, 22, 0.045);
+}
+
+.notice-modal__button {
+  width: 100%;
+  margin-top: 18px;
+  padding: 13px 16px;
+  border: 0;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #1e1b15, #4f3a23);
+  color: #fff6ea;
+  cursor: pointer;
+}
+
+.error-screen__inner {
+  text-align: center;
+}
+
+.error-screen__title {
+  margin-top: 10px;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.error-screen__body {
+  margin-top: 10px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.error-screen__link {
+  display: inline-flex;
+  margin-top: 18px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+}
+
+@media (max-width: 1180px) {
+  .shell__body {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+  }
+
+  .rail,
+  .main-column {
+    overflow: visible;
+    max-height: none;
+    height: auto;
+  }
+
+  body {
+    overflow: auto;
+  }
+}
+
+@media (max-width: 760px) {
+  html,
+  body {
+    height: auto;
+    min-height: 100%;
+    overflow: auto;
+  }
+
+  .shell {
+    padding: 14px;
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .shell__topbar {
+    padding: 14px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .mobile-tab-input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .mobile-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    margin: 0 auto 10px;
+    width: 100%;
+    max-width: 1500px;
+    position: sticky;
+    top: 0;
+    z-index: 18;
+    padding: 8px 0;
+    background: linear-gradient(180deg, rgba(242, 238, 230, 0.96), rgba(242, 238, 230, 0.82));
+    backdrop-filter: blur(8px);
+  }
+
+  .mobile-tabs__item {
+    min-width: 0;
+    padding: 8px 8px 7px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.46);
+    text-align: center;
+  }
+
+  .mobile-tabs__title {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+
+  .mobile-tabs__meta {
+    display: block;
+    margin-top: 3px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    line-height: 1.1;
+  }
+
+  #mobileTabOverview:checked ~ .mobile-tabs label[for="mobileTabOverview"],
+  #mobileTabCourse:checked ~ .mobile-tabs label[for="mobileTabCourse"],
+  #mobileTabDeadline:checked ~ .mobile-tabs label[for="mobileTabDeadline"] {
+    border-color: var(--line-strong);
+    background: rgba(255, 255, 255, 0.82);
+  }
+
+  .panel,
+  .hero {
+    padding: 12px;
+    border-radius: 16px;
+  }
+
+  .shell__body {
+    display: block;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .profile-name,
+  .hero__title {
+    font-size: 24px;
+  }
+
+  .terminal-card__head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .course-card__grade {
+    text-align: left;
+  }
+
+  .terminal-table__head,
+  .terminal-table__row {
+    grid-template-columns: minmax(74px, 0.8fr) minmax(0, 1.5fr) minmax(80px, 0.8fr);
+  }
+
+  .terminal-table__head div:nth-child(4),
+  .terminal-table__row div:nth-child(4) {
+    display: none;
+  }
+
+  .focus-item {
+    grid-template-columns: 1fr;
+  }
+
+  .shell__body > .rail--profile,
+  .shell__body > .main-column,
+  .shell__body > .rail--sidebar {
+    display: none;
+    height: auto;
+    max-height: none;
+    min-height: 0;
+    overflow: visible;
+    padding-right: 0;
+    padding-bottom: 20px;
+  }
+
+  #mobileTabOverview:checked ~ .shell__body > .rail--profile {
+    display: flex;
+  }
+
+  #mobileTabCourse:checked ~ .shell__body > .main-column {
+    display: flex;
+  }
+
+  #mobileTabDeadline:checked ~ .shell__body > .rail--sidebar {
+    display: flex;
+  }
+
+  .calendar-day__tooltip {
+    display: none;
+  }
+
+  .calendar-day {
+    min-height: 42px;
+  }
+
+  .calendar-day__badge {
+    font-size: 7px;
+  }
+
+}
+
+</style>
+  </head>
+  <body>
+    
+
+    
+
+    
+
+    <div id="previewApp" class="shell">
+      <header class="shell__topbar">
+        <div class="shell__brand">
+          <span class="shell__brand-mark">TG</span>
+          <div>
+            <div class="shell__brand-name">通关指南</div>
+            <div class="shell__brand-sub">student-terminal-dashboard x interactive_web</div>
+          </div>
+        </div>
+        <div class="shell__topbar-actions">
+          <a id="liveDashboardLink" class="shell__link" href="/?fixture=/fixtures/chuhe-xiong-qea.json">查看现网版</a>
+          <a id="guideLink" class="shell__link shell__link--strong" href="/guide.html?fixture=/fixtures/chuhe-xiong-qea.json">通关指南全文</a>
+        </div>
+      </header>
+
+      <input id="mobileTabOverview" class="mobile-tab-input" type="radio" name="mobileTab" checked="">
+      <input id="mobileTabCourse" class="mobile-tab-input" type="radio" name="mobileTab">
+      <input id="mobileTabDeadline" class="mobile-tab-input" type="radio" name="mobileTab">
+      <div class="mobile-tabs">
+        <label class="mobile-tabs__item" for="mobileTabOverview">
+          <span class="mobile-tabs__title">总览</span>
+          <span id="mobileTabOverviewMeta" class="mobile-tabs__meta">25 missing</span>
+        </label>
+        <label class="mobile-tabs__item" for="mobileTabCourse">
+          <span class="mobile-tabs__title">课程</span>
+          <span id="mobileTabCourseMeta" class="mobile-tabs__meta">3 courses</span>
+        </label>
+        <label class="mobile-tabs__item" for="mobileTabDeadline">
+          <span class="mobile-tabs__title">DDL</span>
+          <span id="mobileTabDeadlineMeta" class="mobile-tabs__meta">1 ddl</span>
+        </label>
+      </div>
+
+      <main class="shell__body">
+        <aside class="rail rail--profile">
+          <section class="panel panel--profile">
+            <div class="panel__eyebrow">Student Profile</div>
+            <div id="profileAvatar" class="profile-avatar">Chuhe Xiong</div>
+            <div id="profileName" class="profile-name">Chuhe Xiong</div>
+            <div id="profileMeta" class="profile-meta">3 门课程</div>
+            <div class="meter">
+              <div class="meter__label">
+                <span>Credit Progress</span>
+                <span id="creditNumbers">0 / ?</span>
+              </div>
+              <div class="meter__track"><div id="creditFill" class="meter__fill" style="width: 0%;"></div></div>
+              <div id="creditHint" class="meter__hint">学分目标已完成或未配置。</div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel__eyebrow">Semester</div>
+            <div id="semesterLabel" class="stat stat--hero">当前学期</div>
+            <div class="meter">
+              <div class="meter__label">
+                <span>Week Progress</span>
+                <span id="semesterProgressText">2 / 8</span>
+              </div>
+              <div class="meter__track"><div id="semesterFill" class="meter__fill meter__fill--accent" style="width: 25%;"></div></div>
+            </div>
+            <div id="semesterDates" class="panel__small">2026-03-02 至 2026-04-24 · 距离学期结束还有 44 天</div>
+          </section>
+
+          <section class="panel">
+            <div class="panel__eyebrow">Activity Matrix</div>
+            <div class="streak-header">
+              <span>Current Streak</span>
+              <strong id="streakCount">0 days</strong>
+            </div>
+            <div id="streakMessage" class="panel__small">先把今天补上，再重新连击。</div>
+            <div id="comboGrid" class="combo-grid">
+      <div class="combo-cell combo-cell--no_assignment">
+        <span class="combo-cell__tip">2026-03-04</span>
+      </div>
+    
+      <div class="combo-cell combo-cell--no_assignment">
+        <span class="combo-cell__tip">2026-03-05</span>
+      </div>
+    
+      <div class="combo-cell combo-cell--no_assignment">
+        <span class="combo-cell__tip">2026-03-06</span>
+      </div>
+    
+      <div class="combo-cell combo-cell--no_assignment">
+        <span class="combo-cell__tip">2026-03-07</span>
+      </div>
+    
+      <div class="combo-cell combo-cell--no_assignment">
+        <span class="combo-cell__tip">2026-03-08</span>
+      </div>
+    
+      <div class="combo-cell combo-cell--hit">
+        <span class="combo-cell__tip">2026-03-09 · CIA4U: 1</span>
+      </div>
+    
+      <div class="combo-cell combo-cell--no_assignment">
+        <span class="combo-cell__tip">2026-03-10</span>
+      </div>
+    
+      <div class="combo-cell combo-cell--no_assignment">
+        <span class="combo-cell__tip">2026-03-11</span>
+      </div>
+    
+      <div class="combo-cell combo-cell--future">
+        <span class="combo-cell__tip">2026-03-12</span>
+      </div>
+    
+      <div class="combo-cell combo-cell--future">
+        <span class="combo-cell__tip">2026-03-13</span>
+      </div>
+    
+      <div class="combo-cell combo-cell--future">
+        <span class="combo-cell__tip">2026-03-14</span>
+      </div>
+    
+      <div class="combo-cell combo-cell--future">
+        <span class="combo-cell__tip">2026-03-15</span>
+      </div>
+    
+      <div class="combo-cell combo-cell--future">
+        <span class="combo-cell__tip">2026-03-16</span>
+      </div>
+    
+      <div class="combo-cell combo-cell--future">
+        <span class="combo-cell__tip">2026-03-17</span>
+      </div>
+    
+      <div class="combo-cell combo-cell--future">
+        <span class="combo-cell__tip">2026-03-18</span>
+      </div>
+    
+      <div class="combo-cell combo-cell--future">
+        <span class="combo-cell__tip">2026-03-19</span>
+      </div>
+    
+      <div class="combo-cell combo-cell--future">
+        <span class="combo-cell__tip">2026-03-20</span>
+      </div>
+    
+      <div class="combo-cell combo-cell--future">
+        <span class="combo-cell__tip">2026-03-21</span>
+      </div>
+    
+      <div class="combo-cell combo-cell--future">
+        <span class="combo-cell__tip">2026-03-22</span>
+      </div>
+    
+      <div class="combo-cell combo-cell--future">
+        <span class="combo-cell__tip">2026-03-23</span>
+      </div>
+    
+      <div class="combo-cell combo-cell--future">
+        <span class="combo-cell__tip">2026-03-24</span>
+      </div>
+    
+      <div class="combo-cell combo-cell--future">
+        <span class="combo-cell__tip">2026-03-25</span>
+      </div>
+    
+      <div class="combo-cell combo-cell--future">
+        <span class="combo-cell__tip">2026-03-26</span>
+      </div>
+    
+      <div class="combo-cell combo-cell--future">
+        <span class="combo-cell__tip">2026-03-27</span>
+      </div>
+    
+      <div class="combo-cell combo-cell--future">
+        <span class="combo-cell__tip">2026-03-28</span>
+      </div>
+    
+      <div class="combo-cell combo-cell--future">
+        <span class="combo-cell__tip">2026-03-29</span>
+      </div>
+    
+      <div class="combo-cell combo-cell--future">
+        <span class="combo-cell__tip">2026-03-30</span>
+      </div>
+    
+      <div class="combo-cell combo-cell--future">
+        <span class="combo-cell__tip">2026-03-31</span>
+      </div>
+    </div>
+            <div class="combo-legend">
+              <span><i class="combo-legend__dot combo-legend__dot--hit"></i> 提交</span>
+              <span><i class="combo-legend__dot combo-legend__dot--idle"></i> 无作业</span>
+              <span><i class="combo-legend__dot combo-legend__dot--future"></i> 未来</span>
+            </div>
+          </section>
+        </aside>
+
+        <section class="main-column">
+          <section class="hero">
+            <div>
+              <div class="hero__eyebrow">Mission Control</div>
+              <h1 id="heroTitle" class="hero__title">Chuhe Xiong，先处理最卡分的地方。</h1>
+              <p id="heroSubtitle" class="hero__subtitle">当前共有 25 个缺交，优先提交可评分版本；BOH4M 现在最需要补进度。</p>
+            </div>
+          </section>
+
+          <section class="panel panel--focus">
+            <div class="panel__eyebrow">Today Focus</div>
+            <div id="focusList" class="focus-list">
+      <article class="focus-item">
+        <span class="focus-item__badge focus-item__badge--danger">Missing</span>
+        <div class="focus-item__content">
+          <div class="focus-item__head">
+            <div class="focus-item__title">Unit 1 - Lesson 2</div>
+            <a class="focus-item__cta" href="https://queenscanada.schoology.com/assignment/8274929045" target="_blank" rel="noopener">前往作业 →</a>
+          </div>
+          <div class="focus-item__meta">BOH4M · 尽快补交，先提交可评分版本。</div>
+        </div>
+      </article>
+    
+      <article class="focus-item">
+        <span class="focus-item__badge focus-item__badge--danger">Missing</span>
+        <div class="focus-item__content">
+          <div class="focus-item__head">
+            <div class="focus-item__title">Unit 1 - KWL Dropbox</div>
+            <a class="focus-item__cta" href="https://queenscanada.schoology.com/assignment/8274929141" target="_blank" rel="noopener">前往作业 →</a>
+          </div>
+          <div class="focus-item__meta">BOH4M · 尽快补交，先提交可评分版本。</div>
+        </div>
+      </article>
+    
+      <article class="focus-item">
+        <span class="focus-item__badge focus-item__badge--warn">Low Score</span>
+        <div class="focus-item__content">
+          <div class="focus-item__head">
+            <div class="focus-item__title">Unit 3 Combinations Test [Assessment OF Learning]</div>
+            <a class="focus-item__cta" href="https://queenscanada.schoology.com/assignment/8173243699" target="_blank" rel="noopener">前往作业 →</a>
+          </div>
+          <div class="focus-item__meta">MDM4U · 30.75 / 54，建议先看 rubric 再修订。</div>
+        </div>
+      </article>
+    </div>
+          </section>
+
+          <section class="panel">
+            <div class="section-head">
+              <div>
+                <div class="panel__eyebrow">Course Progress</div>
+                <h2 class="section-head__title">课程终端视图</h2>
+              </div>
+            </div>
+            <div id="courseList" class="course-list">
+      <article class="terminal-card terminal-card--danger" data-course-card="">
+        <div class="terminal-card__head">
+          <div class="course-card__title-block">
+            <div class="course-card__title">
+              <span class="course-card__code">&gt; BOH4M</span>
+            </div>
+            <div class="course-card__chips">
+              
+            </div>
+          </div>
+          <div class="course-card__grade">
+            --
+            <span class="course-card__grade-sub">暂无总评分</span>
+          </div>
+        </div>
+        <div class="terminal-card__body">
+          <div class="course-card__progress-head">
+            <span>当前进度</span>
+            <div class="course-card__progress-meta">
+              <strong>22.2%</strong>
+              <span class="course-card__chip course-card__chip--danger">高风险</span>
+            </div>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-bar__rail">
+              <div class="progress-bar__fill" style="width:22.2%"></div>
+            </div>
+          </div>
+          <div class="course-card__stats">
+            <span class="course-card__stat"><strong>2</strong> 已交</span>
+            <span class="course-card__stat"><strong>7</strong> 缺交</span>
+            <span class="course-card__stat"><strong>0</strong> 已评分</span>
+          </div>
+
+          <div class="terminal-sections">
+            
+    <section class="terminal-section " data-terminal-section="">
+      <button class="terminal-section__toggle" type="button">
+        <span class="terminal-section__toggle-main">
+          <span class="terminal-section__icon">[+]</span>
+          <span class="terminal-section__label">AoL 评分详情</span>
+        </span>
+        <span class="terminal-section__count">0</span>
+      </button>
+      <div class="terminal-section__body"><div class="terminal-empty">当前没有评分记录。</div></div>
+    </section>
+  
+            
+    <section class="terminal-section is-open" data-terminal-section="">
+      <button class="terminal-section__toggle" type="button">
+        <span class="terminal-section__toggle-main">
+          <span class="terminal-section__icon">[-]</span>
+          <span class="terminal-section__label">未提交作业</span>
+        </span>
+        <span class="terminal-section__count">7</span>
+      </button>
+      <div class="terminal-section__body">
+    <div class="terminal-list">
+      
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">Unit 1 - Lesson 2</div>
+                  <div class="terminal-row__sub">BOH4M</div>
+                </div>
+                <div class="terminal-row__side">
+                  <a class="focus-item__cta" href="https://queenscanada.schoology.com/assignment/8274929045" target="_blank" rel="noopener">前往作业 →</a>
+                </div>
+              </div>
+            
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">Unit 1 - KWL Dropbox</div>
+                  <div class="terminal-row__sub">BOH4M</div>
+                </div>
+                <div class="terminal-row__side">
+                  <a class="focus-item__cta" href="https://queenscanada.schoology.com/assignment/8274929141" target="_blank" rel="noopener">前往作业 →</a>
+                </div>
+              </div>
+            
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">My Goals For BOH4M</div>
+                  <div class="terminal-row__sub">BOH4M</div>
+                </div>
+                <div class="terminal-row__side">
+                  <a class="focus-item__cta" href="https://queenscanada.schoology.com/assignment/8274928986" target="_blank" rel="noopener">前往作业 →</a>
+                </div>
+              </div>
+            
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">Unit 1 - Assignment 1 (AOL)</div>
+                  <div class="terminal-row__sub">BOH4M</div>
+                </div>
+                <div class="terminal-row__side">
+                  <a class="focus-item__cta" href="https://queenscanada.schoology.com/assignment/8274929008" target="_blank" rel="noopener">前往作业 →</a>
+                </div>
+              </div>
+            
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">Unit 1 - Lesson 1</div>
+                  <div class="terminal-row__sub">BOH4M</div>
+                </div>
+                <div class="terminal-row__side">
+                  <a class="focus-item__cta" href="https://queenscanada.schoology.com/assignment/8274929037" target="_blank" rel="noopener">前往作业 →</a>
+                </div>
+              </div>
+            
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">Unit 1 - Lesson 3</div>
+                  <div class="terminal-row__sub">BOH4M</div>
+                </div>
+                <div class="terminal-row__side">
+                  <a class="focus-item__cta" href="https://queenscanada.schoology.com/assignment/8274929064" target="_blank" rel="noopener">前往作业 →</a>
+                </div>
+              </div>
+            
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">Unit 1 - Lesson 4</div>
+                  <div class="terminal-row__sub">BOH4M</div>
+                </div>
+                <div class="terminal-row__side">
+                  <a class="focus-item__cta" href="https://queenscanada.schoology.com/assignment/8274929088" target="_blank" rel="noopener">前往作业 →</a>
+                </div>
+              </div>
+            
+    </div>
+  </div>
+    </section>
+  
+            
+    <section class="terminal-section " data-terminal-section="">
+      <button class="terminal-section__toggle" type="button">
+        <span class="terminal-section__toggle-main">
+          <span class="terminal-section__icon">[+]</span>
+          <span class="terminal-section__label">本周提交记录</span>
+        </span>
+        <span class="terminal-section__count">0</span>
+      </button>
+      <div class="terminal-section__body"><div class="terminal-empty">当前没有近期提交记录。</div></div>
+    </section>
+  
+          </div>
+        </div>
+      </article>
+    
+      <article class="terminal-card terminal-card--danger" data-course-card="">
+        <div class="terminal-card__head">
+          <div class="course-card__title-block">
+            <div class="course-card__title">
+              <span class="course-card__code">&gt; CIA4U</span>
+            </div>
+            <div class="course-card__chips">
+              
+            </div>
+          </div>
+          <div class="course-card__grade">
+            --
+            <span class="course-card__grade-sub">暂无总评分</span>
+          </div>
+        </div>
+        <div class="terminal-card__body">
+          <div class="course-card__progress-head">
+            <span>当前进度</span>
+            <div class="course-card__progress-meta">
+              <strong>33.3%</strong>
+              <span class="course-card__chip course-card__chip--danger">高风险</span>
+            </div>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-bar__rail">
+              <div class="progress-bar__fill" style="width:33.3%"></div>
+            </div>
+          </div>
+          <div class="course-card__stats">
+            <span class="course-card__stat"><strong>2</strong> 已交</span>
+            <span class="course-card__stat"><strong>4</strong> 缺交</span>
+            <span class="course-card__stat"><strong>0</strong> 已评分</span>
+          </div>
+
+          <div class="terminal-sections">
+            
+    <section class="terminal-section " data-terminal-section="">
+      <button class="terminal-section__toggle" type="button">
+        <span class="terminal-section__toggle-main">
+          <span class="terminal-section__icon">[+]</span>
+          <span class="terminal-section__label">AoL 评分详情</span>
+        </span>
+        <span class="terminal-section__count">0</span>
+      </button>
+      <div class="terminal-section__body"><div class="terminal-empty">当前没有评分记录。</div></div>
+    </section>
+  
+            
+    <section class="terminal-section " data-terminal-section="">
+      <button class="terminal-section__toggle" type="button">
+        <span class="terminal-section__toggle-main">
+          <span class="terminal-section__icon">[+]</span>
+          <span class="terminal-section__label">未提交作业</span>
+        </span>
+        <span class="terminal-section__count">4</span>
+      </button>
+      <div class="terminal-section__body">
+    <div class="terminal-list">
+      
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">Unit 1 - Lesson 2</div>
+                  <div class="terminal-row__sub">CIA4U</div>
+                </div>
+                <div class="terminal-row__side">
+                  <a class="focus-item__cta" href="https://queenscanada.schoology.com/assignment/8274861225" target="_blank" rel="noopener">前往作业 →</a>
+                </div>
+              </div>
+            
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">Unit 1 - Lesson 1</div>
+                  <div class="terminal-row__sub">CIA4U</div>
+                </div>
+                <div class="terminal-row__side">
+                  <a class="focus-item__cta" href="https://queenscanada.schoology.com/assignment/8274861214" target="_blank" rel="noopener">前往作业 →</a>
+                </div>
+              </div>
+            
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">In-text Citation Practice</div>
+                  <div class="terminal-row__sub">CIA4U</div>
+                </div>
+                <div class="terminal-row__side">
+                  <a class="focus-item__cta" href="https://queenscanada.schoology.com/assignment/8277994869" target="_blank" rel="noopener">前往作业 →</a>
+                </div>
+              </div>
+            
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">Unit 1 - Lesson 4</div>
+                  <div class="terminal-row__sub">CIA4U</div>
+                </div>
+                <div class="terminal-row__side">
+                  <a class="focus-item__cta" href="https://queenscanada.schoology.com/assignment/8274861248" target="_blank" rel="noopener">前往作业 →</a>
+                </div>
+              </div>
+            
+    </div>
+  </div>
+    </section>
+  
+            
+    <section class="terminal-section " data-terminal-section="">
+      <button class="terminal-section__toggle" type="button">
+        <span class="terminal-section__toggle-main">
+          <span class="terminal-section__icon">[+]</span>
+          <span class="terminal-section__label">本周提交记录</span>
+        </span>
+        <span class="terminal-section__count">1</span>
+      </button>
+      <div class="terminal-section__body">
+    <div class="terminal-list">
+      
+            <div class="terminal-row">
+              <div class="terminal-row__main">
+                <div class="terminal-row__title">Unit 1 - Lesson 3</div>
+                <div class="terminal-row__sub">CIA4U · 3月9日 15:45</div>
+              </div>
+              <div class="terminal-row__side">
+                <div class="terminal-row__score">Submitted</div>
+              </div>
+            </div>
+          
+    </div>
+  </div>
+    </section>
+  
+          </div>
+        </div>
+      </article>
+    
+      <article class="terminal-card terminal-card--muted" data-course-card="">
+        <div class="terminal-card__head">
+          <div class="course-card__title-block">
+            <div class="course-card__title">
+              <span class="course-card__code">&gt; MDM4U</span>
+            </div>
+            <div class="course-card__chips">
+              
+            </div>
+          </div>
+          <div class="course-card__grade">
+            69.8%
+            <span class="course-card__grade-sub">更新于 3月11日</span>
+          </div>
+        </div>
+        <div class="terminal-card__body">
+          <div class="course-card__progress-head">
+            <span>当前进度</span>
+            <div class="course-card__progress-meta">
+              <strong>0%</strong>
+              <span class="course-card__chip course-card__chip--muted">历史学期</span>
+            </div>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-bar__rail">
+              <div class="progress-bar__fill" style="width:0%"></div>
+            </div>
+          </div>
+          <div class="course-card__stats">
+            <span class="course-card__stat"><strong>0</strong> 已交</span>
+            <span class="course-card__stat"><strong>0</strong> 缺交</span>
+            <span class="course-card__stat"><strong>6</strong> 已评分</span>
+          </div>
+
+          <div class="terminal-sections">
+            
+    <section class="terminal-section " data-terminal-section="">
+      <button class="terminal-section__toggle" type="button">
+        <span class="terminal-section__toggle-main">
+          <span class="terminal-section__icon">[+]</span>
+          <span class="terminal-section__label">AoL 评分详情</span>
+        </span>
+        <span class="terminal-section__count">6</span>
+      </button>
+      <div class="terminal-section__body">
+    <div class="terminal-list">
+      
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">Unit 1 Assignment [Assessment OF Learning]</div>
+                  <div class="terminal-row__sub">成绩条目</div>
+                </div>
+                <div class="terminal-row__side">
+                  <div class="terminal-row__score">19.9 / 25 (80%)</div>
+                  <div class="terminal-row__status">权重 5%</div>
+                </div>
+              </div>
+            
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">Unit 1 Test [Assessment OF Learning]</div>
+                  <div class="terminal-row__sub">成绩条目</div>
+                </div>
+                <div class="terminal-row__side">
+                  <div class="terminal-row__score">36 / 51 (71%)</div>
+                  <div class="terminal-row__status">权重 7%</div>
+                </div>
+              </div>
+            
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">Unit 2 Test [Assessment OF Learning]</div>
+                  <div class="terminal-row__sub">成绩条目</div>
+                </div>
+                <div class="terminal-row__side">
+                  <div class="terminal-row__score">58 / 76 (76%)</div>
+                  <div class="terminal-row__status">权重 7%</div>
+                </div>
+              </div>
+            
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">Unit 3 Combinations Test [Assessment OF Learning]</div>
+                  <div class="terminal-row__sub">成绩条目</div>
+                </div>
+                <div class="terminal-row__side">
+                  <div class="terminal-row__score">30.8 / 54 (57%)</div>
+                  <div class="terminal-row__status">权重 7%</div>
+                </div>
+              </div>
+            
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">Unit 4 Probability Distribution Test  [Assessment OF Learning]</div>
+                  <div class="terminal-row__sub">成绩条目</div>
+                </div>
+                <div class="terminal-row__side">
+                  <div class="terminal-row__score">35.8 / 56 (64%)</div>
+                  <div class="terminal-row__status">权重 7%</div>
+                </div>
+              </div>
+            
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">Unit 4 Assignment [Assessment OF Learning]</div>
+                  <div class="terminal-row__sub">成绩条目</div>
+                </div>
+                <div class="terminal-row__side">
+                  <div class="terminal-row__score">33 / 52 (63%)</div>
+                  <div class="terminal-row__status">权重 5%</div>
+                </div>
+              </div>
+            
+    </div>
+  </div>
+    </section>
+  
+            
+    <section class="terminal-section " data-terminal-section="">
+      <button class="terminal-section__toggle" type="button">
+        <span class="terminal-section__toggle-main">
+          <span class="terminal-section__icon">[+]</span>
+          <span class="terminal-section__label">未提交作业</span>
+        </span>
+        <span class="terminal-section__count">14</span>
+      </button>
+      <div class="terminal-section__body">
+    <div class="terminal-list">
+      
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">Week 8 Learning Log</div>
+                  <div class="terminal-row__sub">MDM4U</div>
+                </div>
+                <div class="terminal-row__side">
+                  <a class="focus-item__cta" href="https://queenscanada.schoology.com/assignment/8236708842" target="_blank" rel="noopener">前往作业 →</a>
+                </div>
+              </div>
+            
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">Unit 7 Lesson 4 Homework Questions</div>
+                  <div class="terminal-row__sub">MDM4U</div>
+                </div>
+                <div class="terminal-row__side">
+                  <a class="focus-item__cta" href="https://queenscanada.schoology.com/assignment/8255679033" target="_blank" rel="noopener">前往作业 →</a>
+                </div>
+              </div>
+            
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">Wednesday, February 11th Exit Card</div>
+                  <div class="terminal-row__sub">MDM4U</div>
+                </div>
+                <div class="terminal-row__side">
+                  <a class="focus-item__cta" href="https://queenscanada.schoology.com/assignment/8255683134" target="_blank" rel="noopener">前往作业 →</a>
+                </div>
+              </div>
+            
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">Monday, February 9th Exit Card</div>
+                  <div class="terminal-row__sub">MDM4U</div>
+                </div>
+                <div class="terminal-row__side">
+                  <a class="focus-item__cta" href="https://queenscanada.schoology.com/assignment/8249907555" target="_blank" rel="noopener">前往作业 →</a>
+                </div>
+              </div>
+            
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">Week 4 Learning Log</div>
+                  <div class="terminal-row__sub">MDM4U</div>
+                </div>
+                <div class="terminal-row__side">
+                  <a class="focus-item__cta" href="https://queenscanada.schoology.com/assignment/8236707790" target="_blank" rel="noopener">前往作业 →</a>
+                </div>
+              </div>
+            
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">Tuesday, February 10th Exit Card</div>
+                  <div class="terminal-row__sub">MDM4U</div>
+                </div>
+                <div class="terminal-row__side">
+                  <a class="focus-item__cta" href="https://queenscanada.schoology.com/assignment/8252033724" target="_blank" rel="noopener">前往作业 →</a>
+                </div>
+              </div>
+            
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">Unit 8 Lesson 4 Homework [Assessment FOR Learning]</div>
+                  <div class="terminal-row__sub">MDM4U</div>
+                </div>
+                <div class="terminal-row__side">
+                  <a class="focus-item__cta" href="https://queenscanada.schoology.com/assignment/8270710796" target="_blank" rel="noopener">前往作业 →</a>
+                </div>
+              </div>
+            
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">Week 5 Learning Log</div>
+                  <div class="terminal-row__sub">MDM4U</div>
+                </div>
+                <div class="terminal-row__side">
+                  <a class="focus-item__cta" href="https://queenscanada.schoology.com/assignment/8236708085" target="_blank" rel="noopener">前往作业 →</a>
+                </div>
+              </div>
+            
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">Unit 7 Lesson 5 Homework Questions</div>
+                  <div class="terminal-row__sub">MDM4U</div>
+                </div>
+                <div class="terminal-row__side">
+                  <a class="focus-item__cta" href="https://queenscanada.schoology.com/assignment/8255681305" target="_blank" rel="noopener">前往作业 →</a>
+                </div>
+              </div>
+            
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">Week 7 Learning Log</div>
+                  <div class="terminal-row__sub">MDM4U</div>
+                </div>
+                <div class="terminal-row__side">
+                  <a class="focus-item__cta" href="https://queenscanada.schoology.com/assignment/8236708663" target="_blank" rel="noopener">前往作业 →</a>
+                </div>
+              </div>
+            
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">Thursday, February 12th Exit Card</div>
+                  <div class="terminal-row__sub">MDM4U</div>
+                </div>
+                <div class="terminal-row__side">
+                  <a class="focus-item__cta" href="https://queenscanada.schoology.com/assignment/8255683746" target="_blank" rel="noopener">前往作业 →</a>
+                </div>
+              </div>
+            
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">Saturday, February 7th Exit Card</div>
+                  <div class="terminal-row__sub">MDM4U</div>
+                </div>
+                <div class="terminal-row__side">
+                  <a class="focus-item__cta" href="https://queenscanada.schoology.com/assignment/8248934633" target="_blank" rel="noopener">前往作业 →</a>
+                </div>
+              </div>
+            
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">Unit 7 Project 2 [Assessment OF Learning]</div>
+                  <div class="terminal-row__sub">MDM4U</div>
+                </div>
+                <div class="terminal-row__side">
+                  <a class="focus-item__cta" href="https://queenscanada.schoology.com/assignment/8173243876" target="_blank" rel="noopener">前往作业 →</a>
+                </div>
+              </div>
+            
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">Midterm Student-Teacher Conference [Assessment OF Learning]</div>
+                  <div class="terminal-row__sub">MDM4U</div>
+                </div>
+                <div class="terminal-row__side">
+                  <a class="focus-item__cta" href="https://queenscanada.schoology.com/assignment/8193397810" target="_blank" rel="noopener">前往作业 →</a>
+                </div>
+              </div>
+            
+    </div>
+  </div>
+    </section>
+  
+            
+    <section class="terminal-section " data-terminal-section="">
+      <button class="terminal-section__toggle" type="button">
+        <span class="terminal-section__toggle-main">
+          <span class="terminal-section__icon">[+]</span>
+          <span class="terminal-section__label">本周提交记录</span>
+        </span>
+        <span class="terminal-section__count">0</span>
+      </button>
+      <div class="terminal-section__body"><div class="terminal-empty">当前没有近期提交记录。</div></div>
+    </section>
+  
+          </div>
+        </div>
+      </article>
+    </div>
+          </section>
+
+          <section class="panel">
+            <div class="section-head">
+              <div>
+                <div class="panel__eyebrow">Recent Submissions</div>
+                <h2 class="section-head__title">近期提交记录</h2>
+              </div>
+              <div id="recentWeekLabel" class="section-head__meta">统计区间 3/9-3/15</div>
+            </div>
+            <div id="recentTable" class="terminal-table">
+    <div class="terminal-table__head">
+      <div>Course</div>
+      <div>Assignment</div>
+      <div>Date</div>
+      <div>Status</div>
+    </div>
+    
+    <div class="terminal-table__row">
+      <div class="terminal-table__course">CIA4U</div>
+      <div>Unit 1 - Lesson 3</div>
+      <div>3月9日</div>
+      <div class="terminal-table__status">Submitted</div>
+    </div>
+  
+  </div>
+          </section>
+        </section>
+
+        <aside class="rail rail--sidebar">
+          <section class="panel">
+            <div class="section-head">
+              <div>
+                <div class="panel__eyebrow">Notice Feed</div>
+                <h2 class="section-head__title">通知与提醒</h2>
+              </div>
+            </div>
+            <div id="alertList" class="stack-list">
+    <article class="alert-card alert-card--guide-group">
+      <span class="alert-card__tag alert-card__tag--guide">guide</span>
+      <div class="alert-card__title">通关指南推荐</div>
+      <div class="alert-guide-list">
+      <a class="alert-guide-list__link" href="/guide.html?fixture=/fixtures/chuhe-xiong-qea.json#aol-recovery">
+        <span class="alert-guide-list__title">优先处理缺交：复活与翻盘</span>
+        <span class="alert-guide-list__meta">4.8 危机关：复活与翻盘</span>
+      </a>
+    
+      <a class="alert-guide-list__link" href="/guide.html?fixture=/fixtures/chuhe-xiong-qea.json#rubric">
+        <span class="alert-guide-list__title">用 Rubric 直接提分</span>
+        <span class="alert-guide-list__meta">4.4 作业关：Rubric 狙击手</span>
+      </a>
+    
+      <a class="alert-guide-list__link" href="/guide.html?fixture=/fixtures/chuhe-xiong-qea.json#maintain">
+        <span class="alert-guide-list__title">建立每日循环，止住连锁迟交</span>
+        <span class="alert-guide-list__meta">4.2 每日循环 Daily Loop</span>
+      </a>
+    </div>
+    </article>
+  </div>
+          </section>
+
+          <section class="panel">
+            <div class="section-head">
+              <div>
+                <div class="panel__eyebrow">Deadline Calendar</div>
+                <h2 class="section-head__title">DDL 月历</h2>
+              </div>
+              <div class="calendar-nav">
+                <button id="calendarPrev" class="calendar-nav__btn" type="button" aria-label="上个月">‹</button>
+                <div id="calendarLabel" class="calendar-nav__label">2026.03</div>
+                <button id="calendarNext" class="calendar-nav__btn" type="button" aria-label="下个月">›</button>
+              </div>
+            </div>
+            <div id="upcomingList" class="upcoming-list">
+      <article class="upcoming-item">
+        <div class="upcoming-item__date">3月12日</div>
+        <div>
+          <div class="upcoming-item__title">Unit 1 - Assignment 1 (AOL)</div>
+          <div class="upcoming-item__meta">BOH4M · U1A1 (4%)</div>
+          <span class="upcoming-item__pill">AoL / 4%</span>
+        </div>
+      </article>
+    </div>
+            <div class="panel__divider"></div>
+            <div id="calendarGrid" class="calendar-grid"><div class="calendar-grid__weekday">日</div><div class="calendar-grid__weekday">一</div><div class="calendar-grid__weekday">二</div><div class="calendar-grid__weekday">三</div><div class="calendar-grid__weekday">四</div><div class="calendar-grid__weekday">五</div><div class="calendar-grid__weekday">六</div>
+      <button class="calendar-day" type="button" data-calendar-day="2026-03-01">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">1</div>
+        </div>
+        <div class="calendar-day__dots">
+          
+        </div>
+        
+      </button>
+    
+      <button class="calendar-day" type="button" data-calendar-day="2026-03-02">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">2</div>
+        </div>
+        <div class="calendar-day__dots">
+          
+        </div>
+        
+      </button>
+    
+      <button class="calendar-day" type="button" data-calendar-day="2026-03-03">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">3</div>
+        </div>
+        <div class="calendar-day__dots">
+          
+        </div>
+        
+      </button>
+    
+      <button class="calendar-day" type="button" data-calendar-day="2026-03-04">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">4</div>
+        </div>
+        <div class="calendar-day__dots">
+          
+        </div>
+        
+      </button>
+    
+      <button class="calendar-day" type="button" data-calendar-day="2026-03-05">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">5</div>
+        </div>
+        <div class="calendar-day__dots">
+          
+        </div>
+        
+      </button>
+    
+      <button class="calendar-day" type="button" data-calendar-day="2026-03-06">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">6</div>
+        </div>
+        <div class="calendar-day__dots">
+          
+        </div>
+        
+      </button>
+    
+      <button class="calendar-day" type="button" data-calendar-day="2026-03-07">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">7</div>
+        </div>
+        <div class="calendar-day__dots">
+          
+        </div>
+        
+      </button>
+    
+      <button class="calendar-day" type="button" data-calendar-day="2026-03-08">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">8</div>
+        </div>
+        <div class="calendar-day__dots">
+          
+        </div>
+        
+      </button>
+    
+      <button class="calendar-day" type="button" data-calendar-day="2026-03-09">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">9</div>
+        </div>
+        <div class="calendar-day__dots">
+          
+        </div>
+        
+      </button>
+    
+      <button class="calendar-day" type="button" data-calendar-day="2026-03-10">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">10</div>
+        </div>
+        <div class="calendar-day__dots">
+          
+        </div>
+        
+      </button>
+    
+      <button class="calendar-day calendar-day--today" type="button" data-calendar-day="2026-03-11">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">11</div>
+        </div>
+        <div class="calendar-day__dots">
+          
+        </div>
+        
+      </button>
+    
+      <button class="calendar-day calendar-day--has-event calendar-day--selected" type="button" data-calendar-day="2026-03-12">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">12</div>
+        </div>
+        <div class="calendar-day__dots">
+          <span class="calendar-day__dot "></span>
+        </div>
+        
+          <div class="calendar-day__tooltip">
+            
+              <article class="calendar-tooltip__item">
+                <div class="calendar-tooltip__title">Unit 1 - Assignment 1 (AOL)</div>
+                <div class="calendar-tooltip__meta">BOH4M · 3月12日 19:59</div>
+                <span class="calendar-tooltip__pill">AoL / 4%</span>
+              </article>
+            
+          </div>
+        
+      </button>
+    
+      <button class="calendar-day" type="button" data-calendar-day="2026-03-13">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">13</div>
+        </div>
+        <div class="calendar-day__dots">
+          
+        </div>
+        
+      </button>
+    
+      <button class="calendar-day" type="button" data-calendar-day="2026-03-14">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">14</div>
+        </div>
+        <div class="calendar-day__dots">
+          
+        </div>
+        
+      </button>
+    
+      <button class="calendar-day" type="button" data-calendar-day="2026-03-15">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">15</div>
+        </div>
+        <div class="calendar-day__dots">
+          
+        </div>
+        
+      </button>
+    
+      <button class="calendar-day" type="button" data-calendar-day="2026-03-16">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">16</div>
+        </div>
+        <div class="calendar-day__dots">
+          
+        </div>
+        
+      </button>
+    
+      <button class="calendar-day" type="button" data-calendar-day="2026-03-17">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">17</div>
+        </div>
+        <div class="calendar-day__dots">
+          
+        </div>
+        
+      </button>
+    
+      <button class="calendar-day" type="button" data-calendar-day="2026-03-18">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">18</div>
+        </div>
+        <div class="calendar-day__dots">
+          
+        </div>
+        
+      </button>
+    
+      <button class="calendar-day" type="button" data-calendar-day="2026-03-19">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">19</div>
+        </div>
+        <div class="calendar-day__dots">
+          
+        </div>
+        
+      </button>
+    
+      <button class="calendar-day" type="button" data-calendar-day="2026-03-20">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">20</div>
+        </div>
+        <div class="calendar-day__dots">
+          
+        </div>
+        
+      </button>
+    
+      <button class="calendar-day" type="button" data-calendar-day="2026-03-21">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">21</div>
+        </div>
+        <div class="calendar-day__dots">
+          
+        </div>
+        
+      </button>
+    
+      <button class="calendar-day" type="button" data-calendar-day="2026-03-22">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">22</div>
+        </div>
+        <div class="calendar-day__dots">
+          
+        </div>
+        
+      </button>
+    
+      <button class="calendar-day" type="button" data-calendar-day="2026-03-23">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">23</div>
+        </div>
+        <div class="calendar-day__dots">
+          
+        </div>
+        
+      </button>
+    
+      <button class="calendar-day" type="button" data-calendar-day="2026-03-24">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">24</div>
+        </div>
+        <div class="calendar-day__dots">
+          
+        </div>
+        
+      </button>
+    
+      <button class="calendar-day" type="button" data-calendar-day="2026-03-25">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">25</div>
+        </div>
+        <div class="calendar-day__dots">
+          
+        </div>
+        
+      </button>
+    
+      <button class="calendar-day" type="button" data-calendar-day="2026-03-26">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">26</div>
+        </div>
+        <div class="calendar-day__dots">
+          
+        </div>
+        
+      </button>
+    
+      <button class="calendar-day" type="button" data-calendar-day="2026-03-27">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">27</div>
+        </div>
+        <div class="calendar-day__dots">
+          
+        </div>
+        
+      </button>
+    
+      <button class="calendar-day" type="button" data-calendar-day="2026-03-28">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">28</div>
+        </div>
+        <div class="calendar-day__dots">
+          
+        </div>
+        
+      </button>
+    
+      <button class="calendar-day" type="button" data-calendar-day="2026-03-29">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">29</div>
+        </div>
+        <div class="calendar-day__dots">
+          
+        </div>
+        
+      </button>
+    
+      <button class="calendar-day" type="button" data-calendar-day="2026-03-30">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">30</div>
+        </div>
+        <div class="calendar-day__dots">
+          
+        </div>
+        
+      </button>
+    
+      <button class="calendar-day" type="button" data-calendar-day="2026-03-31">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">31</div>
+        </div>
+        <div class="calendar-day__dots">
+          
+        </div>
+        
+      </button>
+    </div>
+          </section>
+
+        </aside>
+      </main>
+    </div>
+
+    
+  
+
+</body></html>

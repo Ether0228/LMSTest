@@ -1,0 +1,2739 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>通关指南</title>
+    <style>
+:root {
+  --bg: #f2eee6;
+  --panel: rgba(255, 252, 247, 0.68);
+  --panel-strong: #fffdf8;
+  --panel-muted: #efe7d7;
+  --ink: #1a1916;
+  --muted: #6f6658;
+  --line: rgba(49, 43, 33, 0.11);
+  --line-strong: rgba(49, 43, 33, 0.22);
+  --accent: #b55233;
+  --accent-soft: rgba(181, 82, 51, 0.14);
+  --ok: #2d7c5d;
+  --ok-soft: rgba(45, 124, 93, 0.14);
+  --warn: #b67a10;
+  --warn-soft: rgba(182, 122, 16, 0.14);
+  --danger: #a63d32;
+  --danger-soft: rgba(166, 61, 50, 0.14);
+  --shadow: 0 4px 14px rgba(40, 31, 17, 0.04);
+  --radius: 18px;
+  --font-body: "IBM Plex Sans", "Avenir Next", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-mono: "IBM Plex Mono", "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+  --space-1: 4px;
+  --space-2: 6px;
+  --space-3: 8px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top left, rgba(181, 82, 51, 0.18), transparent 28%),
+    radial-gradient(circle at top right, rgba(45, 124, 93, 0.12), transparent 24%),
+    linear-gradient(180deg, #f7f1e5 0%, #f2eee6 50%, #ece4d6 100%);
+  overflow: hidden;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font: inherit;
+}
+
+.loading-screen,
+.error-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.loading-screen__inner,
+.error-screen__inner {
+  width: min(460px, 100%);
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(16px);
+}
+
+.loading-screen__eyebrow,
+.panel__eyebrow,
+.hero__eyebrow,
+.notice-modal__eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.loading-screen__title {
+  margin-top: 10px;
+  font-size: clamp(24px, 4vw, 34px);
+  font-weight: 700;
+}
+
+.loading-screen__line {
+  margin-top: 18px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(26, 25, 22, 0.06);
+  overflow: hidden;
+}
+
+.loading-screen__line span {
+  display: block;
+  width: 35%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), #e29d3b);
+  animation: preview-loading 1.35s ease-in-out infinite;
+}
+
+@keyframes preview-loading {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(320%); }
+}
+
+.shell {
+  height: 100vh;
+  padding: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.shell__topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 auto 12px;
+  max-width: 1500px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 252, 247, 0.76);
+  backdrop-filter: blur(8px);
+  box-shadow: none;
+}
+
+.shell__brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.shell__brand-mark {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #1f1d18, #564636);
+  color: #f5efe2;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.shell__brand-name {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.shell__brand-sub {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.shell__topbar-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.shell__link {
+  padding: 11px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.44);
+  transition: 0.2s ease;
+}
+
+.shell__link:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+  transform: translateY(-1px);
+}
+
+.shell__link--strong {
+  background: linear-gradient(135deg, var(--accent-soft), rgba(255, 255, 255, 0.72));
+  color: var(--accent);
+}
+
+.mobile-tab-input,
+.mobile-tabs {
+  display: none;
+}
+
+.shell__body {
+  max-width: 1500px;
+  margin: 0 auto;
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr) minmax(260px, 320px);
+  gap: 8px;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.rail,
+.main-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+  overscroll-behavior: contain;
+  min-width: 0;
+}
+
+.rail--profile,
+.rail--sidebar,
+.main-column {
+  position: relative;
+}
+
+.rail--profile {
+  z-index: 4;
+}
+
+.main-column {
+  z-index: 2;
+}
+
+.rail--sidebar {
+  z-index: 1;
+}
+
+.rail::-webkit-scrollbar,
+.main-column::-webkit-scrollbar {
+  width: 3px;
+  height: 3px;
+}
+
+.rail::-webkit-scrollbar-thumb,
+.main-column::-webkit-scrollbar-thumb {
+  background: rgba(49, 43, 33, 0.08);
+  border-radius: 999px;
+}
+
+.rail::-webkit-scrollbar-track,
+.main-column::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.panel,
+.hero {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  backdrop-filter: blur(6px);
+  box-shadow: none;
+  min-width: 0;
+}
+
+.panel {
+  padding: 9px;
+}
+
+.panel--profile {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(255, 252, 247, 0.9)),
+    linear-gradient(135deg, rgba(181, 82, 51, 0.1), transparent 55%);
+}
+
+.profile-avatar {
+  width: 72px;
+  height: 72px;
+  margin-top: var(--space-3);
+  border-radius: 16px;
+  background: linear-gradient(135deg, #231f18, #65503a);
+  color: #f8f2e8;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.profile-name {
+  margin-top: var(--space-3);
+  font-size: 21px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.profile-meta,
+.panel__small,
+.section-head__meta {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.meter {
+  margin-top: var(--space-3);
+}
+
+.meter__label,
+.streak-header,
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  gap: var(--space-3);
+}
+
+.meter__label {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.meter__track {
+  margin-top: var(--space-2);
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(26, 25, 22, 0.08);
+}
+
+.meter__fill {
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #26211a, #6d5a42);
+}
+
+.meter__fill--accent {
+  background: linear-gradient(90deg, var(--accent), #f0a13c);
+}
+
+.meter__hint {
+  margin-top: var(--space-1);
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.stat--hero {
+  margin-top: var(--space-3);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.stage-chip {
+  display: inline-flex;
+  margin-top: 10px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(26, 25, 22, 0.06);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.combo-grid {
+  margin-top: var(--space-3);
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.combo-cell {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: rgba(26, 25, 22, 0.05);
+  z-index: 1;
+}
+
+.combo-cell--hit {
+  background: rgba(45, 124, 93, 0.18);
+  border-color: rgba(45, 124, 93, 0.25);
+}
+
+.combo-cell--idle {
+  background: rgba(26, 25, 22, 0.06);
+}
+
+.combo-cell--no_assignment {
+  background: rgba(26, 25, 22, 0.06);
+}
+
+.combo-cell--future {
+  background: rgba(26, 25, 22, 0.025);
+  border-style: dashed;
+  border-color: rgba(26, 25, 22, 0.12);
+}
+
+.combo-cell--empty {
+  background: transparent;
+}
+
+.combo-cell--miss {
+  background: rgba(166, 61, 50, 0.14);
+  border-color: rgba(166, 61, 50, 0.28);
+}
+
+.combo-cell__tip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  min-width: max-content;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: #27231d;
+  color: #f7f2e9;
+  font-size: 11px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 20;
+}
+
+.combo-cell:hover .combo-cell__tip {
+  opacity: 1;
+}
+
+.combo-cell:hover {
+  z-index: 10;
+}
+
+.combo-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.combo-legend__dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.combo-legend__dot--hit { background: rgba(45, 124, 93, 0.75); }
+.combo-legend__dot--idle { background: rgba(26, 25, 22, 0.18); }
+.combo-legend__dot--future { background: rgba(26, 25, 22, 0.08); border: 1px dashed rgba(26, 25, 22, 0.18); }
+
+.hero {
+  display: block;
+  padding: 10px;
+  background:
+    linear-gradient(135deg, rgba(181, 82, 51, 0.09), rgba(255, 255, 255, 0.65)),
+    linear-gradient(180deg, rgba(255, 252, 247, 0.92), rgba(255, 252, 247, 0.74));
+}
+
+.hero__title {
+  margin: var(--space-1) 0 var(--space-2);
+  font-size: clamp(22px, 2.6vw, 32px);
+  line-height: 1.04;
+  letter-spacing: -0.04em;
+}
+
+.hero__subtitle {
+  margin: 0;
+  max-width: 760px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.panel--focus {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.52), rgba(255, 252, 247, 0.84)),
+    linear-gradient(135deg, rgba(45, 124, 93, 0.08), transparent 45%);
+}
+
+.focus-list,
+.stack-list,
+.recommendation-list,
+.course-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.stack-list {
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.focus-item,
+.alert-card,
+.recommendation-card,
+.upcoming-item {
+  padding: 7px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.focus-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-2);
+  align-items: start;
+}
+
+.focus-item__content {
+  min-width: 0;
+}
+
+.focus-item__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.focus-item__badge,
+.alert-card__tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 58px;
+  padding: 4px 7px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.focus-item__badge--danger,
+.alert-card__tag--urgent {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.focus-item__badge--warn,
+.alert-card__tag--warn {
+  color: var(--warn);
+  background: var(--warn-soft);
+}
+
+.focus-item__badge--ok,
+.alert-card__tag--ok {
+  color: var(--ok);
+  background: var(--ok-soft);
+}
+
+.focus-item__badge--info,
+.alert-card__tag--info {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.alert-card__tag--guide {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.focus-item__title,
+.recommendation-card__title,
+.course-card__title,
+.calendar-detail__title {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.focus-item__meta,
+.alert-card__body,
+.recommendation-card__body,
+.calendar-detail__meta,
+.upcoming-item__meta {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.focus-item__cta,
+.recommendation-card__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+  font-weight: 700;
+  white-space: nowrap;
+  font-size: 10px;
+}
+
+.terminal-card {
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.terminal-card--danger {
+  border-color: rgba(166, 61, 50, 0.18);
+}
+
+.terminal-card--warn {
+  border-color: rgba(182, 122, 16, 0.18);
+}
+
+.terminal-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 9px 9px 7px;
+}
+
+.course-card__title-block {
+  min-width: 0;
+}
+
+.course-card__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.course-card__code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.course-card__chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.course-card__chip {
+  padding: 3px 5px;
+  border-radius: 999px;
+  background: rgba(26, 25, 22, 0.06);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.course-card__chip--danger {
+  color: var(--danger);
+  background: rgba(166, 61, 50, 0.1);
+}
+
+.course-card__chip--warn {
+  color: var(--warn);
+  background: rgba(182, 122, 16, 0.12);
+}
+
+.course-card__chip--ok {
+  color: var(--ok);
+  background: rgba(45, 124, 93, 0.1);
+}
+
+.course-card__chip--muted {
+  color: var(--muted);
+}
+
+.course-card__grade {
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+  text-align: right;
+}
+
+.course-card__grade-sub {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.terminal-card__body {
+  padding: 0 9px 9px;
+}
+
+.course-card__progress-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.course-card__progress-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.course-card__progress-head strong {
+  color: var(--ink);
+  font-size: 11px;
+}
+
+.progress-bar {
+  margin-top: 4px;
+}
+
+.progress-bar__rail {
+  height: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(26, 25, 22, 0.08);
+}
+
+.progress-bar__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #24201a, var(--accent));
+}
+
+.course-card__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.course-card__stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: rgba(26, 25, 22, 0.05);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.course-card__stat strong {
+  color: var(--ink);
+  font-size: 10px;
+}
+
+.terminal-sections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.terminal-section {
+  border-top: 1px dashed var(--line-strong);
+  padding-top: var(--space-2);
+}
+
+.terminal-section__toggle {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.terminal-section__toggle-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.terminal-section__icon {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: rgba(26, 25, 22, 0.06);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.terminal-section__label {
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.terminal-section__count {
+  padding: 3px 5px;
+  border-radius: 999px;
+  background: rgba(26, 25, 22, 0.06);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.terminal-section__body {
+  display: none;
+  margin-top: var(--space-2);
+  padding: 7px;
+  border-radius: 8px;
+  background: rgba(26, 25, 22, 0.035);
+}
+
+.terminal-section.is-open .terminal-section__body {
+  display: block;
+}
+
+.terminal-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.terminal-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.terminal-row__main {
+  min-width: 0;
+}
+
+.terminal-row__title {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.terminal-row__sub {
+  margin-top: 1px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.terminal-row__side {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.terminal-row__score {
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.terminal-row__status {
+  margin-top: 1px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.terminal-empty {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.terminal-table {
+  margin-top: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.terminal-table__head,
+.terminal-table__row {
+  display: grid;
+  grid-template-columns: minmax(90px, 0.9fr) minmax(0, 1.8fr) minmax(110px, 0.8fr) minmax(86px, 0.7fr);
+  gap: var(--space-2);
+  align-items: center;
+  padding: 7px 8px;
+}
+
+.terminal-table__head {
+  background: rgba(26, 25, 22, 0.05);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.terminal-table__row {
+  border-top: 1px solid rgba(49, 43, 33, 0.09);
+  font-size: 11px;
+}
+
+.terminal-table__row:nth-child(2n) {
+  background: rgba(255, 255, 255, 0.46);
+}
+
+.terminal-table__course {
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.terminal-table__status {
+  justify-self: end;
+  padding: 3px 5px;
+  border-radius: 999px;
+  background: rgba(45, 124, 93, 0.12);
+  color: var(--ok);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.alert-card {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.alert-card__title,
+.alert-card__title-link {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.alert-card__title-link:hover {
+  color: var(--accent);
+}
+
+.alert-card--guide-group {
+  gap: var(--space-1);
+}
+
+.alert-guide-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.alert-guide-list__link {
+  display: block;
+  padding: 2px 0;
+}
+
+.alert-guide-list__link + .alert-guide-list__link {
+  border-top: 1px dashed rgba(49, 43, 33, 0.12);
+}
+
+.alert-guide-list__title {
+  display: block;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.alert-guide-list__meta {
+  display: block;
+  margin-top: 1px;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.3;
+}
+
+.alert-guide-list__link:hover .alert-guide-list__title {
+  color: var(--accent);
+}
+
+.notice-empty {
+  padding: 8px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.panel__divider {
+  height: 1px;
+  margin: var(--space-2) 0;
+  background: linear-gradient(90deg, transparent, var(--line-strong), transparent);
+}
+
+.upcoming-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.upcoming-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-2);
+  align-items: start;
+}
+
+.upcoming-item__date {
+  min-width: 56px;
+  padding: 5px 6px;
+  border-radius: 8px;
+  background: rgba(181, 82, 51, 0.1);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-align: center;
+}
+
+.upcoming-item__title {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.upcoming-item__pill {
+  display: inline-flex;
+  margin-top: var(--space-1);
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: rgba(26, 25, 22, 0.06);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.calendar-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.calendar-nav__btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.54);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.calendar-nav__label {
+  min-width: 7em;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.calendar-grid {
+  margin-top: var(--space-2);
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.calendar-grid__weekday {
+  padding-bottom: 4px;
+  text-align: center;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.calendar-day {
+  position: relative;
+  min-height: 34px;
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: rgba(26, 25, 22, 0.045);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.calendar-day--empty {
+  background: transparent;
+  cursor: default;
+}
+
+.calendar-day--today {
+  border-color: var(--line-strong);
+}
+
+.calendar-day--has-event {
+  background: rgba(181, 82, 51, 0.08);
+}
+
+.calendar-day--selected {
+  border-color: rgba(181, 82, 51, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(181, 82, 51, 0.2);
+}
+
+.calendar-day__number {
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.calendar-day__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.calendar-day__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 4px;
+  border-radius: 999px;
+  background: rgba(181, 82, 51, 0.12);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  line-height: 1.2;
+}
+
+.calendar-day__badge--aol {
+  background: rgba(166, 61, 50, 0.12);
+  color: var(--danger);
+}
+
+.calendar-day__dots {
+  display: flex;
+  gap: 3px;
+  margin-top: 3px;
+  flex-wrap: wrap;
+}
+
+.calendar-day__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.calendar-day__dot--aol {
+  background: var(--danger);
+}
+
+.calendar-day__tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  width: min(240px, 60vw);
+  padding: 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(39, 35, 29, 0.4);
+  background: rgba(39, 35, 29, 0.96);
+  box-shadow: 0 14px 28px rgba(20, 14, 7, 0.18);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 12;
+}
+
+.calendar-day:hover .calendar-day__tooltip,
+.calendar-day:focus-visible .calendar-day__tooltip {
+  opacity: 1;
+}
+
+.calendar-tooltip__item + .calendar-tooltip__item {
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.calendar-tooltip__title {
+  font-size: 10px;
+  font-weight: 700;
+  color: #f7f2e9;
+}
+
+.calendar-tooltip__meta {
+  margin-top: 2px;
+  color: rgba(247, 242, 233, 0.72);
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.calendar-tooltip__pill {
+  display: inline-flex;
+  margin-top: 4px;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #f7f2e9;
+  font-family: var(--font-mono);
+  font-size: 8px;
+}
+
+.recommendation-card__body {
+  margin-top: 6px;
+}
+
+.recommendation-card__link {
+  margin-top: 8px;
+}
+
+.notice-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+}
+
+.notice-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(27, 23, 17, 0.42);
+  backdrop-filter: blur(4px);
+}
+
+.notice-modal__panel {
+  position: relative;
+  width: min(520px, calc(100vw - 32px));
+  margin: min(10vh, 88px) auto 0;
+  padding: 24px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 252, 247, 0.94);
+  box-shadow: 0 30px 60px rgba(16, 11, 5, 0.24);
+}
+
+.notice-modal__title {
+  margin: 8px 0 16px;
+  font-size: 30px;
+  line-height: 1;
+}
+
+.notice-modal__list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.notice-modal__item {
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(26, 25, 22, 0.045);
+}
+
+.notice-modal__button {
+  width: 100%;
+  margin-top: 18px;
+  padding: 13px 16px;
+  border: 0;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #1e1b15, #4f3a23);
+  color: #fff6ea;
+  cursor: pointer;
+}
+
+.error-screen__inner {
+  text-align: center;
+}
+
+.error-screen__title {
+  margin-top: 10px;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.error-screen__body {
+  margin-top: 10px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.error-screen__link {
+  display: inline-flex;
+  margin-top: 18px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+}
+
+@media (max-width: 1180px) {
+  .shell__body {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+  }
+
+  .rail,
+  .main-column {
+    overflow: visible;
+    max-height: none;
+    height: auto;
+  }
+
+  body {
+    overflow: auto;
+  }
+}
+
+@media (max-width: 760px) {
+  html,
+  body {
+    height: auto;
+    min-height: 100%;
+    overflow: auto;
+  }
+
+  .shell {
+    padding: 14px;
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .shell__topbar {
+    padding: 14px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .mobile-tab-input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .mobile-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    margin: 0 auto 10px;
+    width: 100%;
+    max-width: 1500px;
+    position: sticky;
+    top: 0;
+    z-index: 18;
+    padding: 8px 0;
+    background: linear-gradient(180deg, rgba(242, 238, 230, 0.96), rgba(242, 238, 230, 0.82));
+    backdrop-filter: blur(8px);
+  }
+
+  .mobile-tabs__item {
+    min-width: 0;
+    padding: 8px 8px 7px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.46);
+    text-align: center;
+  }
+
+  .mobile-tabs__title {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+
+  .mobile-tabs__meta {
+    display: block;
+    margin-top: 3px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    line-height: 1.1;
+  }
+
+  #mobileTabOverview:checked ~ .mobile-tabs label[for="mobileTabOverview"],
+  #mobileTabCourse:checked ~ .mobile-tabs label[for="mobileTabCourse"],
+  #mobileTabDeadline:checked ~ .mobile-tabs label[for="mobileTabDeadline"] {
+    border-color: var(--line-strong);
+    background: rgba(255, 255, 255, 0.82);
+  }
+
+  .panel,
+  .hero {
+    padding: 12px;
+    border-radius: 16px;
+  }
+
+  .shell__body {
+    display: block;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .profile-name,
+  .hero__title {
+    font-size: 24px;
+  }
+
+  .terminal-card__head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .course-card__grade {
+    text-align: left;
+  }
+
+  .terminal-table__head,
+  .terminal-table__row {
+    grid-template-columns: minmax(74px, 0.8fr) minmax(0, 1.5fr) minmax(80px, 0.8fr);
+  }
+
+  .terminal-table__head div:nth-child(4),
+  .terminal-table__row div:nth-child(4) {
+    display: none;
+  }
+
+  .focus-item {
+    grid-template-columns: 1fr;
+  }
+
+  .shell__body > .rail--profile,
+  .shell__body > .main-column,
+  .shell__body > .rail--sidebar {
+    display: none;
+    height: auto;
+    max-height: none;
+    min-height: 0;
+    overflow: visible;
+    padding-right: 0;
+    padding-bottom: 20px;
+  }
+
+  #mobileTabOverview:checked ~ .shell__body > .rail--profile {
+    display: flex;
+  }
+
+  #mobileTabCourse:checked ~ .shell__body > .main-column {
+    display: flex;
+  }
+
+  #mobileTabDeadline:checked ~ .shell__body > .rail--sidebar {
+    display: flex;
+  }
+
+  .calendar-day__tooltip {
+    display: none;
+  }
+
+  .calendar-day {
+    min-height: 42px;
+  }
+
+  .calendar-day__badge {
+    font-size: 7px;
+  }
+
+}
+
+</style>
+  </head>
+  <body>
+    <div id="previewLoading" class="loading-screen">
+      <div class="loading-screen__inner">
+        <div class="loading-screen__eyebrow">QEA / STUDENT TERMINAL</div>
+        <div class="loading-screen__title">正在装载学生终端视图</div>
+        <div class="loading-screen__line"><span></span></div>
+      </div>
+    </div>
+
+    <div id="noticeModal" class="notice-modal" hidden>
+      <div class="notice-modal__backdrop" data-close-notice></div>
+      <div class="notice-modal__panel">
+        <div class="notice-modal__eyebrow">SYSTEM NOTICE</div>
+        <h2 class="notice-modal__title">开屏通知</h2>
+        <div id="noticeModalList" class="notice-modal__list"></div>
+        <button id="noticeModalButton" class="notice-modal__button" type="button">已读，进入预览</button>
+      </div>
+    </div>
+
+    <div id="previewError" class="error-screen" hidden></div>
+
+    <div id="previewApp" class="shell" hidden>
+      <header class="shell__topbar">
+        <div class="shell__brand">
+          <span class="shell__brand-mark">TG</span>
+          <div>
+            <div class="shell__brand-name">通关指南</div>
+            <div class="shell__brand-sub">student-terminal-dashboard x interactive_web</div>
+          </div>
+        </div>
+        <div class="shell__topbar-actions">
+          <a id="liveDashboardLink" class="shell__link" href="/">查看现网版</a>
+          <a id="guideLink" class="shell__link shell__link--strong" href="/guide.html">通关指南全文</a>
+        </div>
+      </header>
+
+      <input id="mobileTabOverview" class="mobile-tab-input" type="radio" name="mobileTab" checked />
+      <input id="mobileTabCourse" class="mobile-tab-input" type="radio" name="mobileTab" />
+      <input id="mobileTabDeadline" class="mobile-tab-input" type="radio" name="mobileTab" />
+      <div class="mobile-tabs">
+        <label class="mobile-tabs__item" for="mobileTabOverview">
+          <span class="mobile-tabs__title">总览</span>
+          <span id="mobileTabOverviewMeta" class="mobile-tabs__meta">Profile</span>
+        </label>
+        <label class="mobile-tabs__item" for="mobileTabCourse">
+          <span class="mobile-tabs__title">课程</span>
+          <span id="mobileTabCourseMeta" class="mobile-tabs__meta">Courses</span>
+        </label>
+        <label class="mobile-tabs__item" for="mobileTabDeadline">
+          <span class="mobile-tabs__title">DDL</span>
+          <span id="mobileTabDeadlineMeta" class="mobile-tabs__meta">Deadlines</span>
+        </label>
+      </div>
+
+      <main class="shell__body">
+        <aside class="rail rail--profile">
+          <section class="panel panel--profile">
+            <div class="panel__eyebrow">Student Profile</div>
+            <div id="profileAvatar" class="profile-avatar"></div>
+            <div id="profileName" class="profile-name"></div>
+            <div id="profileMeta" class="profile-meta"></div>
+            <div class="meter">
+              <div class="meter__label">
+                <span>Credit Progress</span>
+                <span id="creditNumbers">0 / 0</span>
+              </div>
+              <div class="meter__track"><div id="creditFill" class="meter__fill"></div></div>
+              <div id="creditHint" class="meter__hint"></div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel__eyebrow">Semester</div>
+            <div id="semesterLabel" class="stat stat--hero"></div>
+            <div class="meter">
+              <div class="meter__label">
+                <span>Week Progress</span>
+                <span id="semesterProgressText">0 / 0</span>
+              </div>
+              <div class="meter__track"><div id="semesterFill" class="meter__fill meter__fill--accent"></div></div>
+            </div>
+            <div id="semesterDates" class="panel__small"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel__eyebrow">Activity Matrix</div>
+            <div class="streak-header">
+              <span>Current Streak</span>
+              <strong id="streakCount">0 days</strong>
+            </div>
+            <div id="streakMessage" class="panel__small"></div>
+            <div id="comboGrid" class="combo-grid"></div>
+            <div class="combo-legend">
+              <span><i class="combo-legend__dot combo-legend__dot--hit"></i> 提交</span>
+              <span><i class="combo-legend__dot combo-legend__dot--idle"></i> 无作业</span>
+              <span><i class="combo-legend__dot combo-legend__dot--future"></i> 未来</span>
+            </div>
+          </section>
+        </aside>
+
+        <section class="main-column">
+          <section class="hero">
+            <div>
+              <div class="hero__eyebrow">Mission Control</div>
+              <h1 id="heroTitle" class="hero__title"></h1>
+              <p id="heroSubtitle" class="hero__subtitle"></p>
+            </div>
+          </section>
+
+          <section class="panel panel--focus">
+            <div class="panel__eyebrow">Today Focus</div>
+            <div id="focusList" class="focus-list"></div>
+          </section>
+
+          <section class="panel">
+            <div class="section-head">
+              <div>
+                <div class="panel__eyebrow">Course Progress</div>
+                <h2 class="section-head__title">课程终端视图</h2>
+              </div>
+            </div>
+            <div id="courseList" class="course-list"></div>
+          </section>
+
+          <section class="panel">
+            <div class="section-head">
+              <div>
+                <div class="panel__eyebrow">Recent Submissions</div>
+                <h2 class="section-head__title">近期提交记录</h2>
+              </div>
+              <div id="recentWeekLabel" class="section-head__meta"></div>
+            </div>
+            <div id="recentTable" class="terminal-table"></div>
+          </section>
+        </section>
+
+        <aside class="rail rail--sidebar">
+          <section class="panel">
+            <div class="section-head">
+              <div>
+                <div class="panel__eyebrow">Notice Feed</div>
+                <h2 class="section-head__title">通知与提醒</h2>
+              </div>
+            </div>
+            <div id="alertList" class="stack-list"></div>
+          </section>
+
+          <section class="panel">
+            <div class="section-head">
+              <div>
+                <div class="panel__eyebrow">Deadline Calendar</div>
+                <h2 class="section-head__title">DDL 月历</h2>
+              </div>
+              <div class="calendar-nav">
+                <button id="calendarPrev" class="calendar-nav__btn" type="button" aria-label="上个月">‹</button>
+                <div id="calendarLabel" class="calendar-nav__label"></div>
+                <button id="calendarNext" class="calendar-nav__btn" type="button" aria-label="下个月">›</button>
+              </div>
+            </div>
+            <div id="upcomingList" class="upcoming-list"></div>
+            <div class="panel__divider"></div>
+            <div id="calendarGrid" class="calendar-grid"></div>
+          </section>
+
+        </aside>
+      </main>
+    </div>
+
+    <script>
+const PREVIEW_MOCK_DATA = {
+  student: {
+    name: "示例同学",
+    pinyin: "示例同学",
+    grade: null,
+    credits_earned: 18,
+    credits_remaining: 12,
+  },
+  semester: {
+    start_date: "2026-02-02",
+    end_date: "2026-04-24",
+    total_weeks: 12,
+    current_week: 6,
+  },
+  semLabel: "2025-2026学年 第3学期",
+  stage: "申请备战期",
+  course_progress: [
+    {
+      course: "MHF4U",
+      submittedCount: 10,
+      missingCount: 2,
+      completion: 83.3,
+      current_grade: 89.4,
+      grade_updated_at: Date.now(),
+      aolSubmitted: 3,
+      aolMissing: 1,
+      aol_details: [
+        { name: "Unit Test 2", score: 91, max: 100, category: "Assessment of Learning", weight: 40 },
+        { name: "Midterm Prep Quiz", score: 86, max: 100, category: "Assessment of Learning", weight: 20 },
+      ],
+      isCurrentSemester: true,
+    },
+    {
+      course: "ENG4U",
+      submittedCount: 8,
+      missingCount: 1,
+      completion: 88.9,
+      current_grade: 84.2,
+      grade_updated_at: Date.now(),
+      aolSubmitted: 2,
+      aolMissing: 0,
+      aol_details: [
+        { name: "Literary Essay", score: 84, max: 100, category: "Assessment of Learning", weight: 30 },
+      ],
+      isCurrentSemester: true,
+    },
+  ],
+  missing_items: [
+    { course: "MHF4U", assignmentName: "Quiz 9", assignmentLink: "" },
+    { course: "MHF4U", assignmentName: "Chapter Review", assignmentLink: "" },
+    { course: "ENG4U", assignmentName: "Reading Journal", assignmentLink: "" },
+  ],
+  attention_items: [
+    { type: "low_score", course: "MHF4U", assignmentName: "Functions Quiz", assignmentLink: "", nature: "AoF", score: 52, maxScore: 100 },
+  ],
+  recent_submitted: [
+    { course: "MHF4U", assignmentName: "Homework Set 7", submittedAt: Date.now() - 86400000, status: "已提交", assignmentLink: "" },
+    { course: "ENG4U", assignmentName: "Poetry Reflection", submittedAt: Date.now() - 2 * 86400000, status: "迟交", assignmentLink: "" },
+    { course: "MHF4U", assignmentName: "Trigonometry Notes", submittedAt: Date.now() - 3 * 86400000, status: "已提交", assignmentLink: "" },
+  ],
+  recommendations: [
+    { title: "优先处理缺交：复活与翻盘", anchorText: "4.8 危机关：复活与翻盘" },
+    { title: "建立每日循环，止住连锁迟交", anchorText: "4.2 每日循环 Daily Loop" },
+  ],
+  missing_total: 3,
+  submitted_total: 18,
+  combo: null,
+  upcoming_deadlines: [
+    { date_ms: Date.now() + 86400000, course: "MHF4U", name: "Chapter 6 Test", category: "Assessment of Learning", is_aol: true, weight: 35 },
+    { date_ms: Date.now() + 3 * 86400000, course: "ENG4U", name: "Essay Final Draft", category: "Assessment of Learning", is_aol: true, weight: 20 },
+    { date_ms: Date.now() + 6 * 86400000, course: "MHF4U", name: "Weekly Practice", category: "Assessment for Learning", is_aol: false },
+  ],
+  notices: [
+    { type: "info", title: "📢 通知", body: "本周四晚 8 点进行选课答疑。" },
+  ],
+};
+
+const GUIDE_ANCHOR_MAP = {
+  "4.8 危机关：复活与翻盘": "#aol-recovery",
+  "4.4 作业关：Rubric 狙击手": "#rubric",
+  "4.2 每日循环 Daily Loop": "#maintain",
+  "4.1 两个快速启动清单（任选其一，从今天开始）": "#onboarding",
+  "七、终极任务": "#future",
+};
+
+const COMBO_MILESTONES = [
+  [40, "全学期连击。这学期你做到了。"],
+  [20, "半学期准时提交，你已经把它变成了习惯。"],
+  [10, "两周连击，系统已经跑起来了。"],
+  [5, "一整周都在节奏上。"],
+  [3, "三天连击，继续压实。"],
+  [1, "今天已经启动。"],
+  [0, "先把今天补上，再重新连击。"],
+];
+
+const state = {
+  data: null,
+  raw: null,
+  deadlines: [],
+  selectedDateKey: "",
+  calendarMonthOffset: 0,
+};
+
+const DEFAULT_FIXTURE_PATH = "/fixtures/chuhe-xiong-qea.json";
+
+function esc(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function formatDateCN(value) {
+  const date = toDate(value);
+  if (!date) return "暂无";
+  return `${date.getMonth() + 1}月${date.getDate()}日`;
+}
+
+function formatDateTimeCN(value) {
+  const date = toDate(value);
+  if (!date) return "暂无";
+  const hh = String(date.getHours()).padStart(2, "0");
+  const mm = String(date.getMinutes()).padStart(2, "0");
+  return `${date.getMonth() + 1}月${date.getDate()}日 ${hh}:${mm}`;
+}
+
+function formatISODate(value) {
+  const date = toDate(value);
+  if (!date) return "";
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function toDate(value) {
+  if (value == null || value === "") return null;
+  if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
+  if (typeof value === "number") {
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const numeric = Number(value);
+  if (!isNaN(numeric) && numeric > 1000000000000) {
+    const d = new Date(numeric);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function courseCode(course) {
+  return String(course || "").trim() || "---";
+}
+
+function clampText(value, maxLen) {
+  const text = String(value || "").trim();
+  if (!text || text.length <= maxLen) return text;
+  return `${text.slice(0, Math.max(1, maxLen - 1))}…`;
+}
+
+function deadlineDisplayType(deadline) {
+  const name = `${deadline?.name || ""} ${deadline?.category || ""}`;
+  if (deadline?.is_aol || /assessment\s+of\s+learning|aol/i.test(name)) return "AoL";
+  if (deadline?.category) return "Coursework";
+  return "";
+}
+
+function deadlinePillLabel(deadline) {
+  const parts = [];
+  const displayType = deadline?.displayType || deadlineDisplayType(deadline);
+  const weight = deadline?.weight;
+  if (displayType) parts.push(displayType);
+  if (weight != null && weight !== "") parts.push(`${weight}%`);
+  return parts.join(" / ");
+}
+
+function deadlineCellLabel(deadlines) {
+  if (!deadlines.length) return "";
+  if (deadlines.length === 1) {
+    const deadline = deadlines[0];
+    if (deadline.is_aol || /aol/i.test(deadline.name || "")) return "AoL";
+    return clampText(courseCode(deadline.course), 8);
+  }
+  return `+${deadlines.length}`;
+}
+
+function describeCourseRisk(course) {
+  if (course.isCurrentSemester === false) {
+    return { tone: "muted", label: "历史学期" };
+  }
+  if ((course.missingCount || 0) >= 5 || (course.completion || 0) < 35) {
+    return { tone: "danger", label: "高风险" };
+  }
+  if ((course.missingCount || 0) > 0 || (course.completion || 0) < 60) {
+    return { tone: "warn", label: "需补救" };
+  }
+  return { tone: "ok", label: "正常推进" };
+}
+
+function comboMessage(streak) {
+  for (const [n, msg] of COMBO_MILESTONES) {
+    if (streak >= n) return msg;
+  }
+  return "";
+}
+
+function computeComboFromSubmissions(submissions, todayStr, semesterStart, semesterEnd) {
+  const today = new Date(`${todayStr}T00:00:00`);
+  const dayMap = {};
+
+  for (const submission of submissions || []) {
+    const date = toDate(submission.submittedAt);
+    if (!date) continue;
+    const key = formatISODate(date);
+    if (!dayMap[key]) dayMap[key] = [];
+    dayMap[key].push({
+      course: submission.course || "",
+      assignmentName: submission.assignmentName || "",
+    });
+  }
+
+  let streak = 0;
+  for (let offset = 0; offset <= 30; offset++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - offset);
+    const key = formatISODate(d);
+    if (dayMap[key]) streak += 1;
+    else if (offset > 0) break;
+  }
+
+  let firstMonth;
+  let lastMonth;
+  const startDate = semesterStart ? new Date(`${semesterStart}T00:00:00`) : null;
+  const endDate = semesterEnd ? new Date(`${semesterEnd}T00:00:00`) : null;
+
+  if (startDate && endDate && !isNaN(startDate) && !isNaN(endDate)) {
+    firstMonth = { year: startDate.getFullYear(), month: startDate.getMonth() + 1 };
+    const cap = endDate < today ? endDate : today;
+    lastMonth = { year: cap.getFullYear(), month: cap.getMonth() + 1 };
+  } else {
+    const previousMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    firstMonth = { year: previousMonth.getFullYear(), month: previousMonth.getMonth() + 1 };
+    lastMonth = { year: today.getFullYear(), month: today.getMonth() + 1 };
+  }
+
+  const months = [];
+  let year = firstMonth.year;
+  let month = firstMonth.month;
+  while (year < lastMonth.year || (year === lastMonth.year && month <= lastMonth.month)) {
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const label = `${month}月`;
+    const days = {};
+    const dayDetails = {};
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const key = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      const current = new Date(year, month - 1, day);
+      if (current > today) {
+        days[key] = "future";
+      } else if (dayMap[key]) {
+        days[key] = "hit";
+        const details = {};
+        for (const item of dayMap[key]) {
+          const c = courseCode(item.course);
+          details[c] = (details[c] || 0) + 1;
+        }
+        dayDetails[key] = details;
+      } else {
+        days[key] = "no_assignment";
+      }
+    }
+
+    months.push({ label, year, month, days, day_details: dayDetails });
+    month += 1;
+    if (month > 12) {
+      month = 1;
+      year += 1;
+    }
+  }
+
+  return { current_streak: streak, today: todayStr, months };
+}
+
+function normalizeApiResponse(raw) {
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  const recentSubmitted = (raw.recentSubmissions || []).map((item) => ({
+    course: item.course || "",
+    assignmentName: item.assignmentName || item.assignmentname || "",
+    submittedAt: item.submittedAt || item.submittedat || "",
+    status: item.status || "",
+    assignmentLink: item.link || "",
+  }));
+
+  const missingItems = (raw.missingItems || []).map((item) => ({
+    course: item.course || "",
+    assignmentName: item.assignmentName || item.assignmentname || "",
+    assignmentLink: item.assignmentLink || item.link || "",
+  }));
+
+  const attentionItems = (raw.attentionItems || []).map((item) => ({
+    type: item.type || "missing",
+    course: item.course || "",
+    assignmentName: item.assignmentName || "",
+    assignmentLink: item.assignmentLink || item.link || "",
+    nature: item.nature || "",
+    score: item.score ?? null,
+    maxScore: item.maxScore ?? null,
+  }));
+
+  const upcomingDeadlines = (raw.upcomingDeadlines || []).map((deadline) => ({
+    ...deadline,
+    displayType: deadlineDisplayType(deadline),
+  }));
+
+  const courseProgress = (raw.courseProgress || []).map((course) => ({
+    course: course.course || "",
+    submittedCount: course.submittedCount || 0,
+    missingCount: course.missingCount || 0,
+    completion: course.completion || 0,
+    current_grade: course.current_grade || null,
+    grade_updated_at: course.grade_updated_at || null,
+    aol_details: (course.aol_details || []).map((detail) => ({
+      name: detail.name || "",
+      score: detail.score ?? 0,
+      max: detail.max ?? 0,
+      category: detail.category || "",
+      weight: detail.weight ?? null,
+    })),
+    aolSubmitted: course.aolSubmitted || 0,
+    aolMissing: course.aolMissing || 0,
+    semester: course.semester || null,
+    sectionNid: course.sectionNid || null,
+    isCurrentSemester: course.isCurrentSemester !== false,
+  }));
+
+  const finalCourseProgress = courseProgress.length
+    ? courseProgress
+    : (raw.courses || []).map((course) => ({
+        course: typeof course === "string" ? course : course.name || "",
+        submittedCount: 0,
+        missingCount: 0,
+        completion: 0,
+        current_grade: null,
+        grade_updated_at: null,
+        aol_details: [],
+        aolSubmitted: 0,
+        aolMissing: 0,
+        semester: null,
+        sectionNid: null,
+        isCurrentSemester: true,
+      }));
+
+  const schoolYear = raw.schoolYear || "";
+  const semesterNum = raw.semesterNum || "";
+  let semLabel = "";
+  if (schoolYear) semLabel += `${schoolYear}学年`;
+  if (semesterNum) semLabel += `${semLabel ? " " : ""}第${semesterNum}学期`;
+
+  const creditsEarned = raw.creditsEarned != null && raw.creditsEarned !== "" ? Number(raw.creditsEarned) : null;
+  const creditsTarget = raw.creditsTarget != null && raw.creditsTarget !== "" ? Number(raw.creditsTarget) : null;
+  const creditsRemaining = creditsEarned != null && creditsTarget != null
+    ? Math.max(creditsTarget - creditsEarned, 0)
+    : null;
+
+  const student = {
+    name: raw.studentName || "",
+    pinyin: raw.studentName || "",
+    grade: null,
+    credits_earned: creditsEarned,
+    credits_remaining: creditsRemaining,
+  };
+
+  const missingTotal = raw.missingTotal ?? 0;
+  const systemInsights = [];
+  if (missingTotal >= 10) {
+    systemInsights.push({ type: "urgent", title: "⚠️ 缺交预警", body: `共 ${missingTotal} 个作业未提交，请优先处理。` });
+  } else if (missingTotal > 0) {
+    systemInsights.push({ type: "warn", title: "🔶 待处理缺交", body: `${missingTotal} 个作业待补交。` });
+  } else {
+    systemInsights.push({ type: "ok", title: "✓ 无缺交", body: "本学期所有作业均已提交，继续保持！" });
+  }
+
+  const worstCourse = finalCourseProgress
+    .filter((course) => course.completion < 50 && course.missingCount > 0)
+    .sort((a, b) => a.completion - b.completion)[0];
+  if (worstCourse) {
+    systemInsights.push({ type: "warn", title: "📉 课程警告", body: `${worstCourse.course} 完成度仅 ${Math.round(worstCourse.completion)}%，需重点关注。` });
+  }
+
+  const osslt = raw.osslt || "";
+  if (osslt) {
+    const isPass = /通过|pass|yes/i.test(osslt);
+    systemInsights.push({ type: isPass ? "ok" : "info", title: "OSSLT", body: osslt });
+  }
+
+  const noticesRaw = raw.noticesRaw || "";
+  const noticesFromRoster = noticesRaw
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => ({ type: "info", title: "📢 通知", body: line }));
+  const noticesFromServer = (raw.notices || []).map((notice) => ({
+    type: "info",
+    title: notice.title || "📢 通知",
+    body: notice.body || notice.content || "",
+  }));
+
+  return {
+    student,
+    semester: {
+      start_date: raw.semesterStart || "",
+      end_date: raw.semesterEnd || "",
+      total_weeks: raw.totalWeeks || null,
+      current_week: raw.currentWeek || null,
+    },
+    semLabel,
+    stage: raw.stage || "在读",
+    course_progress: finalCourseProgress,
+    missing_items: missingItems,
+    attention_items: attentionItems,
+    recent_submitted: recentSubmitted,
+    recommendations: raw.recommendations || [],
+    missing_total: missingTotal,
+    submitted_total: raw.submittedTotal ?? 0,
+    combo: raw.combo || computeComboFromSubmissions(recentSubmitted, todayStr, raw.semesterStart, raw.semesterEnd),
+    upcoming_deadlines: upcomingDeadlines,
+    notices: [...noticesFromServer, ...noticesFromRoster],
+    system_insights: systemInsights,
+    recentWeekLabel: raw.recentWeekLabel || "",
+  };
+}
+
+function getParams() {
+  const params = new URLSearchParams(location.search);
+  const isProductionEntry = location.pathname === "/" || location.pathname === "/index.html";
+  return {
+    tenant: (params.get("t") || "").trim(),
+    student: (params.get("student") || "").trim(),
+    live: isProductionEntry || (params.get("live") || "").trim() === "1",
+    fixture: (params.get("fixture") || "").trim(),
+  };
+}
+
+function showError(message) {
+  document.getElementById("previewLoading").hidden = true;
+  document.getElementById("previewApp").hidden = true;
+  const error = document.getElementById("previewError");
+  error.hidden = false;
+  error.innerHTML = `
+    <div class="error-screen__inner">
+      <div class="loading-screen__eyebrow">PREVIEW LOAD ERROR</div>
+      <div class="error-screen__title">页面未能装载数据</div>
+      <div class="error-screen__body">${esc(message)}</div>
+      <a class="error-screen__link" href="/${location.search}">返回现网版</a>
+    </div>
+  `;
+}
+
+window.addEventListener("error", (event) => {
+  const message = event?.error?.stack || event?.message || "Unknown preview error";
+  showError(message);
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  const reason = event?.reason;
+  const message =
+    reason?.stack ||
+    reason?.message ||
+    (typeof reason === "string" ? reason : JSON.stringify(reason));
+  showError(message || "Unhandled promise rejection");
+});
+
+function setTopLinks() {
+  const query = location.search || "";
+  const dashboardLink = document.getElementById("liveDashboardLink");
+  const isProductionEntry = location.pathname === "/" || location.pathname === "/index.html";
+  dashboardLink.href = isProductionEntry ? `/preview-terminal-static.html${query}` : `/${query}`;
+  dashboardLink.textContent = isProductionEntry ? "查看静态快照" : "查看现网版";
+  document.getElementById("guideLink").href = `/guide.html${query}`;
+}
+
+function buildFocusItems(data) {
+  const items = [];
+  const missingTop = (data.missing_items || []).slice(0, 2).map((item) => ({
+    tone: "danger",
+    badge: "Missing",
+    title: item.assignmentName,
+    meta: `${courseCode(item.course)} · 尽快补交，先提交可评分版本。`,
+    href: item.assignmentLink || "",
+  }));
+
+  const lowScoreTop = (data.attention_items || [])
+    .filter((item) => item.type === "low_score")
+    .slice(0, 2)
+    .map((item) => ({
+      tone: "warn",
+      badge: "Low Score",
+      title: item.assignmentName,
+      meta: `${courseCode(item.course)} · ${item.score ?? "-"} / ${item.maxScore ?? "-"}，建议先看 rubric 再修订。`,
+      href: item.assignmentLink || "",
+    }));
+
+  items.push(...missingTop, ...lowScoreTop);
+
+  if (!items.length) {
+    items.push({
+      tone: "ok",
+      badge: "Clear",
+      title: "当前没有缺交或低分预警",
+      meta: "这时最适合把 upcoming DDL 提前拆成小任务，避免下一次集中爆发。",
+      href: "",
+    });
+  }
+
+  return items.slice(0, 4);
+}
+
+function renderProfile(data) {
+  const profileName = document.getElementById("profileName");
+  const profileMeta = document.getElementById("profileMeta");
+  const profileAvatar = document.getElementById("profileAvatar");
+  const semesterLabel = document.getElementById("semesterLabel");
+  const semesterDates = document.getElementById("semesterDates");
+  const creditNumbers = document.getElementById("creditNumbers");
+  const creditHint = document.getElementById("creditHint");
+  const creditFill = document.getElementById("creditFill");
+  const semesterFill = document.getElementById("semesterFill");
+  const semesterProgressText = document.getElementById("semesterProgressText");
+
+  profileName.textContent = data.student.name || "未命名学生";
+  profileMeta.textContent = `${data.course_progress.length} 门课程`;
+  profileAvatar.textContent = data.student.name || "QEA";
+  semesterLabel.textContent = data.semLabel || "当前学期";
+
+  const endDate = toDate(data.semester.end_date);
+  const now = new Date();
+  let semesterEndHint = "";
+  if (endDate) {
+    const diffDays = Math.ceil((new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()) - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000);
+    semesterEndHint = diffDays >= 0 ? ` · 距离学期结束还有 ${diffDays} 天` : " · 学期已结束";
+  }
+  semesterDates.textContent = `${data.semester.start_date || "待定"} 至 ${data.semester.end_date || "待定"}${semesterEndHint}`;
+
+  const earned = data.student.credits_earned ?? 0;
+  const remaining = data.student.credits_remaining ?? 0;
+  const target = earned + remaining;
+  const creditPct = target > 0 ? (earned / target) * 100 : 0;
+  creditNumbers.textContent = `${earned} / ${target || "?"}`;
+  creditHint.textContent = remaining > 0 ? `距离目标还差 ${remaining} 学分。` : "学分目标已完成或未配置。";
+  creditFill.style.width = `${Math.max(0, Math.min(creditPct, 100))}%`;
+
+  const totalWeeks = data.semester.total_weeks || 0;
+  const currentWeek = data.semester.current_week || 0;
+  const semesterPct = totalWeeks > 0 ? (currentWeek / totalWeeks) * 100 : 0;
+  semesterProgressText.textContent = `${currentWeek || "-"} / ${totalWeeks || "-"}`;
+  semesterFill.style.width = `${Math.max(0, Math.min(semesterPct, 100))}%`;
+}
+
+function renderHero(data) {
+  document.getElementById("heroTitle").textContent = `${data.student.name || "同学"}，先处理最卡分的地方。`;
+  const riskCourse = (data.course_progress || [])
+    .filter((course) => course.isCurrentSemester !== false)
+    .sort((a, b) => {
+      const aRisk = (a.missingCount || 0) * 10 + (100 - (a.completion || 0));
+      const bRisk = (b.missingCount || 0) * 10 + (100 - (b.completion || 0));
+      return bRisk - aRisk;
+    })[0];
+  document.getElementById("heroSubtitle").textContent =
+    data.missing_total > 0
+      ? `当前共有 ${data.missing_total} 个缺交，优先提交可评分版本；${riskCourse ? `${riskCourse.course} 现在最需要补进度。` : "先清理最临近 DDL。"}`
+      : "当前没有缺交压力，可以把注意力转向 upcoming DDL 的提前拆解和高权重项目准备。";
+  const overviewMeta = document.getElementById("mobileTabOverviewMeta");
+  const courseMeta = document.getElementById("mobileTabCourseMeta");
+  const deadlineMeta = document.getElementById("mobileTabDeadlineMeta");
+  if (overviewMeta) overviewMeta.textContent = `${data.missing_total || 0} missing`;
+  if (courseMeta) courseMeta.textContent = `${(data.course_progress || []).length} courses`;
+  if (deadlineMeta) deadlineMeta.textContent = `${(data.upcoming_deadlines || []).length} ddl`;
+}
+
+function renderFocus(data) {
+  const html = buildFocusItems(data)
+    .map((item) => `
+      <article class="focus-item">
+        <span class="focus-item__badge focus-item__badge--${esc(item.tone)}">${esc(item.badge)}</span>
+        <div class="focus-item__content">
+          <div class="focus-item__head">
+            <div class="focus-item__title">${esc(item.title)}</div>
+            ${item.href ? `<a class="focus-item__cta" href="${esc(item.href)}" target="_blank" rel="noopener">前往作业 →</a>` : ""}
+          </div>
+          <div class="focus-item__meta">${esc(item.meta)}</div>
+        </div>
+      </article>
+    `)
+    .join("");
+  document.getElementById("focusList").innerHTML = html;
+}
+
+function buildTerminalRows(items, kind) {
+  if (!items.length) return `<div class="terminal-empty">当前没有${kind === "missing" ? "未交" : kind === "recent" ? "近期提交" : "评分"}记录。</div>`;
+
+  return `
+    <div class="terminal-list">
+      ${items
+        .map((item) => {
+          if (kind === "aol") {
+            const pct = item.max ? Math.round((item.score / item.max) * 100) : null;
+            return `
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">${esc(item.name)}</div>
+                  <div class="terminal-row__sub">${esc(item.category || "成绩条目")}</div>
+                </div>
+                <div class="terminal-row__side">
+                  <div class="terminal-row__score">${esc(item.score)} / ${esc(item.max)}${pct != null ? ` (${pct}%)` : ""}</div>
+                  <div class="terminal-row__status">${item.weight != null ? `权重 ${esc(item.weight)}%` : "无权重信息"}</div>
+                </div>
+              </div>
+            `;
+          }
+
+          if (kind === "missing") {
+            return `
+              <div class="terminal-row">
+                <div class="terminal-row__main">
+                  <div class="terminal-row__title">${esc(item.assignmentName)}</div>
+                  <div class="terminal-row__sub">${esc(courseCode(item.course))}</div>
+                </div>
+                <div class="terminal-row__side">
+                  ${item.assignmentLink ? `<a class="focus-item__cta" href="${esc(item.assignmentLink)}" target="_blank" rel="noopener">前往作业 →</a>` : `<div class="terminal-row__status">暂无链接</div>`}
+                </div>
+              </div>
+            `;
+          }
+
+          return `
+            <div class="terminal-row">
+              <div class="terminal-row__main">
+                <div class="terminal-row__title">${esc(item.assignmentName)}</div>
+                <div class="terminal-row__sub">${esc(courseCode(item.course))} · ${esc(formatDateTimeCN(item.submittedAt))}</div>
+              </div>
+              <div class="terminal-row__side">
+                <div class="terminal-row__score">${esc(item.status || "已提交")}</div>
+              </div>
+            </div>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+function renderCourses(data) {
+  const container = document.getElementById("courseList");
+  const list = (data.course_progress || []).map((course, index) => {
+    const missingItems = (data.missing_items || []).filter((item) => item.course === course.course);
+    const recentItems = (data.recent_submitted || []).filter((item) => item.course === course.course);
+    const semesterChip = course.semester ? `<span class="course-card__chip">${esc(course.semester)}</span>` : "";
+    const risk = describeCourseRisk(course);
+    const gradeText = course.current_grade != null ? `${course.current_grade}%` : "--";
+    const updatedText = course.grade_updated_at ? `更新于 ${formatDateCN(course.grade_updated_at)}` : "暂无总评分";
+    const completion = Math.max(0, Math.min(Number(course.completion) || 0, 100));
+
+    return `
+      <article class="terminal-card terminal-card--${esc(risk.tone)}" data-course-card>
+        <div class="terminal-card__head">
+          <div class="course-card__title-block">
+            <div class="course-card__title">
+              <span class="course-card__code">&gt; ${esc(course.course)}</span>
+            </div>
+            <div class="course-card__chips">
+              ${semesterChip}
+            </div>
+          </div>
+          <div class="course-card__grade">
+            ${esc(gradeText)}
+            <span class="course-card__grade-sub">${esc(updatedText)}</span>
+          </div>
+        </div>
+        <div class="terminal-card__body">
+          <div class="course-card__progress-head">
+            <span>当前进度</span>
+            <div class="course-card__progress-meta">
+              <strong>${esc(completion)}%</strong>
+              <span class="course-card__chip course-card__chip--${esc(risk.tone)}">${esc(risk.label)}</span>
+            </div>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-bar__rail">
+              <div class="progress-bar__fill" style="width:${completion}%"></div>
+            </div>
+          </div>
+          <div class="course-card__stats">
+            <span class="course-card__stat"><strong>${esc(course.submittedCount)}</strong> 已交</span>
+            <span class="course-card__stat"><strong>${esc(course.missingCount)}</strong> 缺交</span>
+            <span class="course-card__stat"><strong>${esc(course.aol_details?.length || 0)}</strong> 已评分</span>
+          </div>
+
+          <div class="terminal-sections">
+            ${buildCourseSection("aol", "AoL 评分详情", course.aol_details || [], buildTerminalRows(course.aol_details || [], "aol"), false)}
+            ${buildCourseSection("missing", "未提交作业", missingItems, buildTerminalRows(missingItems, "missing"), index === 0 && missingItems.length > 0)}
+            ${buildCourseSection("recent", "本周提交记录", recentItems, buildTerminalRows(recentItems, "recent"), false)}
+          </div>
+        </div>
+      </article>
+    `;
+  }).join("");
+
+  container.innerHTML = list || `<div class="terminal-empty">当前没有课程数据。</div>`;
+}
+
+function buildCourseSection(kind, label, items, body, isOpen) {
+  const icon = isOpen ? "[-]" : "[+]";
+  return `
+    <section class="terminal-section ${isOpen ? "is-open" : ""}" data-terminal-section>
+      <button class="terminal-section__toggle" type="button">
+        <span class="terminal-section__toggle-main">
+          <span class="terminal-section__icon">${icon}</span>
+          <span class="terminal-section__label">${esc(label)}</span>
+        </span>
+        <span class="terminal-section__count">${Array.isArray(items) ? items.length : 0}</span>
+      </button>
+      <div class="terminal-section__body">${body}</div>
+    </section>
+  `;
+}
+
+function bindCourseSections() {
+  document.querySelectorAll("[data-terminal-section]").forEach((section) => {
+    const button = section.querySelector(".terminal-section__toggle");
+    const icon = section.querySelector(".terminal-section__icon");
+    button.addEventListener("click", () => {
+      const open = section.classList.toggle("is-open");
+      icon.textContent = open ? "[-]" : "[+]";
+    });
+  });
+}
+
+function renderRecentTable(data) {
+  document.getElementById("recentWeekLabel").textContent = data.recentWeekLabel ? `统计区间 ${data.recentWeekLabel}` : "";
+  const container = document.getElementById("recentTable");
+  const rows = (data.recent_submitted || []).map((item) => `
+    <div class="terminal-table__row">
+      <div class="terminal-table__course">${esc(courseCode(item.course))}</div>
+      <div>${esc(item.assignmentName || "")}</div>
+      <div>${esc(formatDateCN(item.submittedAt))}</div>
+      <div class="terminal-table__status">${esc(item.status || "已提交")}</div>
+    </div>
+  `).join("");
+
+  container.innerHTML = `
+    <div class="terminal-table__head">
+      <div>Course</div>
+      <div>Assignment</div>
+      <div>Date</div>
+      <div>Status</div>
+    </div>
+    ${rows || `<div class="terminal-table__row"><div class="terminal-empty">暂无近期提交记录。</div></div>`}
+  `;
+}
+
+function renderAlerts(data) {
+  const container = document.getElementById("alertList");
+  const query = location.search || "";
+  const guideItems = (data.recommendations || []).map((item) => {
+    const anchor = GUIDE_ANCHOR_MAP[item.anchorText] || "";
+    return `
+      <a class="alert-guide-list__link" href="/guide.html${query}${anchor}">
+        <span class="alert-guide-list__title">${esc(item.title || "阅读建议")}</span>
+        <span class="alert-guide-list__meta">${esc(item.anchorText || "前往对应章节")}</span>
+      </a>
+    `;
+  }).join("");
+  const guideCards = guideItems ? `
+    <article class="alert-card alert-card--guide-group">
+      <span class="alert-card__tag alert-card__tag--guide">guide</span>
+      <div class="alert-card__title">通关指南推荐</div>
+      <div class="alert-guide-list">${guideItems}</div>
+    </article>
+  ` : "";
+  const noticeCards = (data.notices || []).map((alert) => `
+    <article class="alert-card">
+      <span class="alert-card__tag alert-card__tag--${esc(alert.type || "info")}">notice</span>
+      <div class="focus-item__title">${esc(alert.title || "通知")}</div>
+      <div class="alert-card__body">${esc(alert.body || "")}</div>
+    </article>
+  `).join("");
+  container.innerHTML = guideCards || noticeCards
+    ? `${guideCards}${noticeCards}`
+    : `<div class="notice-empty">暂无可推送的通关指南或老师通知。</div>`;
+}
+
+function buildCalendarDeadlineMap(deadlines) {
+  const map = new Map();
+  for (const deadline of deadlines || []) {
+    const key = formatISODate(deadline.date_ms);
+    if (!key) continue;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(deadline);
+  }
+  return map;
+}
+
+function renderCalendar() {
+  const label = document.getElementById("calendarLabel");
+  const grid = document.getElementById("calendarGrid");
+  const now = new Date();
+  const monthDate = new Date(now.getFullYear(), now.getMonth() + state.calendarMonthOffset, 1);
+  const year = monthDate.getFullYear();
+  const month = monthDate.getMonth();
+  const todayKey = formatISODate(now);
+  const deadlineMap = buildCalendarDeadlineMap(state.deadlines);
+  const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  label.textContent = `${year}.${String(month + 1).padStart(2, "0")}`;
+
+  const items = weekdays.map((day) => `<div class="calendar-grid__weekday">${day}</div>`);
+
+  for (let i = 0; i < firstDay; i++) {
+    items.push(`<div class="calendar-day calendar-day--empty"></div>`);
+  }
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const deadlines = deadlineMap.get(key) || [];
+    const selected = state.selectedDateKey === key;
+    const classes = [
+      "calendar-day",
+      key === todayKey ? "calendar-day--today" : "",
+      deadlines.length ? "calendar-day--has-event" : "",
+      selected ? "calendar-day--selected" : "",
+    ].filter(Boolean).join(" ");
+    items.push(`
+      <button class="${classes}" type="button" data-calendar-day="${key}">
+        <div class="calendar-day__head">
+          <div class="calendar-day__number">${day}</div>
+        </div>
+        <div class="calendar-day__dots">
+          ${deadlines.slice(0, 3).map((deadline) => `<span class="calendar-day__dot ${deadline.is_aol ? "calendar-day__dot--aol" : ""}"></span>`).join("")}
+        </div>
+        ${deadlines.length ? `
+          <div class="calendar-day__tooltip">
+            ${deadlines.map((deadline) => `
+              <article class="calendar-tooltip__item">
+                <div class="calendar-tooltip__title">${esc(deadline.name || "")}</div>
+                <div class="calendar-tooltip__meta">${esc(courseCode(deadline.course))} · ${esc(formatDateTimeCN(deadline.date_ms))}</div>
+                ${deadlinePillLabel(deadline) ? `<span class="calendar-tooltip__pill">${esc(deadlinePillLabel(deadline))}</span>` : ""}
+              </article>
+            `).join("")}
+          </div>
+        ` : ""}
+      </button>
+    `);
+  }
+
+  grid.innerHTML = items.join("");
+
+  if (!state.selectedDateKey) {
+    const firstDeadline = state.deadlines[0];
+    state.selectedDateKey = firstDeadline ? formatISODate(firstDeadline.date_ms) : todayKey;
+  }
+
+  grid.querySelectorAll("[data-calendar-day]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedDateKey = button.getAttribute("data-calendar-day") || "";
+      renderCalendar();
+    });
+  });
+}
+
+function bindCalendarNav() {
+  document.getElementById("calendarPrev").addEventListener("click", () => {
+    state.calendarMonthOffset -= 1;
+    renderCalendar();
+  });
+  document.getElementById("calendarNext").addEventListener("click", () => {
+    state.calendarMonthOffset += 1;
+    renderCalendar();
+  });
+}
+
+function renderUpcomingList() {
+  const container = document.getElementById("upcomingList");
+  const items = (state.deadlines || []).slice(0, 3);
+  if (!container) return;
+  container.innerHTML = items.length
+    ? items.map((item) => `
+      <article class="upcoming-item">
+        <div class="upcoming-item__date">${esc(formatDateCN(item.date_ms))}</div>
+        <div>
+          <div class="upcoming-item__title">${esc(item.name || "")}</div>
+          <div class="upcoming-item__meta">${esc(courseCode(item.course))} · ${esc(item.category || "DDL")}</div>
+          ${deadlinePillLabel(item) ? `<span class="upcoming-item__pill">${esc(deadlinePillLabel(item))}</span>` : ""}
+        </div>
+      </article>
+    `).join("")
+    : `<div class="terminal-empty">暂无 upcoming 作业。</div>`;
+}
+
+function renderCombo(data) {
+  const combo = data.combo || computeComboFromSubmissions(data.recent_submitted || [], new Date().toISOString().slice(0, 10), data.semester.start_date, data.semester.end_date);
+  const months = Array.isArray(combo.months) ? combo.months : [];
+  const cells = [];
+
+  for (let i = months.length - 1; i >= 0; i--) {
+    const month = months[i];
+    const entries = Object.entries(month.days || {});
+    for (let j = entries.length - 1; j >= 0; j--) {
+      const [dateKey, status] = entries[j];
+      const detail = month.day_details?.[dateKey];
+      const tip = detail
+        ? Object.entries(detail).map(([course, count]) => `${course}: ${count}`).join(" / ")
+        : dateKey;
+      cells.push({ status, tip: `${dateKey}${detail ? ` · ${tip}` : ""}` });
+      if (cells.length >= 28) break;
+    }
+    if (cells.length >= 28) break;
+  }
+
+  while (cells.length < 28) {
+    cells.push({ status: "empty", tip: "" });
+  }
+
+  document.getElementById("streakCount").textContent = `${combo.current_streak || 0} days`;
+  document.getElementById("streakMessage").textContent = comboMessage(combo.current_streak || 0);
+  document.getElementById("comboGrid").innerHTML = cells
+    .reverse()
+    .map((cell) => {
+      const status = cell.status === "no_assignment" ? "no_assignment" : (cell.status || "empty");
+      return `
+      <div class="combo-cell combo-cell--${esc(status)}">
+        ${cell.tip ? `<span class="combo-cell__tip">${esc(cell.tip)}</span>` : ""}
+      </div>
+    `;
+    })
+    .join("");
+}
+
+function maybeShowNotices(data, params) {
+  const notices = data.notices || [];
+  if (!notices.length) return;
+
+  const key = `qea__preview_notice_seen__${params.tenant || "mock"}__${params.student || "mock"}`;
+  if (localStorage.getItem(key) === "1") return;
+
+  const modal = document.getElementById("noticeModal");
+  const list = document.getElementById("noticeModalList");
+  list.innerHTML = notices
+    .map((alert) => `
+      <div class="notice-modal__item">
+        <div class="focus-item__title">${esc(alert.title || "通知")}</div>
+        <div class="alert-card__body">${esc(alert.body || "")}</div>
+      </div>
+    `)
+    .join("");
+
+  const close = () => {
+    localStorage.setItem(key, "1");
+    modal.hidden = true;
+  };
+
+  modal.hidden = false;
+  document.getElementById("noticeModalButton").onclick = close;
+  modal.querySelectorAll("[data-close-notice]").forEach((node) => {
+    node.onclick = close;
+  });
+}
+
+function renderAll(data, raw, params) {
+  state.data = data;
+  state.raw = raw;
+  state.deadlines = (data.upcoming_deadlines || []).slice().sort((a, b) => (a.date_ms || 0) - (b.date_ms || 0));
+  state.selectedDateKey = state.deadlines[0] ? formatISODate(state.deadlines[0].date_ms) : formatISODate(new Date());
+  const now = new Date();
+  if (state.deadlines[0]) {
+    const firstDeadline = toDate(state.deadlines[0].date_ms);
+    state.calendarMonthOffset = firstDeadline
+      ? (firstDeadline.getFullYear() - now.getFullYear()) * 12 + (firstDeadline.getMonth() - now.getMonth())
+      : 0;
+  } else {
+    state.calendarMonthOffset = 0;
+  }
+
+  renderProfile(data);
+  renderHero(data);
+  renderFocus(data);
+  renderCourses(data);
+  bindCourseSections();
+  renderRecentTable(data);
+  renderAlerts(data);
+  renderCombo(data);
+  renderUpcomingList();
+  renderCalendar();
+  maybeShowNotices(data, params);
+}
+
+function lsGet(key, ttl) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    if (Date.now() - (parsed.ts || 0) > ttl) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    return parsed.data || null;
+  } catch {
+    return null;
+  }
+}
+
+function lsSet(key, data) {
+  try {
+    localStorage.setItem(key, JSON.stringify({ data, ts: Date.now() }));
+  } catch {}
+}
+
+async function loadDashboardData(params) {
+  const ttl = 25 * 60 * 1000;
+  const cacheKey = `qea__preview__${params.tenant || "mock"}__${params.student || "mock"}`;
+  const cached = lsGet(cacheKey, ttl);
+  if (cached) {
+    renderAll(normalizeApiResponse(cached), cached, params);
+    document.getElementById("previewLoading").hidden = true;
+    document.getElementById("previewApp").hidden = false;
+    fetch(`/api/dashboard?t=${encodeURIComponent(params.tenant)}&student=${encodeURIComponent(params.student)}`)
+      .then((resp) => (resp.ok ? resp.json() : null))
+      .then((data) => { if (data) lsSet(cacheKey, data); })
+      .catch(() => {});
+    return;
+  }
+
+  const resp = await fetch(`/api/dashboard?t=${encodeURIComponent(params.tenant)}&student=${encodeURIComponent(params.student)}`);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const raw = await resp.json();
+  lsSet(cacheKey, raw);
+  renderAll(normalizeApiResponse(raw), raw, params);
+  document.getElementById("previewLoading").hidden = true;
+  document.getElementById("previewApp").hidden = false;
+}
+
+async function loadFixtureData(params) {
+  const fixturePath = params.fixture || DEFAULT_FIXTURE_PATH;
+  const resp = await fetch(fixturePath, { cache: "no-store" });
+  if (!resp.ok) throw new Error(`Fixture HTTP ${resp.status}`);
+  const raw = await resp.json();
+  renderAll(normalizeApiResponse(raw), raw, params);
+  document.getElementById("previewLoading").hidden = true;
+  document.getElementById("previewApp").hidden = false;
+}
+
+function renderMockPreview() {
+  const data = PREVIEW_MOCK_DATA.combo
+    ? PREVIEW_MOCK_DATA
+    : {
+        ...PREVIEW_MOCK_DATA,
+        combo: computeComboFromSubmissions(
+          PREVIEW_MOCK_DATA.recent_submitted,
+          new Date().toISOString().slice(0, 10),
+          PREVIEW_MOCK_DATA.semester.start_date,
+          PREVIEW_MOCK_DATA.semester.end_date
+        ),
+      };
+  renderAll(data, data, { tenant: "", student: "" });
+  document.getElementById("previewLoading").hidden = true;
+  document.getElementById("previewApp").hidden = false;
+}
+
+(function init() {
+  setTopLinks();
+  bindCalendarNav();
+
+  const params = getParams();
+  if (!params.live) {
+    loadFixtureData(params).catch((error) => {
+      console.warn("[preview-terminal] fixture load failed, fallback to mock:", error);
+      renderMockPreview();
+    });
+    return;
+  }
+
+  loadDashboardData(params).catch((error) => {
+    console.warn("[preview-terminal] API failed, fallback to mock:", error);
+    renderMockPreview();
+  });
+})();
+
+</script>
+  </body>
+</html>

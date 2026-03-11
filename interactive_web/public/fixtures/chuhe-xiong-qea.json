@@ -1,0 +1,472 @@
+{
+  "osslt": "",
+  "tenant": "qea",
+  "courses": [
+    "BOH4M",
+    "CIA4U",
+    "MDM4U"
+  ],
+  "_cachedAt": 1773209728677,
+  "noticesRaw": "",
+  "schoolYear": "",
+  "totalWeeks": 8,
+  "currentWeek": 2,
+  "semesterEnd": "2026-04-24",
+  "semesterNum": "",
+  "studentName": "Chuhe Xiong",
+  "missingItems": [
+    {
+      "course": "BOH4M",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8274929045",
+      "assignmentName": "Unit 1 - Lesson 2"
+    },
+    {
+      "course": "BOH4M",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8274929141",
+      "assignmentName": "Unit 1 - KWL Dropbox"
+    },
+    {
+      "course": "CIA4U",
+      "nature": "🔥 极其重要",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8274861225",
+      "assignmentName": "Unit 1 - Lesson 2"
+    },
+    {
+      "course": "CIA4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8274861214",
+      "assignmentName": "Unit 1 - Lesson 1"
+    },
+    {
+      "course": "BOH4M",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8274928986",
+      "assignmentName": "My Goals For BOH4M"
+    },
+    {
+      "course": "BOH4M",
+      "nature": "🔥 极其重要",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8274929008",
+      "assignmentName": "Unit 1 - Assignment 1 (AOL)"
+    },
+    {
+      "course": "CIA4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8277994869",
+      "assignmentName": "In-text Citation Practice"
+    },
+    {
+      "course": "BOH4M",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8274929037",
+      "assignmentName": "Unit 1 - Lesson 1"
+    },
+    {
+      "course": "BOH4M",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8274929064",
+      "assignmentName": "Unit 1 - Lesson 3"
+    },
+    {
+      "course": "BOH4M",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8274929088",
+      "assignmentName": "Unit 1 - Lesson 4"
+    },
+    {
+      "course": "MDM4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8236708842",
+      "assignmentName": "Week 8 Learning Log"
+    },
+    {
+      "course": "MDM4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8255679033",
+      "assignmentName": "Unit 7 Lesson 4 Homework Questions"
+    },
+    {
+      "course": "MDM4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8255683134",
+      "assignmentName": "Wednesday, February 11th Exit Card"
+    },
+    {
+      "course": "MDM4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8249907555",
+      "assignmentName": "Monday, February 9th Exit Card"
+    },
+    {
+      "course": "MDM4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8236707790",
+      "assignmentName": "Week 4 Learning Log"
+    },
+    {
+      "course": "MDM4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8252033724",
+      "assignmentName": "Tuesday, February 10th Exit Card"
+    },
+    {
+      "course": "MDM4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8270710796",
+      "assignmentName": "Unit 8 Lesson 4 Homework [Assessment FOR Learning]"
+    },
+    {
+      "course": "MDM4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8236708085",
+      "assignmentName": "Week 5 Learning Log"
+    },
+    {
+      "course": "MDM4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8255681305",
+      "assignmentName": "Unit 7 Lesson 5 Homework Questions"
+    },
+    {
+      "course": "MDM4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8236708663",
+      "assignmentName": "Week 7 Learning Log"
+    },
+    {
+      "course": "MDM4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8255683746",
+      "assignmentName": "Thursday, February 12th Exit Card"
+    },
+    {
+      "course": "MDM4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8248934633",
+      "assignmentName": "Saturday, February 7th Exit Card"
+    },
+    {
+      "course": "MDM4U",
+      "nature": "🔥 极其重要",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8173243876",
+      "assignmentName": "Unit 7 Project 2 [Assessment OF Learning]"
+    },
+    {
+      "course": "MDM4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8193397810",
+      "assignmentName": "Midterm Student-Teacher Conference [Assessment OF Learning]"
+    },
+    {
+      "course": "CIA4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8274861248",
+      "assignmentName": "Unit 1 - Lesson 4"
+    }
+  ],
+  "missingTotal": 25,
+  "creditsEarned": "",
+  "creditsTarget": "",
+  "semesterStart": "2026-03-02",
+  "attentionItems": [
+    {
+      "type": "missing",
+      "course": "CIA4U",
+      "nature": "🔥 极其重要",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8274861225",
+      "assignmentName": "Unit 1 - Lesson 2"
+    },
+    {
+      "type": "missing",
+      "course": "BOH4M",
+      "nature": "🔥 极其重要",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8274929008",
+      "assignmentName": "Unit 1 - Assignment 1 (AOL)"
+    },
+    {
+      "type": "missing",
+      "course": "MDM4U",
+      "nature": "🔥 极其重要",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8173243876",
+      "assignmentName": "Unit 7 Project 2 [Assessment OF Learning]"
+    },
+    {
+      "type": "missing",
+      "course": "BOH4M",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8274929045",
+      "assignmentName": "Unit 1 - Lesson 2"
+    },
+    {
+      "type": "missing",
+      "course": "BOH4M",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8274929141",
+      "assignmentName": "Unit 1 - KWL Dropbox"
+    },
+    {
+      "type": "missing",
+      "course": "CIA4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8274861214",
+      "assignmentName": "Unit 1 - Lesson 1"
+    },
+    {
+      "type": "missing",
+      "course": "BOH4M",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8274928986",
+      "assignmentName": "My Goals For BOH4M"
+    },
+    {
+      "type": "missing",
+      "course": "CIA4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8277994869",
+      "assignmentName": "In-text Citation Practice"
+    },
+    {
+      "type": "missing",
+      "course": "BOH4M",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8274929037",
+      "assignmentName": "Unit 1 - Lesson 1"
+    },
+    {
+      "type": "missing",
+      "course": "BOH4M",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8274929064",
+      "assignmentName": "Unit 1 - Lesson 3"
+    },
+    {
+      "type": "missing",
+      "course": "BOH4M",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8274929088",
+      "assignmentName": "Unit 1 - Lesson 4"
+    },
+    {
+      "type": "missing",
+      "course": "MDM4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8236708842",
+      "assignmentName": "Week 8 Learning Log"
+    },
+    {
+      "type": "missing",
+      "course": "MDM4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8255679033",
+      "assignmentName": "Unit 7 Lesson 4 Homework Questions"
+    },
+    {
+      "type": "missing",
+      "course": "MDM4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8255683134",
+      "assignmentName": "Wednesday, February 11th Exit Card"
+    },
+    {
+      "type": "missing",
+      "course": "MDM4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8249907555",
+      "assignmentName": "Monday, February 9th Exit Card"
+    },
+    {
+      "type": "missing",
+      "course": "MDM4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8236707790",
+      "assignmentName": "Week 4 Learning Log"
+    },
+    {
+      "type": "missing",
+      "course": "MDM4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8252033724",
+      "assignmentName": "Tuesday, February 10th Exit Card"
+    },
+    {
+      "type": "missing",
+      "course": "MDM4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8270710796",
+      "assignmentName": "Unit 8 Lesson 4 Homework [Assessment FOR Learning]"
+    },
+    {
+      "type": "missing",
+      "course": "MDM4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8236708085",
+      "assignmentName": "Week 5 Learning Log"
+    },
+    {
+      "type": "missing",
+      "course": "MDM4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8255681305",
+      "assignmentName": "Unit 7 Lesson 5 Homework Questions"
+    },
+    {
+      "type": "missing",
+      "course": "MDM4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8236708663",
+      "assignmentName": "Week 7 Learning Log"
+    },
+    {
+      "type": "missing",
+      "course": "MDM4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8255683746",
+      "assignmentName": "Thursday, February 12th Exit Card"
+    },
+    {
+      "type": "missing",
+      "course": "MDM4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8248934633",
+      "assignmentName": "Saturday, February 7th Exit Card"
+    },
+    {
+      "type": "missing",
+      "course": "MDM4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8193397810",
+      "assignmentName": "Midterm Student-Teacher Conference [Assessment OF Learning]"
+    },
+    {
+      "type": "missing",
+      "course": "CIA4U",
+      "nature": "✅ 必交",
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8274861248",
+      "assignmentName": "Unit 1 - Lesson 4"
+    },
+    {
+      "type": "low_score",
+      "score": 30.75,
+      "course": "MDM4U",
+      "nature": "🔥 极其重要",
+      "maxScore": 54,
+      "assignmentLink": "https://queenscanada.schoology.com/assignment/8173243699",
+      "assignmentName": "Unit 3 Combinations Test [Assessment OF Learning]"
+    }
+  ],
+  "courseProgress": [
+    {
+      "course": "BOH4M",
+      "aolMissing": 0,
+      "completion": 22.2,
+      "sectionNid": "8274808548",
+      "aolSubmitted": 0,
+      "missingCount": 7,
+      "submittedCount": 2,
+      "isCurrentSemester": true
+    },
+    {
+      "course": "CIA4U",
+      "aolMissing": 0,
+      "completion": 33.3,
+      "sectionNid": "8274808485",
+      "aolSubmitted": 0,
+      "missingCount": 4,
+      "submittedCount": 2,
+      "isCurrentSemester": true
+    },
+    {
+      "course": "MDM4U",
+      "aolMissing": 0,
+      "completion": 0,
+      "sectionNid": "8173239673",
+      "aol_details": [
+        {
+          "max": 25,
+          "name": "Unit 1 Assignment [Assessment OF Learning]",
+          "score": 19.9,
+          "weight": "5"
+        },
+        {
+          "max": 51,
+          "name": "Unit 1 Test [Assessment OF Learning]",
+          "score": 36,
+          "weight": "7"
+        },
+        {
+          "max": 76,
+          "name": "Unit 2 Test [Assessment OF Learning]",
+          "score": 58,
+          "weight": "7"
+        },
+        {
+          "max": 54,
+          "name": "Unit 3 Combinations Test [Assessment OF Learning]",
+          "score": 30.8,
+          "weight": "7"
+        },
+        {
+          "max": 56,
+          "name": "Unit 4 Probability Distribution Test  [Assessment OF Learning]",
+          "score": 35.8,
+          "weight": "7"
+        },
+        {
+          "max": 52,
+          "name": "Unit 4 Assignment [Assessment OF Learning]",
+          "score": 33,
+          "weight": "5"
+        }
+      ],
+      "aolSubmitted": 0,
+      "missingCount": 0,
+      "current_grade": 69.8,
+      "submittedCount": 0,
+      "grade_updated_at": 1773209728449,
+      "isCurrentSemester": false
+    }
+  ],
+  "submittedTotal": 81,
+  "missingByCourse": {
+    "BOH4M": 7,
+    "CIA4U": 4,
+    "MDM4U": 14
+  },
+  "recentWeekLabel": "3/9-3/15",
+  "recommendations": [
+    {
+      "title": "优先处理缺交：复活与翻盘",
+      "anchorText": "4.8 危机关：复活与翻盘"
+    },
+    {
+      "title": "用 Rubric 直接提分",
+      "anchorText": "4.4 作业关：Rubric 狙击手"
+    },
+    {
+      "title": "建立每日循环，止住连锁迟交",
+      "anchorText": "4.2 每日循环 Daily Loop"
+    }
+  ],
+  "recentSubmissions": [
+    {
+      "link": "https://queenscanada.schoology.com/assignment/8274861239",
+      "course": "CIA4U",
+      "nature": "✅ 必交",
+      "status": "Submitted",
+      "submittedAt": "2026/03/09 15:45",
+      "assignmentName": "Unit 1 - Lesson 3"
+    }
+  ],
+  "upcomingDeadlines": [
+    {
+      "name": "Unit 1 - Assignment 1 (AOL)",
+      "course": "BOH4M",
+      "is_aol": false,
+      "weight": "4",
+      "date_ms": 1773316740000,
+      "category": "U1A1 (4%)"
+    }
+  ]
+}

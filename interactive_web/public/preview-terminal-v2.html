@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>通关指南</title>
+    <link rel="stylesheet" href="/preview-terminal.css?v=20260311e" />
+  </head>
+  <body>
+    <div id="previewLoading" class="loading-screen">
+      <div class="loading-screen__inner">
+        <div class="loading-screen__eyebrow">QEA / STUDENT TERMINAL</div>
+        <div class="loading-screen__title">正在装载学生终端视图</div>
+        <div class="loading-screen__line"><span></span></div>
+      </div>
+    </div>
+
+    <div id="noticeModal" class="notice-modal" hidden>
+      <div class="notice-modal__backdrop" data-close-notice></div>
+      <div class="notice-modal__panel">
+        <div class="notice-modal__eyebrow">SYSTEM NOTICE</div>
+        <h2 class="notice-modal__title">开屏通知</h2>
+        <div id="noticeModalList" class="notice-modal__list"></div>
+        <button id="noticeModalButton" class="notice-modal__button" type="button">已读，进入预览</button>
+      </div>
+    </div>
+
+    <div id="previewError" class="error-screen" hidden></div>
+
+    <div id="previewApp" class="shell" hidden>
+      <header class="shell__topbar">
+        <div class="shell__brand">
+          <span class="shell__brand-mark">TG</span>
+          <div>
+            <div class="shell__brand-name">通关指南</div>
+            <div class="shell__brand-sub">student-terminal-dashboard x interactive_web</div>
+          </div>
+        </div>
+        <div class="shell__topbar-actions">
+          <a id="liveDashboardLink" class="shell__link" href="/">查看现网版</a>
+          <a id="guideLink" class="shell__link shell__link--strong" href="/guide.html">通关指南全文</a>
+        </div>
+      </header>
+
+      <input id="mobileTabOverview" class="mobile-tab-input" type="radio" name="mobileTab" checked />
+      <input id="mobileTabCourse" class="mobile-tab-input" type="radio" name="mobileTab" />
+      <input id="mobileTabDeadline" class="mobile-tab-input" type="radio" name="mobileTab" />
+      <div class="mobile-tabs">
+        <label class="mobile-tabs__item" for="mobileTabOverview">
+          <span class="mobile-tabs__title">总览</span>
+          <span id="mobileTabOverviewMeta" class="mobile-tabs__meta">Profile</span>
+        </label>
+        <label class="mobile-tabs__item" for="mobileTabCourse">
+          <span class="mobile-tabs__title">课程</span>
+          <span id="mobileTabCourseMeta" class="mobile-tabs__meta">Courses</span>
+        </label>
+        <label class="mobile-tabs__item" for="mobileTabDeadline">
+          <span class="mobile-tabs__title">DDL</span>
+          <span id="mobileTabDeadlineMeta" class="mobile-tabs__meta">Deadlines</span>
+        </label>
+      </div>
+
+      <main class="shell__body">
+        <aside class="rail rail--profile">
+          <section class="panel panel--profile">
+            <div class="panel__eyebrow">Student Profile</div>
+            <div id="profileAvatar" class="profile-avatar"></div>
+            <div id="profileName" class="profile-name"></div>
+            <div id="profileMeta" class="profile-meta"></div>
+            <div class="meter">
+              <div class="meter__label">
+                <span>Credit Progress</span>
+                <span id="creditNumbers">0 / 0</span>
+              </div>
+              <div class="meter__track"><div id="creditFill" class="meter__fill"></div></div>
+              <div id="creditHint" class="meter__hint"></div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel__eyebrow">Semester</div>
+            <div id="semesterLabel" class="stat stat--hero"></div>
+            <div class="meter">
+              <div class="meter__label">
+                <span>Week Progress</span>
+                <span id="semesterProgressText">0 / 0</span>
+              </div>
+              <div class="meter__track"><div id="semesterFill" class="meter__fill meter__fill--accent"></div></div>
+            </div>
+            <div id="semesterDates" class="panel__small"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel__eyebrow">Activity Matrix</div>
+            <div class="streak-header">
+              <span>Current Streak</span>
+              <strong id="streakCount">0 days</strong>
+            </div>
+            <div id="streakMessage" class="panel__small"></div>
+            <div id="comboGrid" class="combo-grid"></div>
+            <div class="combo-legend">
+              <span><i class="combo-legend__dot combo-legend__dot--hit"></i> 提交</span>
+              <span><i class="combo-legend__dot combo-legend__dot--idle"></i> 无作业</span>
+              <span><i class="combo-legend__dot combo-legend__dot--future"></i> 未来</span>
+            </div>
+          </section>
+        </aside>
+
+        <section class="main-column">
+          <section class="hero">
+            <div>
+              <div class="hero__eyebrow">Mission Control</div>
+              <h1 id="heroTitle" class="hero__title"></h1>
+              <p id="heroSubtitle" class="hero__subtitle"></p>
+            </div>
+          </section>
+
+          <section class="panel panel--focus">
+            <div class="panel__eyebrow">Today Focus</div>
+            <div id="focusList" class="focus-list"></div>
+          </section>
+
+          <section class="panel">
+            <div class="section-head">
+              <div>
+                <div class="panel__eyebrow">Course Progress</div>
+                <h2 class="section-head__title">课程终端视图</h2>
+              </div>
+            </div>
+            <div id="courseList" class="course-list"></div>
+          </section>
+
+          <section class="panel">
+            <div class="section-head">
+              <div>
+                <div class="panel__eyebrow">Recent Submissions</div>
+                <h2 class="section-head__title">近期提交记录</h2>
+              </div>
+              <div id="recentWeekLabel" class="section-head__meta"></div>
+            </div>
+            <div id="recentTable" class="terminal-table"></div>
+          </section>
+        </section>
+
+        <aside class="rail rail--sidebar">
+          <section class="panel">
+            <div class="section-head">
+              <div>
+                <div class="panel__eyebrow">Notice Feed</div>
+                <h2 class="section-head__title">通知与提醒</h2>
+              </div>
+            </div>
+            <div id="alertList" class="stack-list"></div>
+          </section>
+
+          <section class="panel">
+            <div class="section-head">
+              <div>
+                <div class="panel__eyebrow">Deadline Calendar</div>
+                <h2 class="section-head__title">DDL 月历</h2>
+              </div>
+              <div class="calendar-nav">
+                <button id="calendarPrev" class="calendar-nav__btn" type="button" aria-label="上个月">‹</button>
+                <div id="calendarLabel" class="calendar-nav__label"></div>
+                <button id="calendarNext" class="calendar-nav__btn" type="button" aria-label="下个月">›</button>
+              </div>
+            </div>
+            <div id="upcomingList" class="upcoming-list"></div>
+            <div class="panel__divider"></div>
+            <div id="calendarGrid" class="calendar-grid"></div>
+          </section>
+
+        </aside>
+      </main>
+    </div>
+
+    <script src="/preview-terminal.js?v=20260311e"></script>
+  </body>
+</html>

@@ -10,7 +10,12 @@ let pgPool = null;
 try {
   if (process.env.DATABASE_URL) {
     const { Pool } = require("pg");
-    pgPool = new Pool({ connectionString: process.env.DATABASE_URL });
+    const poolOptions = { connectionString: process.env.DATABASE_URL };
+    // Render/managed PostgreSQL commonly requires SSL while using a public URL.
+    if (/\bsslmode=require\b/i.test(process.env.DATABASE_URL) || (process.env.PGSSLMODE || "").trim() === "require") {
+      poolOptions.ssl = { rejectUnauthorized: false };
+    }
+    pgPool = new Pool(poolOptions);
     console.log("[pg] pool initialized");
   }
 } catch (e) {
@@ -596,8 +601,6 @@ async function handleApiDashboard(req, res, parsedUrl) {
 
   if (!tenantConf) return json(res, 400, { error: `unknown tenant key: ${tenantKey}` });
 
-  const token = await feishuGetTenantAccessToken(tenantKey, tenantConf);
-
   // 身份：MVP 先支持 mock（从 query/student 取）；生产必须改成飞书免登/OAuth 后写 session
   let studentName = "";
   if (AUTH_MODE === "mock") {
@@ -631,6 +634,8 @@ async function handleApiDashboard(req, res, parsedUrl) {
       return json(res, 200, hit);
     }
   }
+
+  const token = await feishuGetTenantAccessToken(tenantKey, tenantConf);
 
   // Speed strategy:
   // - roster: filter by studentName (text field)
@@ -728,7 +733,7 @@ async function handleApiDashboard(req, res, parsedUrl) {
 function serveStatic(req, res, parsedUrl) {
   const publicDir = path.join(__dirname, "public");
   let pathname = parsedUrl.pathname || "/";
-  if (pathname === "/") pathname = "/index.html";
+  if (pathname === "/" || pathname === "/index.html") pathname = "/preview-terminal-v2.html";
   const filePath = path.normalize(path.join(publicDir, pathname));
   if (!filePath.startsWith(publicDir)) return text(res, 403, "forbidden");
 
