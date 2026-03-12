@@ -761,7 +761,7 @@ button {
   background: rgba(26, 25, 22, 0.035);
 }
 
-.terminal-section.is-open .terminal-section__body {
+.terminal-section.is-open > .terminal-section__body {
   display: block;
 }
 
@@ -2294,6 +2294,37 @@ function buildFocusItems(data) {
   return items.slice(0, 4);
 }
 
+function compactSemesterLabel(label, fallback = "当前学期") {
+  const text = String(label || "").trim();
+  if (!text) return fallback;
+  const cnMatch = text.match(/第\s*(\d+)\s*学期/);
+  if (cnMatch) return `S${cnMatch[1]}`;
+  const enMatch = text.match(/\bS(?:emester)?\s*(\d+)\b/i);
+  if (enMatch) return `S${enMatch[1]}`;
+  if (text.length <= 12) return text;
+  return fallback;
+}
+
+function missingSummaryBySemester(data) {
+  const grouped = new Map();
+  for (const course of data.course_progress || []) {
+    const missingCount = Number(course.missingCount) || 0;
+    if (!missingCount) continue;
+    const label = course.isCurrentSemester !== false
+      ? compactSemesterLabel(data.semLabel, "当前学期")
+      : compactSemesterLabel(course.semester, "历史学期");
+    grouped.set(label, (grouped.get(label) || 0) + missingCount);
+  }
+  return [...grouped.entries()]
+    .sort((a, b) => {
+      const aCurrent = a[0] === compactSemesterLabel(data.semLabel, "当前学期") ? -1 : 0;
+      const bCurrent = b[0] === compactSemesterLabel(data.semLabel, "当前学期") ? -1 : 0;
+      if (aCurrent !== bCurrent) return aCurrent - bCurrent;
+      return a[0].localeCompare(b[0], "zh-CN");
+    })
+    .map(([label, count]) => `${label} 缺交 ${count} 个`);
+}
+
 function renderProfile(data) {
   const profileName = document.getElementById("profileName");
   const profileMeta = document.getElementById("profileMeta");
@@ -2344,9 +2375,10 @@ function renderHero(data) {
       const bRisk = (b.missingCount || 0) * 10 + (100 - (b.completion || 0));
       return bRisk - aRisk;
     })[0];
+  const missingParts = missingSummaryBySemester(data);
   document.getElementById("heroSubtitle").textContent =
-    data.missing_total > 0
-      ? `当前共有 ${data.missing_total} 个缺交，优先提交可评分版本；${riskCourse ? `${riskCourse.course} 现在最需要补进度。` : "先清理最临近 DDL。"}`
+    missingParts.length
+      ? `${missingParts.join("；")}。${riskCourse ? `${riskCourse.course} 现在最需要补进度。` : "先清理最临近 DDL。"}`
       : "当前没有缺交压力，可以把注意力转向 upcoming DDL 的提前拆解和高权重项目准备。";
   const overviewMeta = document.getElementById("mobileTabOverviewMeta");
   const courseMeta = document.getElementById("mobileTabCourseMeta");

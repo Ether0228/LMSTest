@@ -754,7 +754,7 @@ button {
   background: rgba(26, 25, 22, 0.035);
 }
 
-.terminal-section.is-open .terminal-section__body {
+.terminal-section.is-open > .terminal-section__body {
   display: block;
 }
 
