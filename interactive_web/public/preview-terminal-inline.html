@@ -1645,6 +1645,35 @@ button {
     </div>
 
     <script>
+      (function bootstrapPreviewGuard() {
+        window.__previewBooted = false;
+        window.__previewFailSafe = window.setTimeout(function () {
+          if (window.__previewBooted) return;
+          var loading = document.getElementById("previewLoading");
+          var app = document.getElementById("previewApp");
+          var error = document.getElementById("previewError");
+          if (loading) loading.hidden = true;
+          if (app) app.hidden = true;
+          if (error) {
+            error.hidden = false;
+            error.innerHTML =
+              '<div class="error-screen__inner">' +
+              '<div class="loading-screen__eyebrow">PREVIEW LOAD ERROR</div>' +
+              '<div class="error-screen__title">页面未能完成初始化</div>' +
+              '<div class="error-screen__body">主脚本或实时数据在 15 秒内没有完成装载。请先打开静态快照确认页面，再检查实时接口状态。</div>' +
+              '<a class="error-screen__link" href="/preview-terminal-static.html' + location.search + '">查看静态快照</a>' +
+              "</div>";
+          }
+        }, 15000);
+      })();
+    </script>
+    <script>
+window.__previewBooted = true;
+if (window.__previewFailSafe) {
+  clearTimeout(window.__previewFailSafe);
+  window.__previewFailSafe = 0;
+}
+
 const PREVIEW_MOCK_DATA = {
   student: {
     name: "示例同学",

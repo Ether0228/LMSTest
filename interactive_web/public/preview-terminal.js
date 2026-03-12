@@ -1,3 +1,9 @@
+window.__previewBooted = true;
+if (window.__previewFailSafe) {
+  clearTimeout(window.__previewFailSafe);
+  window.__previewFailSafe = 0;
+}
+
 const PREVIEW_MOCK_DATA = {
   student: {
     name: "示例同学",
