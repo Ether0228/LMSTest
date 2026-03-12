@@ -182,6 +182,32 @@ function loadTenants() {
 
 const TENANTS = loadTenants();
 const UPSTREAM_FETCH_TIMEOUT_MS = Math.max(1000, parseInt(process.env.UPSTREAM_FETCH_TIMEOUT_MS || "10000", 10) || 10000);
+const GRADEBOOK_COURSE_NAME_MAP = {
+  "grade 11 physics": "SPH3U",
+  "grade 12 physics": "SPH4U",
+  "grade 11 chemistry": "SCH3U",
+  "grade 12 chemistry": "SCH4U",
+  "grade 11 computer science": "ICS3U",
+  "grade 12 data management": "MDM4U",
+  "grade 12 advanced functions": "MHF4U",
+  "grade 11 functions": "MCR3U",
+  "grade 12 calculus & vectors": "MCV4U",
+  "grade 12 english": "ENG4U",
+  "grade 11 english": "ENG3U",
+  "grade 11 food and culture": "HFC3M",
+  "grade 12 nutrition & health": "HFA4U",
+  "grade 11 visual arts": "AVI3M",
+  "grade 12 visual arts": "AVI4M",
+  "grade 12 fashion": "HNB4M",
+  "g10 canadian history since wwi": "CHC2D",
+  "grade 12 canadian and world issues": "CGW4U",
+  "grade 12 business leadership": "BOH4M",
+  "g12 analysing current economic issues": "CIA4U",
+  "esl level 5": "ESLEO",
+  "esl level 4": "ESLDO",
+  "esl level 3": "ESLCO",
+  "esl level 2": "ESLBO",
+};
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = UPSTREAM_FETCH_TIMEOUT_MS) {
   const controller = new AbortController();
@@ -409,6 +435,27 @@ function normalizeName(s) {
   return String(s || "").trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+function normalizeGradebookCourseName(rawName) {
+  const cleaned = String(rawName || "").trim().replace(/\s+/g, " ").toLowerCase();
+  return GRADEBOOK_COURSE_NAME_MAP[cleaned] || String(rawName || "").trim();
+}
+
+function cleanSchoologyUrl(url) {
+  const text = String(url || "").trim();
+  if (!text) return "";
+  const match = text.match(/(https:\/\/.*?\/(?:assignment|assessment|discussion)\/\d+)/);
+  return match ? match[1] : text;
+}
+
+function isAol(value) {
+  const text = String(value || "").toLowerCase();
+  return text.includes("aol") || text.includes("assessment of learning");
+}
+
+function gradebookTableIdForTenant(tenantConf) {
+  return (tenantConf?.gradebookTableId || process.env.FEISHU_GRADEBOOK_TABLE_ID || "").trim();
+}
+
 function mergeCourseLists(...courseLists) {
   const seen = new Set();
   const merged = [];
@@ -421,6 +468,94 @@ function mergeCourseLists(...courseLists) {
     }
   }
   return merged;
+}
+
+function buildNidLookup(libRecords) {
+  const out = new Map();
+  for (const rec of libRecords || []) {
+    const fields = rec.fields || {};
+    const link = cleanSchoologyUrl(getFieldLinkUrl(fields["作业链接"]));
+    if (!link) continue;
+    const match = link.match(/\/(?:assignment|assessment|discussion)\/(\d+)/);
+    if (!match) continue;
+    const nid = match[1];
+    if (out.has(nid)) continue;
+    out.set(nid, {
+      link,
+      course: String(fields["所属课程"] || "").trim(),
+      nature: String(fields["作业性质"] || "").trim(),
+      name: String(fields["作业名称"] || "").trim(),
+    });
+  }
+  return out;
+}
+
+async function buildUpcomingDeadlinesForStudent(tenantKey, token, tenantConf, studentName, { forceRefresh = false } = {}) {
+  const gradebookTableId = gradebookTableIdForTenant(tenantConf);
+  if (!gradebookTableId) return [];
+
+  const gradebookRows = await bitableFetchByFilterCached(
+    tenantKey,
+    token,
+    tenantConf.appToken,
+    gradebookTableId,
+    buildEqualsFilter("学生姓名", studentName),
+    ["学生姓名", "课程名", "作业名", "作业NID", "截止日期", "分类", "分类权重%"],
+    { forceRefresh },
+  );
+  if (!gradebookRows.length) return [];
+
+  const libRecords = await bitableFetchAllCached(tenantKey, token, tenantConf.appToken, tenantConf.libTableId, { forceRefresh });
+  const nidLookup = buildNidLookup(libRecords);
+  const nowMs = Date.now();
+  const seen = new Set();
+  const deadlines = [];
+
+  for (const row of gradebookRows) {
+    const fields = row.fields || {};
+    const dueMsRaw = fields["截止日期"];
+    const dueMs = Number(dueMsRaw);
+    if (!Number.isFinite(dueMs) || dueMs <= nowMs) continue;
+    const name = String(fields["作业名"] || "").trim();
+    if (!name) continue;
+    const course = normalizeGradebookCourseName(fields["课程名"]);
+    const category = String(fields["分类"] || "").trim();
+    const assignmentNid = String(fields["作业NID"] || "").trim();
+    const libItem = nidLookup.get(assignmentNid) || null;
+    const dedupeKey = `${dueMs}|${course}|${name}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+
+    const entry = {
+      date_ms: dueMs,
+      course,
+      name,
+      category,
+      is_aol: isAol(category),
+    };
+    const weight = fields["分类权重%"];
+    if (weight != null && weight !== "") entry.weight = weight;
+    const assignmentLink = libItem?.link || "";
+    if (assignmentLink) entry.assignmentLink = assignmentLink;
+    deadlines.push(entry);
+  }
+
+  deadlines.sort((a, b) => (a.date_ms || 0) - (b.date_ms || 0));
+  return deadlines.slice(0, 30);
+}
+
+function deadlinesNeedLinkEnrichment(payload) {
+  const deadlines = payload?.upcomingDeadlines;
+  if (!Array.isArray(deadlines) || !deadlines.length) return true;
+  return deadlines.some((item) => !String(item?.assignmentLink || item?.link || "").trim());
+}
+
+async function enrichDashboardPayloadWithUpcomingDeadlines(payload, tenantKey, token, tenantConf, studentName, forceRefresh) {
+  if (!payload || !gradebookTableIdForTenant(tenantConf)) return payload;
+  if (!forceRefresh && !deadlinesNeedLinkEnrichment(payload)) return payload;
+  const upcomingDeadlines = await buildUpcomingDeadlinesForStudent(tenantKey, token, tenantConf, studentName, { forceRefresh });
+  if (!upcomingDeadlines.length) return payload;
+  return { ...payload, upcomingDeadlines };
 }
 
 function extractLinkedRecordIds(value) {
@@ -674,7 +809,11 @@ async function handleApiDashboard(req, res, parsedUrl) {
     if (pgHit) {
       const ageMin = Math.round((Date.now() - (pgHit._cachedAt || 0)) / 60000);
       console.log(`[pg] hit: ${tenantKey}/${studentName} (${ageMin}min ago)`);
-      return json(res, 200, pgHit);
+      const token = gradebookTableIdForTenant(tenantConf) ? await feishuGetTenantAccessToken(tenantKey, tenantConf) : null;
+      const enriched = token
+        ? await enrichDashboardPayloadWithUpcomingDeadlines(pgHit, tenantKey, token, tenantConf, studentName, forceRefresh)
+        : pgHit;
+      return json(res, 200, enriched);
     }
   }
 
@@ -684,7 +823,11 @@ async function handleApiDashboard(req, res, parsedUrl) {
     if (hit) {
       const ageMin = Math.round((Date.now() - (hit._cachedAt || 0)) / 60000);
       console.log(`[cache] hit: ${tenantKey}/${studentName} (${ageMin}min ago)`);
-      return json(res, 200, hit);
+      const token = gradebookTableIdForTenant(tenantConf) ? await feishuGetTenantAccessToken(tenantKey, tenantConf) : null;
+      const enriched = token
+        ? await enrichDashboardPayloadWithUpcomingDeadlines(hit, tenantKey, token, tenantConf, studentName, forceRefresh)
+        : hit;
+      return json(res, 200, enriched);
     }
   }
 
@@ -779,8 +922,9 @@ async function handleApiDashboard(req, res, parsedUrl) {
     ...summary,
     ...computeSemesterProgress(await fetchGradingPeriod(tenantKey, tenantConf)),
   };
-  diskCacheSet(tenantKey, studentName, result);
-  return json(res, 200, result);
+  const enrichedResult = await enrichDashboardPayloadWithUpcomingDeadlines(result, tenantKey, token, tenantConf, studentName, forceRefresh);
+  diskCacheSet(tenantKey, studentName, enrichedResult);
+  return json(res, 200, enrichedResult);
 }
 
 function serveStatic(req, res, parsedUrl) {
