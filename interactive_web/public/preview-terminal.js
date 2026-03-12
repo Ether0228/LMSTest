@@ -730,7 +730,7 @@ function renderProfile(data) {
 }
 
 function renderHero(data) {
-  document.getElementById("heroTitle").textContent = `${data.student.name || "同学"}，先处理最卡分的地方。`;
+  document.getElementById("heroTitle").textContent = `Welcome back, ${data.student.name || "同学"}`;
   const riskCourse = (data.course_progress || [])
     .filter((course) => course.isCurrentSemester !== false)
     .sort((a, b) => {

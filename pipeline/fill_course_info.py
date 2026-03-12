@@ -104,6 +104,23 @@ def parse_semester_from_section_id(text):
         return f"{start_year}-{sem}"    # "2025-S3"
     return ""
 
+
+def normalize_course_title(text):
+    """标准化课程标题，仅保留课程名部分用于做精确映射。"""
+    base = str(text or "").split(":")[0].strip().lower()
+    return re.sub(r"\s+", " ", base)
+
+
+def resolve_course_code(raw_name, course_mapping):
+    """
+    只对标准化后的课程标题做精确匹配，避免 ENG3U/ENG4U 这类近似课程误判。
+    返回 (course_code, normalized_title)；失败时返回 (None, normalized_title)。
+    """
+    normalized_title = normalize_course_title(raw_name)
+    if not normalized_title:
+        return None, normalized_title
+    return course_mapping.get(normalized_title), normalized_title
+
 # === 1. 获取所有"所属课程"为空的记录 ===
 def get_empty_course_records(token, app_token, table_id):
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}/records"
@@ -174,16 +191,18 @@ def scrape_course_name(driver, url, course_mapping, nid_to_course=None):
         # 给 React 页面一点渲染时间
         time.sleep(5)
 
-        # === 策略 A0: 从重定向后的 URL 提取 Section NID，直接查映射表（最快最准）===
+        final_url = driver.current_url
+        nid_course_code = None
+        nid_semester = ""
+
+        # === 策略 A0: 从重定向后的 URL 提取 Section NID，先记下映射结果，稍后与页面标题交叉校验 ===
         if nid_to_course:
-            final_url = driver.current_url
             m = re.search(r'/course/(\d+)/', final_url)
             if m:
                 nid = m.group(1)
                 if nid in nid_to_course:
-                    course_code, semester = nid_to_course[nid]
-                    print(f"   -> [策略A0-NID] {nid} → {course_code} ({semester})")
-                    return course_code, semester
+                    nid_course_code, nid_semester = nid_to_course[nid]
+                    print(f"   -> [策略A0-NID] {nid} → {nid_course_code} ({nid_semester})")
 
         raw_name = ""
 
@@ -237,20 +256,35 @@ def scrape_course_name(driver, url, course_mapping, nid_to_course=None):
 
         if not raw_name:
             print("   -> 无法定位课程名")
+            if nid_course_code:
+                print(f"   -> 页面标题缺失，降级使用 NID 结果: {nid_course_code}")
+                return nid_course_code, nid_semester
             return None, ""
 
-        # === 提取学期（来自 Section ID，如 "Section 2526S4N" → "2026-S4"） ===
-        semester = parse_semester_from_section_id(raw_name)
-        if semester:
-            print(f"   -> 学期识别: {semester}")
+        # === 提取学期（来自 Section ID，如 "Section 2526S4N" → "2025-S4"） ===
+        title_semester = parse_semester_from_section_id(raw_name)
+        if title_semester:
+            print(f"   -> 学期识别: {title_semester}")
 
-        # === 课程名映射：取冒号前的部分做匹配，避免 "Section XXXX" 干扰 ===
-        # "ESL Level 5: Section 2526S4N" → 匹配 "esl level 5"
-        name_for_mapping = raw_name.split(":")[0].strip().lower()
-        for key, code in course_mapping.items():
-            if key in name_for_mapping:
-                print(f"   -> 匹配成功: {raw_name} -> {code}")
-                return code, semester
+        title_course_code, normalized_title = resolve_course_code(raw_name, course_mapping)
+        if title_course_code:
+            print(f"   -> 标题映射成功: {normalized_title} -> {title_course_code}")
+
+        if nid_course_code and title_course_code:
+            if nid_course_code != title_course_code:
+                print(
+                    f"   -> [冲突] NID={nid_course_code} 但标题={title_course_code} "
+                    f"(title={normalized_title}, url={final_url})，跳过写入"
+                )
+                return None, ""
+            return title_course_code, title_semester or nid_semester
+
+        if title_course_code:
+            return title_course_code, title_semester or nid_semester
+
+        if nid_course_code:
+            print(f"   -> 标题未命中映射，降级使用 NID 结果: {nid_course_code}")
+            return nid_course_code, nid_semester
 
         print(f"   -> 未匹配到课程简称，跳过 (raw={raw_name.split(':')[0].strip()[:40]})")
         return None, ""
