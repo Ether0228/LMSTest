@@ -1,7 +1,11 @@
 window.__previewBooted = true;
-if (window.__previewFailSafe) {
-  clearTimeout(window.__previewFailSafe);
-  window.__previewFailSafe = 0;
+
+function resolvePreviewBoot() {
+  window.__previewBootResolved = true;
+  if (window.__previewFailSafe) {
+    clearTimeout(window.__previewFailSafe);
+    window.__previewFailSafe = 0;
+  }
 }
 
 const PREVIEW_MOCK_DATA = {
@@ -461,6 +465,7 @@ function showError(message) {
       <a class="error-screen__link" href="/preview-terminal-static.html${location.search}">查看静态快照</a>
     </div>
   `;
+  resolvePreviewBoot();
 }
 
 window.addEventListener("error", (event) => {
@@ -1049,6 +1054,7 @@ async function loadDashboardData(params) {
     renderAll(normalizeApiResponse(cached), cached, params);
     document.getElementById("previewLoading").hidden = true;
     document.getElementById("previewApp").hidden = false;
+    resolvePreviewBoot();
     fetchJsonWithTimeout(`/api/dashboard?t=${encodeURIComponent(params.tenant)}&student=${encodeURIComponent(params.student)}`, 8000)
       .then((data) => { if (data) lsSet(cacheKey, data); })
       .catch(() => {});
@@ -1063,6 +1069,7 @@ async function loadDashboardData(params) {
   renderAll(normalizeApiResponse(raw), raw, params);
   document.getElementById("previewLoading").hidden = true;
   document.getElementById("previewApp").hidden = false;
+  resolvePreviewBoot();
 }
 
 async function loadFixtureData(params) {
@@ -1073,6 +1080,7 @@ async function loadFixtureData(params) {
   renderAll(normalizeApiResponse(raw), raw, params);
   document.getElementById("previewLoading").hidden = true;
   document.getElementById("previewApp").hidden = false;
+  resolvePreviewBoot();
 }
 
 function renderMockPreview() {
@@ -1090,6 +1098,7 @@ function renderMockPreview() {
   renderAll(data, data, { tenant: "", student: "" });
   document.getElementById("previewLoading").hidden = true;
   document.getElementById("previewApp").hidden = false;
+  resolvePreviewBoot();
 }
 
 (function init() {

@@ -176,9 +176,9 @@
 
     <script>
       (function bootstrapPreviewGuard() {
-        window.__previewBooted = false;
+        window.__previewBootResolved = false;
         window.__previewFailSafe = window.setTimeout(function () {
-          if (window.__previewBooted) return;
+          if (window.__previewBootResolved) return;
           var loading = document.getElementById("previewLoading");
           var app = document.getElementById("previewApp");
           var error = document.getElementById("previewError");
