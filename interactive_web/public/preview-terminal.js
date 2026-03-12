@@ -113,6 +113,10 @@ const state = {
 
 const DEFAULT_FIXTURE_PATH = "/fixtures/chuhe-xiong-qea.json";
 const LIVE_FETCH_TIMEOUT_MS = 12000;
+const HOVER_OFFSET_PX = 8;
+
+let floatingHoverEl = null;
+let floatingHoverHideTimer = 0;
 
 function esc(str) {
   return String(str)
@@ -120,6 +124,94 @@ function esc(str) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function ensureFloatingHover() {
+  if (floatingHoverEl) return floatingHoverEl;
+  floatingHoverEl = document.createElement("div");
+  floatingHoverEl.className = "floating-hover";
+  floatingHoverEl.hidden = true;
+  floatingHoverEl.addEventListener("mouseenter", () => {
+    if (floatingHoverHideTimer) clearTimeout(floatingHoverHideTimer);
+  });
+  floatingHoverEl.addEventListener("mouseleave", () => {
+    scheduleFloatingHoverHide();
+  });
+  floatingHoverEl.addEventListener("click", (event) => {
+    const target = event.target instanceof Element ? event.target.closest("[data-deadline-link]") : null;
+    if (!target) return;
+    const href = target.getAttribute("data-deadline-link") || "";
+    if (!href) return;
+    event.preventDefault();
+    event.stopPropagation();
+    window.open(href, "_blank", "noopener");
+  });
+  document.body.appendChild(floatingHoverEl);
+  document.addEventListener("scroll", hideFloatingHover, true);
+  window.addEventListener("resize", hideFloatingHover);
+  return floatingHoverEl;
+}
+
+function hideFloatingHover() {
+  if (!floatingHoverEl) return;
+  if (floatingHoverHideTimer) {
+    clearTimeout(floatingHoverHideTimer);
+    floatingHoverHideTimer = 0;
+  }
+  floatingHoverEl.hidden = true;
+  floatingHoverEl.className = "floating-hover";
+  floatingHoverEl.innerHTML = "";
+}
+
+function scheduleFloatingHoverHide() {
+  if (floatingHoverHideTimer) clearTimeout(floatingHoverHideTimer);
+  floatingHoverHideTimer = window.setTimeout(() => {
+    hideFloatingHover();
+  }, 120);
+}
+
+function showFloatingHover(anchor, source, variant) {
+  const layer = ensureFloatingHover();
+  if (floatingHoverHideTimer) {
+    clearTimeout(floatingHoverHideTimer);
+    floatingHoverHideTimer = 0;
+  }
+  layer.className = `floating-hover floating-hover--${variant}`;
+  layer.innerHTML = source.innerHTML;
+  layer.hidden = false;
+
+  const anchorRect = anchor.getBoundingClientRect();
+  const layerRect = layer.getBoundingClientRect();
+  const maxLeft = Math.max(8, window.innerWidth - layerRect.width - 8);
+  const centeredLeft = anchorRect.left + (anchorRect.width / 2) - (layerRect.width / 2);
+  const left = Math.min(Math.max(8, centeredLeft), maxLeft);
+  let top = anchorRect.top - layerRect.height - HOVER_OFFSET_PX;
+  if (top < 8) {
+    top = Math.min(window.innerHeight - layerRect.height - 8, anchorRect.bottom + HOVER_OFFSET_PX);
+  }
+  layer.style.left = `${left}px`;
+  layer.style.top = `${Math.max(8, top)}px`;
+  layer.classList.add("is-visible");
+}
+
+function bindFloatingHoverTips() {
+  document.querySelectorAll(".combo-cell").forEach((cell) => {
+    const tip = cell.querySelector(".combo-cell__tip");
+    if (!tip) return;
+    cell.onmouseenter = () => showFloatingHover(cell, tip, "combo");
+    cell.onmouseleave = () => scheduleFloatingHoverHide();
+    cell.onfocus = () => showFloatingHover(cell, tip, "combo");
+    cell.onblur = () => scheduleFloatingHoverHide();
+  });
+
+  document.querySelectorAll("[data-calendar-day]").forEach((day) => {
+    const tip = day.querySelector(".calendar-day__tooltip");
+    if (!tip) return;
+    day.onmouseenter = () => showFloatingHover(day, tip, "calendar");
+    day.onmouseleave = () => scheduleFloatingHoverHide();
+    day.onfocus = () => showFloatingHover(day, tip, "calendar");
+    day.onblur = () => scheduleFloatingHoverHide();
+  });
 }
 
 function formatDateCN(value) {
@@ -955,6 +1047,7 @@ function renderCalendar() {
       window.open(href, "_blank", "noopener");
     });
   });
+  bindFloatingHoverTips();
 }
 
 function bindCalendarNav() {
@@ -1031,6 +1124,7 @@ function renderCombo(data) {
     `;
     })
     .join("");
+  bindFloatingHoverTips();
 }
 
 function maybeShowNotices(data, params) {
@@ -1064,6 +1158,7 @@ function maybeShowNotices(data, params) {
 }
 
 function renderAll(data, raw, params) {
+  hideFloatingHover();
   state.data = data;
   state.raw = raw;
   state.deadlines = (data.upcoming_deadlines || []).slice().sort((a, b) => (a.date_ms || 0) - (b.date_ms || 0));

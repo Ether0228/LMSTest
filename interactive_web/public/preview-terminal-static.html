@@ -428,24 +428,7 @@ button {
 }
 
 .combo-cell__tip {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 8px);
-  transform: translateX(-50%);
-  min-width: max-content;
-  padding: 6px 8px;
-  border-radius: 10px;
-  background: #27231d;
-  color: #f7f2e9;
-  font-size: 11px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s ease;
-  z-index: 20;
-}
-
-.combo-cell:hover .combo-cell__tip {
-  opacity: 1;
+  display: none !important;
 }
 
 .combo-cell:hover {
@@ -1190,25 +1173,7 @@ button {
 }
 
 .calendar-day__tooltip {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 8px);
-  transform: translateX(-50%);
-  width: min(240px, 60vw);
-  padding: 8px;
-  border-radius: 10px;
-  border: 1px solid rgba(39, 35, 29, 0.4);
-  background: rgba(39, 35, 29, 0.96);
-  box-shadow: 0 14px 28px rgba(20, 14, 7, 0.18);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s ease;
-  z-index: 12;
-}
-
-.calendar-day:hover .calendar-day__tooltip,
-.calendar-day:focus-visible .calendar-day__tooltip {
-  opacity: 1;
+  display: none !important;
 }
 
 .calendar-tooltip__item + .calendar-tooltip__item {
@@ -1239,6 +1204,40 @@ button {
   color: #f7f2e9;
   font-family: var(--font-mono);
   font-size: 8px;
+}
+
+.floating-hover {
+  position: fixed;
+  left: 0;
+  top: 0;
+  max-width: min(280px, calc(100vw - 16px));
+  padding: 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(39, 35, 29, 0.4);
+  background: rgba(39, 35, 29, 0.96);
+  box-shadow: 0 14px 28px rgba(20, 14, 7, 0.18);
+  color: #f7f2e9;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition: opacity 0.14s ease, transform 0.14s ease;
+  z-index: 200;
+}
+
+.floating-hover.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.floating-hover--combo {
+  min-width: max-content;
+  padding: 6px 8px;
+  font-size: 11px;
+}
+
+.floating-hover--calendar {
+  width: min(240px, calc(100vw - 16px));
 }
 
 .recommendation-card__body {
