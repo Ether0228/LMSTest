@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>通关指南</title>
-    <link rel="stylesheet" href="/preview-terminal.css?v=20260312d" />
+    <link rel="stylesheet" href="/preview-terminal.css?v=20260312e" />
   </head>
   <body>
     <div id="previewLoading" class="loading-screen">
@@ -28,20 +28,6 @@
     <div id="previewError" class="error-screen" hidden></div>
 
     <div id="previewApp" class="shell" hidden>
-      <header class="shell__topbar">
-        <div class="shell__brand">
-          <span class="shell__brand-mark">TG</span>
-          <div>
-            <div class="shell__brand-name">通关指南</div>
-            <div class="shell__brand-sub">student-terminal-dashboard x interactive_web</div>
-          </div>
-        </div>
-        <div class="shell__topbar-actions">
-          <a id="liveDashboardLink" class="shell__link" href="/">查看现网版</a>
-          <a id="guideLink" class="shell__link shell__link--strong" href="/guide.html">通关指南全文</a>
-        </div>
-      </header>
-
       <input id="mobileTabOverview" class="mobile-tab-input" type="radio" name="mobileTab" checked />
       <input id="mobileTabCourse" class="mobile-tab-input" type="radio" name="mobileTab" />
       <input id="mobileTabDeadline" class="mobile-tab-input" type="radio" name="mobileTab" />
@@ -143,6 +129,14 @@
         </section>
 
         <aside class="rail rail--sidebar">
+          <section class="panel panel--guide-entry">
+            <a id="guideLink" class="guide-entry-card" href="/guide.html">
+              <span class="alert-card__tag alert-card__tag--guide">guide</span>
+              <div class="guide-entry-card__title">通关指南全文</div>
+              <div class="guide-entry-card__meta">按当前学生状态查看完整打法与章节入口</div>
+            </a>
+          </section>
+
           <section class="panel">
             <div class="section-head">
               <div>
@@ -197,6 +191,6 @@
         }, 15000);
       })();
     </script>
-    <script src="/preview-terminal.js?v=20260312d"></script>
+    <script src="/preview-terminal.js?v=20260312e"></script>
   </body>
 </html>

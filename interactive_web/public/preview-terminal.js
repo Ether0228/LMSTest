@@ -615,11 +615,10 @@ window.addEventListener("unhandledrejection", (event) => {
 
 function setTopLinks() {
   const query = location.search || "";
-  const dashboardLink = document.getElementById("liveDashboardLink");
-  const isProductionEntry = location.pathname === "/" || location.pathname === "/index.html";
-  dashboardLink.href = isProductionEntry ? `/preview-terminal-static.html${query}` : `/${query}`;
-  dashboardLink.textContent = isProductionEntry ? "查看静态快照" : "查看现网版";
-  document.getElementById("guideLink").href = `/guide.html${query}`;
+  const guideLink = document.getElementById("guideLink");
+  if (guideLink) {
+    guideLink.href = `/guide.html${query}`;
+  }
 }
 
 function buildFocusItems(data) {
