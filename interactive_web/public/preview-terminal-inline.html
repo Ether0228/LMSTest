@@ -1749,6 +1749,7 @@ const state = {
 };
 
 const DEFAULT_FIXTURE_PATH = "/fixtures/chuhe-xiong-qea.json";
+const LIVE_FETCH_TIMEOUT_MS = 12000;
 
 function esc(str) {
   return String(str)
@@ -2098,7 +2099,7 @@ function showError(message) {
       <div class="loading-screen__eyebrow">PREVIEW LOAD ERROR</div>
       <div class="error-screen__title">页面未能装载数据</div>
       <div class="error-screen__body">${esc(message)}</div>
-      <a class="error-screen__link" href="/${location.search}">返回现网版</a>
+      <a class="error-screen__link" href="/preview-terminal-static.html${location.search}">查看静态快照</a>
     </div>
   `;
 }
@@ -2664,6 +2665,23 @@ function lsSet(key, data) {
   } catch {}
 }
 
+async function fetchJsonWithTimeout(url, timeoutMs = LIVE_FETCH_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new Error("fetch_timeout")), timeoutMs);
+  try {
+    const resp = await fetch(url, { signal: controller.signal });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return await resp.json();
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error(`实时数据请求超时（>${Math.round(timeoutMs / 1000)}s）`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function loadDashboardData(params) {
   const ttl = 25 * 60 * 1000;
   const cacheKey = `qea__preview__${params.tenant || "mock"}__${params.student || "mock"}`;
@@ -2672,16 +2690,16 @@ async function loadDashboardData(params) {
     renderAll(normalizeApiResponse(cached), cached, params);
     document.getElementById("previewLoading").hidden = true;
     document.getElementById("previewApp").hidden = false;
-    fetch(`/api/dashboard?t=${encodeURIComponent(params.tenant)}&student=${encodeURIComponent(params.student)}`)
-      .then((resp) => (resp.ok ? resp.json() : null))
+    fetchJsonWithTimeout(`/api/dashboard?t=${encodeURIComponent(params.tenant)}&student=${encodeURIComponent(params.student)}`, 8000)
       .then((data) => { if (data) lsSet(cacheKey, data); })
       .catch(() => {});
     return;
   }
 
-  const resp = await fetch(`/api/dashboard?t=${encodeURIComponent(params.tenant)}&student=${encodeURIComponent(params.student)}`);
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-  const raw = await resp.json();
+  if (!params.tenant) {
+    throw new Error("缺少租户参数，现网入口需要通过 ?t=租户 打开。");
+  }
+  const raw = await fetchJsonWithTimeout(`/api/dashboard?t=${encodeURIComponent(params.tenant)}&student=${encodeURIComponent(params.student)}`);
   lsSet(cacheKey, raw);
   renderAll(normalizeApiResponse(raw), raw, params);
   document.getElementById("previewLoading").hidden = true;
@@ -2729,8 +2747,8 @@ function renderMockPreview() {
   }
 
   loadDashboardData(params).catch((error) => {
-    console.warn("[preview-terminal] API failed, fallback to mock:", error);
-    renderMockPreview();
+    console.warn("[preview-terminal] API failed:", error);
+    showError(error?.message || "实时数据装载失败");
   });
 })();
 

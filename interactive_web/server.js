@@ -10,9 +10,24 @@ let pgPool = null;
 try {
   if (process.env.DATABASE_URL) {
     const { Pool } = require("pg");
-    const poolOptions = { connectionString: process.env.DATABASE_URL };
+    const poolOptions = {
+      connectionString: process.env.DATABASE_URL,
+      connectionTimeoutMillis: Math.max(1000, parseInt(process.env.PG_CONNECT_TIMEOUT_MS || "5000", 10) || 5000),
+      query_timeout: Math.max(1000, parseInt(process.env.PG_QUERY_TIMEOUT_MS || "8000", 10) || 8000),
+      statement_timeout: Math.max(1000, parseInt(process.env.PG_STATEMENT_TIMEOUT_MS || "8000", 10) || 8000),
+      idleTimeoutMillis: Math.max(1000, parseInt(process.env.PG_IDLE_TIMEOUT_MS || "30000", 10) || 30000),
+    };
     // Render/managed PostgreSQL commonly requires SSL while using a public URL.
-    if (/\bsslmode=require\b/i.test(process.env.DATABASE_URL) || (process.env.PGSSLMODE || "").trim() === "require") {
+    let shouldUseSsl = /\bsslmode=require\b/i.test(process.env.DATABASE_URL) || (process.env.PGSSLMODE || "").trim() === "require";
+    if (!shouldUseSsl) {
+      try {
+        const dbUrl = new URL(process.env.DATABASE_URL);
+        shouldUseSsl = /(?:^|\.)render\.com$/i.test(dbUrl.hostname || "");
+      } catch {
+        shouldUseSsl = false;
+      }
+    }
+    if (shouldUseSsl) {
       poolOptions.ssl = { rejectUnauthorized: false };
     }
     pgPool = new Pool(poolOptions);
@@ -166,6 +181,22 @@ function loadTenants() {
 }
 
 const TENANTS = loadTenants();
+const UPSTREAM_FETCH_TIMEOUT_MS = Math.max(1000, parseInt(process.env.UPSTREAM_FETCH_TIMEOUT_MS || "10000", 10) || 10000);
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = UPSTREAM_FETCH_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error(`upstream fetch timeout after ${timeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 function json(res, statusCode, body) {
   const data = Buffer.from(JSON.stringify(body));
@@ -241,11 +272,14 @@ async function feishuGetTenantAccessToken(tenantKey, tenantConf) {
   const now = Date.now();
   if (cached && cached.expMs > now + 30_000) return cached.token;
 
-  const resp = await fetch("https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal", {
-    method: "POST",
-    headers: { "Content-Type": "application/json; charset=utf-8" },
-    body: JSON.stringify({ app_id: tenantConf.appId, app_secret: tenantConf.appSecret }),
-  });
+  const resp = await fetchWithTimeout(
+    "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify({ app_id: tenantConf.appId, app_secret: tenantConf.appSecret }),
+    }
+  );
   const data = await resp.json();
   const token = data.tenant_access_token;
   const expireSec = data.expire || 3600;
@@ -320,7 +354,7 @@ async function bitableFetchAll(token, appToken, tableId, queryParams = {}) {
     if (queryParams.sort) u.searchParams.set("sort", String(queryParams.sort));
     if (queryParams.field_names) u.searchParams.set("field_names", String(queryParams.field_names));
 
-    const resp = await fetch(u, { headers: { Authorization: `Bearer ${token}` } });
+    const resp = await fetchWithTimeout(u, { headers: { Authorization: `Bearer ${token}` } });
     const data = await resp.json();
     if (data.code !== 0) break;
     const payload = data.data || {};
