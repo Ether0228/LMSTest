@@ -1001,6 +1001,16 @@ button {
   font-weight: 700;
 }
 
+.upcoming-item__title-link {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.upcoming-item__title-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
 .upcoming-item__pill {
   display: inline-flex;
   margin-top: var(--space-1);
@@ -1141,6 +1151,16 @@ button {
   font-size: 10px;
   font-weight: 700;
   color: #f7f2e9;
+}
+
+.calendar-tooltip__title-link {
+  color: #f7f2e9;
+  text-decoration: none;
+}
+
+.calendar-tooltip__title-link:hover {
+  color: #ffd694;
+  text-decoration: underline;
 }
 
 .calendar-tooltip__meta {
@@ -2365,7 +2385,7 @@ button {
     </div>
             <div class="panel__divider"></div>
             <div id="calendarGrid" class="calendar-grid"><div class="calendar-grid__weekday">日</div><div class="calendar-grid__weekday">一</div><div class="calendar-grid__weekday">二</div><div class="calendar-grid__weekday">三</div><div class="calendar-grid__weekday">四</div><div class="calendar-grid__weekday">五</div><div class="calendar-grid__weekday">六</div>
-      <button class="calendar-day" type="button" data-calendar-day="2026-03-01">
+      <div class="calendar-day" data-calendar-day="2026-03-01" role="button" tabindex="0" aria-pressed="false">
         <div class="calendar-day__head">
           <div class="calendar-day__number">1</div>
         </div>
@@ -2373,9 +2393,9 @@ button {
           
         </div>
         
-      </button>
+      </div>
     
-      <button class="calendar-day" type="button" data-calendar-day="2026-03-02">
+      <div class="calendar-day" data-calendar-day="2026-03-02" role="button" tabindex="0" aria-pressed="false">
         <div class="calendar-day__head">
           <div class="calendar-day__number">2</div>
         </div>
@@ -2383,9 +2403,9 @@ button {
           
         </div>
         
-      </button>
+      </div>
     
-      <button class="calendar-day" type="button" data-calendar-day="2026-03-03">
+      <div class="calendar-day" data-calendar-day="2026-03-03" role="button" tabindex="0" aria-pressed="false">
         <div class="calendar-day__head">
           <div class="calendar-day__number">3</div>
         </div>
@@ -2393,9 +2413,9 @@ button {
           
         </div>
         
-      </button>
+      </div>
     
-      <button class="calendar-day" type="button" data-calendar-day="2026-03-04">
+      <div class="calendar-day" data-calendar-day="2026-03-04" role="button" tabindex="0" aria-pressed="false">
         <div class="calendar-day__head">
           <div class="calendar-day__number">4</div>
         </div>
@@ -2403,9 +2423,9 @@ button {
           
         </div>
         
-      </button>
+      </div>
     
-      <button class="calendar-day" type="button" data-calendar-day="2026-03-05">
+      <div class="calendar-day" data-calendar-day="2026-03-05" role="button" tabindex="0" aria-pressed="false">
         <div class="calendar-day__head">
           <div class="calendar-day__number">5</div>
         </div>
@@ -2413,9 +2433,9 @@ button {
           
         </div>
         
-      </button>
+      </div>
     
-      <button class="calendar-day" type="button" data-calendar-day="2026-03-06">
+      <div class="calendar-day" data-calendar-day="2026-03-06" role="button" tabindex="0" aria-pressed="false">
         <div class="calendar-day__head">
           <div class="calendar-day__number">6</div>
         </div>
@@ -2423,9 +2443,9 @@ button {
           
         </div>
         
-      </button>
+      </div>
     
-      <button class="calendar-day" type="button" data-calendar-day="2026-03-07">
+      <div class="calendar-day" data-calendar-day="2026-03-07" role="button" tabindex="0" aria-pressed="false">
         <div class="calendar-day__head">
           <div class="calendar-day__number">7</div>
         </div>
@@ -2433,9 +2453,9 @@ button {
           
         </div>
         
-      </button>
+      </div>
     
-      <button class="calendar-day" type="button" data-calendar-day="2026-03-08">
+      <div class="calendar-day" data-calendar-day="2026-03-08" role="button" tabindex="0" aria-pressed="false">
         <div class="calendar-day__head">
           <div class="calendar-day__number">8</div>
         </div>
@@ -2443,9 +2463,9 @@ button {
           
         </div>
         
-      </button>
+      </div>
     
-      <button class="calendar-day" type="button" data-calendar-day="2026-03-09">
+      <div class="calendar-day" data-calendar-day="2026-03-09" role="button" tabindex="0" aria-pressed="false">
         <div class="calendar-day__head">
           <div class="calendar-day__number">9</div>
         </div>
@@ -2453,9 +2473,9 @@ button {
           
         </div>
         
-      </button>
+      </div>
     
-      <button class="calendar-day" type="button" data-calendar-day="2026-03-10">
+      <div class="calendar-day" data-calendar-day="2026-03-10" role="button" tabindex="0" aria-pressed="false">
         <div class="calendar-day__head">
           <div class="calendar-day__number">10</div>
         </div>
@@ -2463,9 +2483,9 @@ button {
           
         </div>
         
-      </button>
+      </div>
     
-      <button class="calendar-day" type="button" data-calendar-day="2026-03-11">
+      <div class="calendar-day" data-calendar-day="2026-03-11" role="button" tabindex="0" aria-pressed="false">
         <div class="calendar-day__head">
           <div class="calendar-day__number">11</div>
         </div>
@@ -2473,9 +2493,9 @@ button {
           
         </div>
         
-      </button>
+      </div>
     
-      <button class="calendar-day calendar-day--today calendar-day--has-event calendar-day--selected" type="button" data-calendar-day="2026-03-12">
+      <div class="calendar-day calendar-day--today calendar-day--has-event calendar-day--selected" data-calendar-day="2026-03-12" role="button" tabindex="0" aria-pressed="true">
         <div class="calendar-day__head">
           <div class="calendar-day__number">12</div>
         </div>
@@ -2493,9 +2513,9 @@ button {
             
           </div>
         
-      </button>
+      </div>
     
-      <button class="calendar-day" type="button" data-calendar-day="2026-03-13">
+      <div class="calendar-day" data-calendar-day="2026-03-13" role="button" tabindex="0" aria-pressed="false">
         <div class="calendar-day__head">
           <div class="calendar-day__number">13</div>
         </div>
@@ -2503,9 +2523,9 @@ button {
           
         </div>
         
-      </button>
+      </div>
     
-      <button class="calendar-day" type="button" data-calendar-day="2026-03-14">
+      <div class="calendar-day" data-calendar-day="2026-03-14" role="button" tabindex="0" aria-pressed="false">
         <div class="calendar-day__head">
           <div class="calendar-day__number">14</div>
         </div>
@@ -2513,9 +2533,9 @@ button {
           
         </div>
         
-      </button>
+      </div>
     
-      <button class="calendar-day" type="button" data-calendar-day="2026-03-15">
+      <div class="calendar-day" data-calendar-day="2026-03-15" role="button" tabindex="0" aria-pressed="false">
         <div class="calendar-day__head">
           <div class="calendar-day__number">15</div>
         </div>
@@ -2523,9 +2543,9 @@ button {
           
         </div>
         
-      </button>
+      </div>
     
-      <button class="calendar-day" type="button" data-calendar-day="2026-03-16">
+      <div class="calendar-day" data-calendar-day="2026-03-16" role="button" tabindex="0" aria-pressed="false">
         <div class="calendar-day__head">
           <div class="calendar-day__number">16</div>
         </div>
@@ -2533,9 +2553,9 @@ button {
           
         </div>
         
-      </button>
+      </div>
     
-      <button class="calendar-day" type="button" data-calendar-day="2026-03-17">
+      <div class="calendar-day" data-calendar-day="2026-03-17" role="button" tabindex="0" aria-pressed="false">
         <div class="calendar-day__head">
           <div class="calendar-day__number">17</div>
         </div>
@@ -2543,9 +2563,9 @@ button {
           
         </div>
         
-      </button>
+      </div>
     
-      <button class="calendar-day" type="button" data-calendar-day="2026-03-18">
+      <div class="calendar-day" data-calendar-day="2026-03-18" role="button" tabindex="0" aria-pressed="false">
         <div class="calendar-day__head">
           <div class="calendar-day__number">18</div>
         </div>
@@ -2553,9 +2573,9 @@ button {
           
         </div>
         
-      </button>
+      </div>
     
-      <button class="calendar-day" type="button" data-calendar-day="2026-03-19">
+      <div class="calendar-day" data-calendar-day="2026-03-19" role="button" tabindex="0" aria-pressed="false">
         <div class="calendar-day__head">
           <div class="calendar-day__number">19</div>
         </div>
@@ -2563,9 +2583,9 @@ button {
           
         </div>
         
-      </button>
+      </div>
     
-      <button class="calendar-day" type="button" data-calendar-day="2026-03-20">
+      <div class="calendar-day" data-calendar-day="2026-03-20" role="button" tabindex="0" aria-pressed="false">
         <div class="calendar-day__head">
           <div class="calendar-day__number">20</div>
         </div>
@@ -2573,9 +2593,9 @@ button {
           
         </div>
         
-      </button>
+      </div>
     
-      <button class="calendar-day" type="button" data-calendar-day="2026-03-21">
+      <div class="calendar-day" data-calendar-day="2026-03-21" role="button" tabindex="0" aria-pressed="false">
         <div class="calendar-day__head">
           <div class="calendar-day__number">21</div>
         </div>
@@ -2583,9 +2603,9 @@ button {
           
         </div>
         
-      </button>
+      </div>
     
-      <button class="calendar-day" type="button" data-calendar-day="2026-03-22">
+      <div class="calendar-day" data-calendar-day="2026-03-22" role="button" tabindex="0" aria-pressed="false">
         <div class="calendar-day__head">
           <div class="calendar-day__number">22</div>
         </div>
@@ -2593,9 +2613,9 @@ button {
           
         </div>
         
-      </button>
+      </div>
     
-      <button class="calendar-day" type="button" data-calendar-day="2026-03-23">
+      <div class="calendar-day" data-calendar-day="2026-03-23" role="button" tabindex="0" aria-pressed="false">
         <div class="calendar-day__head">
           <div class="calendar-day__number">23</div>
         </div>
@@ -2603,9 +2623,9 @@ button {
           
         </div>
         
-      </button>
+      </div>
     
-      <button class="calendar-day" type="button" data-calendar-day="2026-03-24">
+      <div class="calendar-day" data-calendar-day="2026-03-24" role="button" tabindex="0" aria-pressed="false">
         <div class="calendar-day__head">
           <div class="calendar-day__number">24</div>
         </div>
@@ -2613,9 +2633,9 @@ button {
           
         </div>
         
-      </button>
+      </div>
     
-      <button class="calendar-day" type="button" data-calendar-day="2026-03-25">
+      <div class="calendar-day" data-calendar-day="2026-03-25" role="button" tabindex="0" aria-pressed="false">
         <div class="calendar-day__head">
           <div class="calendar-day__number">25</div>
         </div>
@@ -2623,9 +2643,9 @@ button {
           
         </div>
         
-      </button>
+      </div>
     
-      <button class="calendar-day" type="button" data-calendar-day="2026-03-26">
+      <div class="calendar-day" data-calendar-day="2026-03-26" role="button" tabindex="0" aria-pressed="false">
         <div class="calendar-day__head">
           <div class="calendar-day__number">26</div>
         </div>
@@ -2633,9 +2653,9 @@ button {
           
         </div>
         
-      </button>
+      </div>
     
-      <button class="calendar-day" type="button" data-calendar-day="2026-03-27">
+      <div class="calendar-day" data-calendar-day="2026-03-27" role="button" tabindex="0" aria-pressed="false">
         <div class="calendar-day__head">
           <div class="calendar-day__number">27</div>
         </div>
@@ -2643,9 +2663,9 @@ button {
           
         </div>
         
-      </button>
+      </div>
     
-      <button class="calendar-day" type="button" data-calendar-day="2026-03-28">
+      <div class="calendar-day" data-calendar-day="2026-03-28" role="button" tabindex="0" aria-pressed="false">
         <div class="calendar-day__head">
           <div class="calendar-day__number">28</div>
         </div>
@@ -2653,9 +2673,9 @@ button {
           
         </div>
         
-      </button>
+      </div>
     
-      <button class="calendar-day" type="button" data-calendar-day="2026-03-29">
+      <div class="calendar-day" data-calendar-day="2026-03-29" role="button" tabindex="0" aria-pressed="false">
         <div class="calendar-day__head">
           <div class="calendar-day__number">29</div>
         </div>
@@ -2663,9 +2683,9 @@ button {
           
         </div>
         
-      </button>
+      </div>
     
-      <button class="calendar-day" type="button" data-calendar-day="2026-03-30">
+      <div class="calendar-day" data-calendar-day="2026-03-30" role="button" tabindex="0" aria-pressed="false">
         <div class="calendar-day__head">
           <div class="calendar-day__number">30</div>
         </div>
@@ -2673,9 +2693,9 @@ button {
           
         </div>
         
-      </button>
+      </div>
     
-      <button class="calendar-day" type="button" data-calendar-day="2026-03-31">
+      <div class="calendar-day" data-calendar-day="2026-03-31" role="button" tabindex="0" aria-pressed="false">
         <div class="calendar-day__head">
           <div class="calendar-day__number">31</div>
         </div>
@@ -2683,7 +2703,7 @@ button {
           
         </div>
         
-      </button>
+      </div>
     </div>
           </section>
 

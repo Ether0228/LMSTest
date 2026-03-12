@@ -1033,7 +1033,7 @@ function renderCalendar() {
       selected ? "calendar-day--selected" : "",
     ].filter(Boolean).join(" ");
     items.push(`
-      <button class="${classes}" type="button" data-calendar-day="${key}">
+      <div class="${classes}" data-calendar-day="${key}" role="button" tabindex="0" aria-pressed="${selected ? "true" : "false"}">
         <div class="calendar-day__head">
           <div class="calendar-day__number">${day}</div>
         </div>
@@ -1043,15 +1043,17 @@ function renderCalendar() {
         ${deadlines.length ? `
           <div class="calendar-day__tooltip">
             ${deadlines.map((deadline) => `
-              <article class="calendar-tooltip__item ${deadline.assignmentLink ? "calendar-tooltip__item--link" : ""}" ${deadline.assignmentLink ? `data-deadline-link="${esc(deadline.assignmentLink)}"` : ""}>
-                <div class="calendar-tooltip__title">${esc(deadline.name || "")}${deadline.assignmentLink ? ` <span class="calendar-tooltip__cta">打开 →</span>` : ""}</div>
+              <article class="calendar-tooltip__item ${deadline.assignmentLink ? "calendar-tooltip__item--link" : ""}">
+                ${deadline.assignmentLink
+                  ? `<a class="calendar-tooltip__title calendar-tooltip__title-link" href="${esc(deadline.assignmentLink)}" target="_blank" rel="noopener">${esc(deadline.name || "")} <span class="calendar-tooltip__cta">打开 →</span></a>`
+                  : `<div class="calendar-tooltip__title">${esc(deadline.name || "")}</div>`}
                 <div class="calendar-tooltip__meta">${esc(courseCode(deadline.course))} · ${esc(formatDateTimeCN(deadline.date_ms))}</div>
                 ${deadlinePillLabel(deadline) ? `<span class="calendar-tooltip__pill">${esc(deadlinePillLabel(deadline))}</span>` : ""}
               </article>
             `).join("")}
           </div>
         ` : ""}
-      </button>
+      </div>
     `);
   }
 
@@ -1063,19 +1065,18 @@ function renderCalendar() {
   }
 
   grid.querySelectorAll("[data-calendar-day]").forEach((button) => {
-    button.addEventListener("click", () => {
+    const selectDay = () => {
       state.selectedDateKey = button.getAttribute("data-calendar-day") || "";
       renderCalendar();
+    };
+    button.addEventListener("click", (event) => {
+      if (event.target instanceof Element && event.target.closest("a")) return;
+      selectDay();
     });
-  });
-
-  grid.querySelectorAll("[data-deadline-link]").forEach((node) => {
-    node.addEventListener("click", (event) => {
+    button.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
-      event.stopPropagation();
-      const href = node.getAttribute("data-deadline-link") || "";
-      if (!href) return;
-      window.open(href, "_blank", "noopener");
+      selectDay();
     });
   });
   bindFloatingHoverTips();
@@ -1098,24 +1099,18 @@ function renderUpcomingList() {
   if (!container) return;
   container.innerHTML = items.length
     ? items.map((item) => `
-      <article class="upcoming-item ${item.assignmentLink ? "upcoming-item--link" : ""}" ${item.assignmentLink ? `data-deadline-link="${esc(item.assignmentLink)}"` : ""}>
+      <article class="upcoming-item ${item.assignmentLink ? "upcoming-item--link" : ""}">
         <div class="upcoming-item__date">${esc(formatDateCN(item.date_ms))}</div>
         <div>
-          <div class="upcoming-item__title">${esc(item.name || "")}${item.assignmentLink ? ` <span class="calendar-tooltip__cta">打开 →</span>` : ""}</div>
+          ${item.assignmentLink
+            ? `<a class="upcoming-item__title upcoming-item__title-link" href="${esc(item.assignmentLink)}" target="_blank" rel="noopener">${esc(item.name || "")} <span class="calendar-tooltip__cta">打开 →</span></a>`
+            : `<div class="upcoming-item__title">${esc(item.name || "")}</div>`}
           <div class="upcoming-item__meta">${esc(courseCode(item.course))} · ${esc(item.category || "DDL")}</div>
           ${deadlinePillLabel(item) ? `<span class="upcoming-item__pill">${esc(deadlinePillLabel(item))}</span>` : ""}
         </div>
       </article>
     `).join("")
     : `<div class="terminal-empty">暂无 upcoming 作业。</div>`;
-
-  container.querySelectorAll("[data-deadline-link]").forEach((node) => {
-    node.addEventListener("click", () => {
-      const href = node.getAttribute("data-deadline-link") || "";
-      if (!href) return;
-      window.open(href, "_blank", "noopener");
-    });
-  });
 }
 
 function renderCombo(data) {
