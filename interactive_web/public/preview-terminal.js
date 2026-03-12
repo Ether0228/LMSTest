@@ -76,9 +76,9 @@ const PREVIEW_MOCK_DATA = {
   submitted_total: 18,
   combo: null,
   upcoming_deadlines: [
-    { date_ms: Date.now() + 86400000, course: "MHF4U", name: "Chapter 6 Test", category: "Assessment of Learning", is_aol: true, weight: 35 },
-    { date_ms: Date.now() + 3 * 86400000, course: "ENG4U", name: "Essay Final Draft", category: "Assessment of Learning", is_aol: true, weight: 20 },
-    { date_ms: Date.now() + 6 * 86400000, course: "MHF4U", name: "Weekly Practice", category: "Assessment for Learning", is_aol: false },
+    { date_ms: Date.now() + 86400000, course: "MHF4U", name: "Chapter 6 Test", category: "Assessment of Learning", is_aol: true, weight: 35, assignmentLink: "" },
+    { date_ms: Date.now() + 3 * 86400000, course: "ENG4U", name: "Essay Final Draft", category: "Assessment of Learning", is_aol: true, weight: 20, assignmentLink: "" },
+    { date_ms: Date.now() + 6 * 86400000, course: "MHF4U", name: "Weekly Practice", category: "Assessment for Learning", is_aol: false, assignmentLink: "" },
   ],
   notices: [
     { type: "info", title: "📢 通知", body: "本周四晚 8 点进行选课答疑。" },
@@ -334,6 +334,7 @@ function normalizeApiResponse(raw) {
 
   const upcomingDeadlines = (raw.upcomingDeadlines || []).map((deadline) => ({
     ...deadline,
+    assignmentLink: deadline.assignmentLink || deadline.link || "",
     displayType: deadlineDisplayType(deadline),
   }));
 
@@ -919,8 +920,8 @@ function renderCalendar() {
         ${deadlines.length ? `
           <div class="calendar-day__tooltip">
             ${deadlines.map((deadline) => `
-              <article class="calendar-tooltip__item">
-                <div class="calendar-tooltip__title">${esc(deadline.name || "")}</div>
+              <article class="calendar-tooltip__item ${deadline.assignmentLink ? "calendar-tooltip__item--link" : ""}" ${deadline.assignmentLink ? `data-deadline-link="${esc(deadline.assignmentLink)}"` : ""}>
+                <div class="calendar-tooltip__title">${esc(deadline.name || "")}${deadline.assignmentLink ? ` <span class="calendar-tooltip__cta">打开 →</span>` : ""}</div>
                 <div class="calendar-tooltip__meta">${esc(courseCode(deadline.course))} · ${esc(formatDateTimeCN(deadline.date_ms))}</div>
                 ${deadlinePillLabel(deadline) ? `<span class="calendar-tooltip__pill">${esc(deadlinePillLabel(deadline))}</span>` : ""}
               </article>
@@ -944,6 +945,16 @@ function renderCalendar() {
       renderCalendar();
     });
   });
+
+  grid.querySelectorAll("[data-deadline-link]").forEach((node) => {
+    node.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const href = node.getAttribute("data-deadline-link") || "";
+      if (!href) return;
+      window.open(href, "_blank", "noopener");
+    });
+  });
 }
 
 function bindCalendarNav() {
@@ -963,16 +974,24 @@ function renderUpcomingList() {
   if (!container) return;
   container.innerHTML = items.length
     ? items.map((item) => `
-      <article class="upcoming-item">
+      <article class="upcoming-item ${item.assignmentLink ? "upcoming-item--link" : ""}" ${item.assignmentLink ? `data-deadline-link="${esc(item.assignmentLink)}"` : ""}>
         <div class="upcoming-item__date">${esc(formatDateCN(item.date_ms))}</div>
         <div>
-          <div class="upcoming-item__title">${esc(item.name || "")}</div>
+          <div class="upcoming-item__title">${esc(item.name || "")}${item.assignmentLink ? ` <span class="calendar-tooltip__cta">打开 →</span>` : ""}</div>
           <div class="upcoming-item__meta">${esc(courseCode(item.course))} · ${esc(item.category || "DDL")}</div>
           ${deadlinePillLabel(item) ? `<span class="upcoming-item__pill">${esc(deadlinePillLabel(item))}</span>` : ""}
         </div>
       </article>
     `).join("")
     : `<div class="terminal-empty">暂无 upcoming 作业。</div>`;
+
+  container.querySelectorAll("[data-deadline-link]").forEach((node) => {
+    node.addEventListener("click", () => {
+      const href = node.getAttribute("data-deadline-link") || "";
+      if (!href) return;
+      window.open(href, "_blank", "noopener");
+    });
+  });
 }
 
 function renderCombo(data) {

@@ -612,7 +612,8 @@ button {
 }
 
 .focus-item__cta,
-.recommendation-card__link {
+.recommendation-card__link,
+.calendar-tooltip__cta {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -953,6 +954,17 @@ button {
 .alert-card {
   display: grid;
   gap: var(--space-1);
+}
+
+.calendar-tooltip__item--link,
+.upcoming-item--link {
+  cursor: pointer;
+}
+
+.calendar-tooltip__item--link:hover,
+.upcoming-item--link:hover {
+  border-color: var(--line-strong);
+  background: rgba(255, 255, 255, 0.48);
 }
 
 .alert-card__title,
@@ -2400,7 +2412,7 @@ button {
               </div>
             </div>
             <div id="upcomingList" class="upcoming-list">
-      <article class="upcoming-item">
+      <article class="upcoming-item ">
         <div class="upcoming-item__date">3月12日</div>
         <div>
           <div class="upcoming-item__title">Unit 1 - Assignment 1 (AOL)</div>
@@ -2531,7 +2543,7 @@ button {
         
           <div class="calendar-day__tooltip">
             
-              <article class="calendar-tooltip__item">
+              <article class="calendar-tooltip__item ">
                 <div class="calendar-tooltip__title">Unit 1 - Assignment 1 (AOL)</div>
                 <div class="calendar-tooltip__meta">BOH4M · 3月12日 19:59</div>
                 <span class="calendar-tooltip__pill">AoL / 4%</span>

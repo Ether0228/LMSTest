@@ -607,7 +607,8 @@ button {
 }
 
 .focus-item__cta,
-.recommendation-card__link {
+.recommendation-card__link,
+.calendar-tooltip__cta {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -948,6 +949,17 @@ button {
 .alert-card {
   display: grid;
   gap: var(--space-1);
+}
+
+.calendar-tooltip__item--link,
+.upcoming-item--link {
+  cursor: pointer;
+}
+
+.calendar-tooltip__item--link:hover,
+.upcoming-item--link:hover {
+  border-color: var(--line-strong);
+  background: rgba(255, 255, 255, 0.48);
 }
 
 .alert-card__title,

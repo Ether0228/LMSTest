@@ -705,6 +705,8 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
             normalized_course = re.sub(r'\s+', ' ', raw_course).lower()
             course_code = _GRADEBOOK_COURSE_NAME_MAP.get(normalized_course, raw_course)
             category = str(gb_row.get("分类", "")).strip()
+            assignment_nid = str(gb_row.get("作业NID", "")).strip()
+            lib_item = _nid_to_lib.get(assignment_nid, {})
             ddl_key = f"{due_ms}_{asgn_name}_{course_code}"
             if ddl_key in seen_ddl:
                 continue
@@ -716,6 +718,9 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
                 "category": category,
                 "is_aol":   is_aol(category),
             }
+            assignment_link = lib_item.get("link", "")
+            if assignment_link:
+                entry["assignmentLink"] = assignment_link
             weight = gb_row.get("分类权重%")
             if weight is not None:
                 entry["weight"] = weight
