@@ -456,6 +456,10 @@ function gradebookTableIdForTenant(tenantConf) {
   return (tenantConf?.gradebookTableId || process.env.FEISHU_GRADEBOOK_TABLE_ID || "").trim();
 }
 
+const COURSE_CODE_ALIASES = {
+  NEG3U: "ENG4U",
+};
+
 function mergeCourseLists(...courseLists) {
   const seen = new Set();
   const merged = [];
@@ -490,11 +494,10 @@ function buildNidLookup(libRecords) {
   return out;
 }
 
-async function buildUpcomingDeadlinesForStudent(tenantKey, token, tenantConf, studentName, { forceRefresh = false } = {}) {
+async function fetchGradebookRowsForStudent(tenantKey, token, tenantConf, studentName, { forceRefresh = false } = {}) {
   const gradebookTableId = gradebookTableIdForTenant(tenantConf);
   if (!gradebookTableId) return [];
-
-  const gradebookRows = await bitableFetchByFilterCached(
+  return await bitableFetchByFilterCached(
     tenantKey,
     token,
     tenantConf.appToken,
@@ -503,7 +506,93 @@ async function buildUpcomingDeadlinesForStudent(tenantKey, token, tenantConf, st
     ["学生姓名", "课程名", "作业名", "作业NID", "截止日期", "分类", "分类权重%"],
     { forceRefresh },
   );
-  if (!gradebookRows.length) return [];
+}
+
+function authoritativeCoursesFromGradebookRows(gradebookRows) {
+  return mergeCourseLists((gradebookRows || []).map((row) => normalizeGradebookCourseName(row.fields?.["课程名"])));
+}
+
+function normalizeCourseByAuthority(course, authoritativeCourses) {
+  const raw = String(course || "").trim().toUpperCase();
+  if (!raw) return "";
+  const alias = COURSE_CODE_ALIASES[raw] || raw;
+  const authoritativeSet = new Set((authoritativeCourses || []).map((item) => String(item || "").trim().toUpperCase()).filter(Boolean));
+  if (!authoritativeSet.size || authoritativeSet.has(alias)) return alias;
+  const prefix = alias.slice(0, 3);
+  const candidates = [...authoritativeSet].filter((code) => code.startsWith(prefix));
+  if (candidates.length === 1) return candidates[0];
+  return alias;
+}
+
+function mergeCourseProgressEntries(entries) {
+  const merged = new Map();
+  for (const entry of entries || []) {
+    const key = [
+      entry.course || "",
+      entry.semester || "",
+      entry.sectionNid || "",
+      entry.isCurrentSemester === false ? "0" : "1",
+    ].join("|");
+    const current = merged.get(key);
+    if (!current) {
+      merged.set(key, {
+        ...entry,
+        aol_details: Array.isArray(entry.aol_details) ? [...entry.aol_details] : [],
+      });
+      continue;
+    }
+    current.submittedCount = (current.submittedCount || 0) + (entry.submittedCount || 0);
+    current.missingCount = (current.missingCount || 0) + (entry.missingCount || 0);
+    current.aolSubmitted = (current.aolSubmitted || 0) + (entry.aolSubmitted || 0);
+    current.aolMissing = (current.aolMissing || 0) + (entry.aolMissing || 0);
+    if ((current.current_grade == null || current.current_grade === "") && entry.current_grade != null) {
+      current.current_grade = entry.current_grade;
+      current.grade_updated_at = entry.grade_updated_at || current.grade_updated_at;
+    }
+    if ((!current.aol_details || !current.aol_details.length) && Array.isArray(entry.aol_details) && entry.aol_details.length) {
+      current.aol_details = [...entry.aol_details];
+    }
+  }
+  return [...merged.values()];
+}
+
+function normalizeDashboardPayloadCourses(payload, authoritativeCourses) {
+  if (!payload || !authoritativeCourses?.length) return payload;
+
+  const normalizeCourse = (course) => normalizeCourseByAuthority(course, authoritativeCourses);
+  const courses = mergeCourseLists((payload.courses || []).map(normalizeCourse));
+  const courseProgress = mergeCourseProgressEntries((payload.courseProgress || []).map((entry) => ({
+    ...entry,
+    course: normalizeCourse(entry.course),
+  })));
+
+  const remapCourseObject = (item) => ({
+    ...item,
+    course: normalizeCourse(item.course),
+  });
+
+  const missingByCourse = {};
+  for (const [course, count] of Object.entries(payload.missingByCourse || {})) {
+    const key = normalizeCourse(course);
+    if (!key) continue;
+    missingByCourse[key] = (missingByCourse[key] || 0) + (Number(count) || 0);
+  }
+
+  return {
+    ...payload,
+    courses,
+    courseProgress,
+    missingItems: (payload.missingItems || []).map(remapCourseObject),
+    recentSubmissions: (payload.recentSubmissions || []).map(remapCourseObject),
+    attentionItems: (payload.attentionItems || []).map(remapCourseObject),
+    upcomingDeadlines: (payload.upcomingDeadlines || []).map(remapCourseObject),
+    missingByCourse,
+  };
+}
+
+async function buildUpcomingDeadlinesForStudent(tenantKey, token, tenantConf, studentName, { forceRefresh = false, gradebookRows = null } = {}) {
+  const rows = gradebookRows || await fetchGradebookRowsForStudent(tenantKey, token, tenantConf, studentName, { forceRefresh });
+  if (!rows.length) return [];
 
   const libRecords = await bitableFetchAllCached(tenantKey, token, tenantConf.appToken, tenantConf.libTableId, { forceRefresh });
   const nidLookup = buildNidLookup(libRecords);
@@ -511,7 +600,7 @@ async function buildUpcomingDeadlinesForStudent(tenantKey, token, tenantConf, st
   const seen = new Set();
   const deadlines = [];
 
-  for (const row of gradebookRows) {
+  for (const row of rows) {
     const fields = row.fields || {};
     const dueMsRaw = fields["截止日期"];
     const dueMs = Number(dueMsRaw);
@@ -552,10 +641,20 @@ function deadlinesNeedLinkEnrichment(payload) {
 
 async function enrichDashboardPayloadWithUpcomingDeadlines(payload, tenantKey, token, tenantConf, studentName, forceRefresh) {
   if (!payload || !gradebookTableIdForTenant(tenantConf)) return payload;
-  if (!forceRefresh && !deadlinesNeedLinkEnrichment(payload)) return payload;
-  const upcomingDeadlines = await buildUpcomingDeadlinesForStudent(tenantKey, token, tenantConf, studentName, { forceRefresh });
-  if (!upcomingDeadlines.length) return payload;
-  return { ...payload, upcomingDeadlines };
+  const gradebookRows = await fetchGradebookRowsForStudent(tenantKey, token, tenantConf, studentName, { forceRefresh });
+  const authoritativeCourses = authoritativeCoursesFromGradebookRows(gradebookRows);
+  let enriched = normalizeDashboardPayloadCourses(payload, authoritativeCourses);
+  if (!forceRefresh && !deadlinesNeedLinkEnrichment(enriched)) return enriched;
+  const upcomingDeadlines = await buildUpcomingDeadlinesForStudent(tenantKey, token, tenantConf, studentName, { forceRefresh, gradebookRows });
+  if (!upcomingDeadlines.length) return enriched;
+  enriched = {
+    ...enriched,
+    upcomingDeadlines: upcomingDeadlines.map((item) => ({
+      ...item,
+      course: normalizeCourseByAuthority(item.course, authoritativeCourses),
+    })),
+  };
+  return enriched;
 }
 
 function extractLinkedRecordIds(value) {
