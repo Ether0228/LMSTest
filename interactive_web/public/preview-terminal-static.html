@@ -513,6 +513,10 @@ button {
   margin-top: var(--space-2);
 }
 
+.course-list--history {
+  margin-top: 0;
+}
+
 .stack-list {
   gap: var(--space-2);
   margin-top: var(--space-1);
@@ -781,6 +785,11 @@ button {
 
 .terminal-section {
   border-top: 1px dashed var(--line-strong);
+  padding-top: var(--space-2);
+}
+
+.course-history-block {
+  margin-top: var(--space-1);
   padding-top: var(--space-2);
 }
 
@@ -1731,42 +1740,42 @@ button {
               </div>
             </div>
             <div id="courseList" class="course-list">
-      <article class="terminal-card terminal-card--danger" data-course-card="">
-        <div class="terminal-card__head">
-          <div class="course-card__title-block">
-            <div class="course-card__title">
-              <span class="course-card__code">&gt; BOH4M</span>
-            </div>
-            <div class="course-card__chips">
-              
-            </div>
+    <article class="terminal-card terminal-card--danger" data-course-card="">
+      <div class="terminal-card__head">
+        <div class="course-card__title-block">
+          <div class="course-card__title">
+            <span class="course-card__code">&gt; BOH4M</span>
           </div>
-          <div class="course-card__grade">
-            --
-            <span class="course-card__grade-sub">暂无总评分</span>
+          <div class="course-card__chips">
+            
           </div>
         </div>
-        <div class="terminal-card__body">
-          <div class="course-card__progress-head">
-            <span>当前进度</span>
-            <div class="course-card__progress-meta">
-              <strong>22.2%</strong>
-              <span class="course-card__chip course-card__chip--danger">高风险</span>
-            </div>
+        <div class="course-card__grade">
+          --
+          <span class="course-card__grade-sub">暂无总评分</span>
+        </div>
+      </div>
+      <div class="terminal-card__body">
+        <div class="course-card__progress-head">
+          <span>当前进度</span>
+          <div class="course-card__progress-meta">
+            <strong>22.2%</strong>
+            <span class="course-card__chip course-card__chip--danger">高风险</span>
           </div>
-          <div class="progress-bar">
-            <div class="progress-bar__rail">
-              <div class="progress-bar__fill" style="width:22.2%"></div>
-            </div>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-bar__rail">
+            <div class="progress-bar__fill" style="width:22.2%"></div>
           </div>
-          <div class="course-card__stats">
-            <span class="course-card__stat"><strong>2</strong> 已交</span>
-            <span class="course-card__stat"><strong>7</strong> 缺交</span>
-            <span class="course-card__stat"><strong>0</strong> 已评分</span>
-          </div>
+        </div>
+        <div class="course-card__stats">
+          <span class="course-card__stat"><strong>2</strong> 已交</span>
+          <span class="course-card__stat"><strong>7</strong> 缺交</span>
+          <span class="course-card__stat"><strong>0</strong> 已评分</span>
+        </div>
 
-          <div class="terminal-sections">
-            
+        <div class="terminal-sections">
+          
     <section class="terminal-section " data-terminal-section="">
       <button class="terminal-section__toggle" type="button">
         <span class="terminal-section__toggle-main">
@@ -1778,11 +1787,11 @@ button {
       <div class="terminal-section__body"><div class="terminal-empty">当前没有评分记录。</div></div>
     </section>
   
-            
-    <section class="terminal-section is-open" data-terminal-section="">
+          
+    <section class="terminal-section " data-terminal-section="">
       <button class="terminal-section__toggle" type="button">
         <span class="terminal-section__toggle-main">
-          <span class="terminal-section__icon">[-]</span>
+          <span class="terminal-section__icon">[+]</span>
           <span class="terminal-section__label">未提交作业</span>
         </span>
         <span class="terminal-section__count">7</span>
@@ -1864,7 +1873,7 @@ button {
   </div>
     </section>
   
-            
+          
     <section class="terminal-section " data-terminal-section="">
       <button class="terminal-section__toggle" type="button">
         <span class="terminal-section__toggle-main">
@@ -1876,46 +1885,46 @@ button {
       <div class="terminal-section__body"><div class="terminal-empty">当前没有近期提交记录。</div></div>
     </section>
   
-          </div>
         </div>
-      </article>
-    
-      <article class="terminal-card terminal-card--danger" data-course-card="">
-        <div class="terminal-card__head">
-          <div class="course-card__title-block">
-            <div class="course-card__title">
-              <span class="course-card__code">&gt; CIA4U</span>
-            </div>
-            <div class="course-card__chips">
-              
-            </div>
+      </div>
+    </article>
+  
+    <article class="terminal-card terminal-card--danger" data-course-card="">
+      <div class="terminal-card__head">
+        <div class="course-card__title-block">
+          <div class="course-card__title">
+            <span class="course-card__code">&gt; CIA4U</span>
           </div>
-          <div class="course-card__grade">
-            --
-            <span class="course-card__grade-sub">暂无总评分</span>
-          </div>
-        </div>
-        <div class="terminal-card__body">
-          <div class="course-card__progress-head">
-            <span>当前进度</span>
-            <div class="course-card__progress-meta">
-              <strong>33.3%</strong>
-              <span class="course-card__chip course-card__chip--danger">高风险</span>
-            </div>
-          </div>
-          <div class="progress-bar">
-            <div class="progress-bar__rail">
-              <div class="progress-bar__fill" style="width:33.3%"></div>
-            </div>
-          </div>
-          <div class="course-card__stats">
-            <span class="course-card__stat"><strong>2</strong> 已交</span>
-            <span class="course-card__stat"><strong>4</strong> 缺交</span>
-            <span class="course-card__stat"><strong>0</strong> 已评分</span>
-          </div>
-
-          <div class="terminal-sections">
+          <div class="course-card__chips">
             
+          </div>
+        </div>
+        <div class="course-card__grade">
+          --
+          <span class="course-card__grade-sub">暂无总评分</span>
+        </div>
+      </div>
+      <div class="terminal-card__body">
+        <div class="course-card__progress-head">
+          <span>当前进度</span>
+          <div class="course-card__progress-meta">
+            <strong>33.3%</strong>
+            <span class="course-card__chip course-card__chip--danger">高风险</span>
+          </div>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-bar__rail">
+            <div class="progress-bar__fill" style="width:33.3%"></div>
+          </div>
+        </div>
+        <div class="course-card__stats">
+          <span class="course-card__stat"><strong>2</strong> 已交</span>
+          <span class="course-card__stat"><strong>4</strong> 缺交</span>
+          <span class="course-card__stat"><strong>0</strong> 已评分</span>
+        </div>
+
+        <div class="terminal-sections">
+          
     <section class="terminal-section " data-terminal-section="">
       <button class="terminal-section__toggle" type="button">
         <span class="terminal-section__toggle-main">
@@ -1927,7 +1936,7 @@ button {
       <div class="terminal-section__body"><div class="terminal-empty">当前没有评分记录。</div></div>
     </section>
   
-            
+          
     <section class="terminal-section " data-terminal-section="">
       <button class="terminal-section__toggle" type="button">
         <span class="terminal-section__toggle-main">
@@ -1983,7 +1992,7 @@ button {
   </div>
     </section>
   
-            
+          
     <section class="terminal-section " data-terminal-section="">
       <button class="terminal-section__toggle" type="button">
         <span class="terminal-section__toggle-main">
@@ -2009,46 +2018,57 @@ button {
   </div>
     </section>
   
-          </div>
         </div>
-      </article>
-    
-      <article class="terminal-card terminal-card--muted" data-course-card="">
-        <div class="terminal-card__head">
-          <div class="course-card__title-block">
-            <div class="course-card__title">
-              <span class="course-card__code">&gt; MDM4U</span>
-            </div>
-            <div class="course-card__chips">
-              
-            </div>
-          </div>
-          <div class="course-card__grade">
-            69.8%
-            <span class="course-card__grade-sub">更新于 3月11日</span>
-          </div>
-        </div>
-        <div class="terminal-card__body">
-          <div class="course-card__progress-head">
-            <span>当前进度</span>
-            <div class="course-card__progress-meta">
-              <strong>0%</strong>
-              <span class="course-card__chip course-card__chip--muted">历史学期</span>
-            </div>
-          </div>
-          <div class="progress-bar">
-            <div class="progress-bar__rail">
-              <div class="progress-bar__fill" style="width:0%"></div>
-            </div>
-          </div>
-          <div class="course-card__stats">
-            <span class="course-card__stat"><strong>0</strong> 已交</span>
-            <span class="course-card__stat"><strong>0</strong> 缺交</span>
-            <span class="course-card__stat"><strong>6</strong> 已评分</span>
-          </div>
-
-          <div class="terminal-sections">
+      </div>
+    </article>
+  
+      <section class="course-history-block terminal-section" data-terminal-section="">
+        <button class="terminal-section__toggle" type="button">
+          <span class="terminal-section__toggle-main">
+            <span class="terminal-section__icon">[+]</span>
+            <span class="terminal-section__label">历史学期</span>
+          </span>
+          <span class="terminal-section__count">1</span>
+        </button>
+        <div class="terminal-section__body">
+          <div class="course-list course-list--history">
             
+    <article class="terminal-card terminal-card--muted" data-course-card="">
+      <div class="terminal-card__head">
+        <div class="course-card__title-block">
+          <div class="course-card__title">
+            <span class="course-card__code">&gt; MDM4U</span>
+          </div>
+          <div class="course-card__chips">
+            
+          </div>
+        </div>
+        <div class="course-card__grade">
+          69.8%
+          <span class="course-card__grade-sub">更新于 3月11日</span>
+        </div>
+      </div>
+      <div class="terminal-card__body">
+        <div class="course-card__progress-head">
+          <span>当前进度</span>
+          <div class="course-card__progress-meta">
+            <strong>0%</strong>
+            <span class="course-card__chip course-card__chip--muted">历史学期</span>
+          </div>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-bar__rail">
+            <div class="progress-bar__fill" style="width:0%"></div>
+          </div>
+        </div>
+        <div class="course-card__stats">
+          <span class="course-card__stat"><strong>0</strong> 已交</span>
+          <span class="course-card__stat"><strong>0</strong> 缺交</span>
+          <span class="course-card__stat"><strong>6</strong> 已评分</span>
+        </div>
+
+        <div class="terminal-sections">
+          
     <section class="terminal-section " data-terminal-section="">
       <button class="terminal-section__toggle" type="button">
         <span class="terminal-section__toggle-main">
@@ -2130,7 +2150,7 @@ button {
   </div>
     </section>
   
-            
+          
     <section class="terminal-section " data-terminal-section="">
       <button class="terminal-section__toggle" type="button">
         <span class="terminal-section__toggle-main">
@@ -2286,7 +2306,7 @@ button {
   </div>
     </section>
   
-            
+          
     <section class="terminal-section " data-terminal-section="">
       <button class="terminal-section__toggle" type="button">
         <span class="terminal-section__toggle-main">
@@ -2298,9 +2318,13 @@ button {
       <div class="terminal-section__body"><div class="terminal-empty">当前没有近期提交记录。</div></div>
     </section>
   
+        </div>
+      </div>
+    </article>
+  
           </div>
         </div>
-      </article>
+      </section>
     </div>
           </section>
 

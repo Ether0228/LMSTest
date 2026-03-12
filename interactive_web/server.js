@@ -409,6 +409,20 @@ function normalizeName(s) {
   return String(s || "").trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+function mergeCourseLists(...courseLists) {
+  const seen = new Set();
+  const merged = [];
+  for (const courseList of courseLists) {
+    for (const course of courseList || []) {
+      const value = String(course || "").trim();
+      if (!value || seen.has(value)) continue;
+      seen.add(value);
+      merged.push(value);
+    }
+  }
+  return merged;
+}
+
 function extractLinkedRecordIds(value) {
   const out = [];
   const visit = (node) => {
@@ -445,7 +459,7 @@ function extractLinkedRecordIds(value) {
 }
 
 function summarizeForStudent({ rosterRec, submissions, missing }) {
-  const courses = Array.isArray(rosterRec?.fields?.["所属课程"]) ? rosterRec.fields["所属课程"] : [];
+  const rosterCourses = Array.isArray(rosterRec?.fields?.["所属课程"]) ? rosterRec.fields["所属课程"] : [];
 
   const missingByCourse = new Map();
   for (const m of missing) {
@@ -472,6 +486,11 @@ function summarizeForStudent({ rosterRec, submissions, missing }) {
 
   const missingTotal = missing.length;
   const submittedTotal = submissions.length;
+  const courses = mergeCourseLists(
+    rosterCourses,
+    [...missingByCourse.keys()],
+    submissions.map((r) => (r.fields?.["所属课程"] || "").toString().trim()).filter(Boolean),
+  );
 
   // 智能推荐：只用“可从现有表算出来”的信号；学分相关后续用 roster 扩展字段接入
   const recommendations = [];

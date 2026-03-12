@@ -217,6 +217,21 @@ def clean_schoology_url(url):
     return match.group(1) if match else text
 
 
+def merge_course_lists(*course_lists):
+    seen = set()
+    merged = []
+    for course_list in course_lists:
+        if not course_list:
+            continue
+        for course in course_list:
+            value = str(course or "").strip()
+            if not value or value in seen:
+                continue
+            seen.add(value)
+            merged.append(value)
+    return merged
+
+
 def build_assignment_lookup(lib_records):
     # rec_id -> {name, link, course, nature, semester}
     out = {}
@@ -275,24 +290,45 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
         courses = f.get("所属课程", [])
         if not isinstance(courses, list):
             courses = [courses] if courses else []
-        students[name] = {
-            "name": name,
-            "roster_record_id": r.get("record_id"),
-            "courses": courses,
-            "submitted": [],
-            "missing": [],
-            "missing_items": [],
-            "submitted_by_course": {},
-            "submitted_by_course_sem": {},  # {(course, semester): set}
-            "expected_by_course": {},
-            # 花名册额外字段（需在飞书花名册表中添加对应列）
-            "school_year":   str(f.get("学年", "")).strip(),
-            "semester_num":  str(f.get("学期号", "")).strip(),
-            "osslt":         str(f.get("OSSLT状态", "")).strip(),
-            "credits_earned": f.get("已获学分", ""),
-            "credits_target": f.get("目标学分", ""),
-            "notices_raw":   str(f.get("公告", "")).strip(),
-        }
+        row_record_id = r.get("record_id")
+        if name not in students:
+            students[name] = {
+                "name": name,
+                "roster_record_id": row_record_id,
+                "roster_record_ids": [row_record_id] if row_record_id else [],
+                "courses": merge_course_lists(courses),
+                "submitted": [],
+                "missing": [],
+                "missing_items": [],
+                "submitted_by_course": {},
+                "submitted_by_course_sem": {},  # {(course, semester): set}
+                "expected_by_course": {},
+                # 花名册额外字段（需在飞书花名册表中添加对应列）
+                "school_year":   str(f.get("学年", "")).strip(),
+                "semester_num":  str(f.get("学期号", "")).strip(),
+                "osslt":         str(f.get("OSSLT状态", "")).strip(),
+                "credits_earned": f.get("已获学分", ""),
+                "credits_target": f.get("目标学分", ""),
+                "notices_raw":   str(f.get("公告", "")).strip(),
+            }
+            continue
+
+        student = students[name]
+        student["courses"] = merge_course_lists(student.get("courses", []), courses)
+        if row_record_id and row_record_id not in student["roster_record_ids"]:
+            student["roster_record_ids"].append(row_record_id)
+            if not student.get("roster_record_id"):
+                student["roster_record_id"] = row_record_id
+        for field_key, raw_value in (
+            ("school_year", str(f.get("学年", "")).strip()),
+            ("semester_num", str(f.get("学期号", "")).strip()),
+            ("osslt", str(f.get("OSSLT状态", "")).strip()),
+            ("credits_earned", f.get("已获学分", "")),
+            ("credits_target", f.get("目标学分", "")),
+            ("notices_raw", str(f.get("公告", "")).strip()),
+        ):
+            if raw_value not in ("", None):
+                student[field_key] = raw_value
 
     # 1b) 从 Gradebook 自动推断每个学生的选课（替代花名册"所属课程"字段）
     if gradebook_by_student:
@@ -304,12 +340,13 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
             })
             if gb_name in students:
                 if gb_courses:
-                    students[gb_name]["courses"] = gb_courses
+                    students[gb_name]["courses"] = merge_course_lists(students[gb_name]["courses"], gb_courses)
             else:
                 # Gradebook 里有但花名册缺失的学生（新生或花名册未同步）
                 students[gb_name] = {
                     "name": gb_name,
                     "roster_record_id": None,
+                    "roster_record_ids": [],
                     "courses": gb_courses,
                     "submitted": [],
                     "missing": [],
@@ -392,9 +429,11 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
                 sbc_sem[key_sem].add(dedup_key)
 
     # 3) 缺交记录聚合（按"关联学生" record_id）
-    roster_id_to_name = {
-        v["roster_record_id"]: k for k, v in students.items() if v.get("roster_record_id")
-    }
+    roster_id_to_name = {}
+    for student_name, student in students.items():
+        for record_id in student.get("roster_record_ids", []):
+            if record_id:
+                roster_id_to_name[record_id] = student_name
     missing_rows_total = 0
     missing_rows_with_link = 0
     missing_links_matched = 0
@@ -479,9 +518,6 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
             missing_by_course[c] = missing_by_course.get(c, 0) + 1
             sem = item.get("semester", "")
             missing_by_course_sem[(c, sem)] = missing_by_course_sem.get((c, sem), 0) + 1
-        # courseProgress 只显示花名册里的课程，跨学期宽限期提交不额外增加课程卡
-        all_courses = sorted(set(s["courses"]))
-
         # AoL 统计
         aol_submitted_by_course = {}
         for sub in s["submitted"]:
@@ -513,8 +549,37 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
             if nid:
                 _gb_rows_by_course_section.setdefault((c_key, nid), []).append(gb_row)
 
+        # 课程卡片不能只依赖 gradebook 推断的选课，否则“本学期还没出 gradebook 行、但已有缺交”的课程会消失。
+        all_courses = sorted(set(merge_course_lists(
+            s["courses"],
+            [item.get("course", "") for item in s["missing"]],
+            [item.get("course", "") for item in s["submitted"]],
+            list(_gb_rows_by_course.keys()),
+        )))
+
         _section_semesters = section_semesters or {}
         _active_nids       = active_section_nids or set()
+
+        def _compute_progress_counts(course_code, semester_label):
+            if semester_label and (course_code, semester_label) in lib_by_course_sem:
+                expected_count = int(lib_by_course_sem[(course_code, semester_label)])
+                missing_count = int(missing_by_course_sem.get((course_code, semester_label), 0))
+                submitted_sem = s["submitted_by_course_sem"].get((course_code, semester_label))
+                if submitted_sem is not None:
+                    submitted_count = len(submitted_sem)
+                else:
+                    submitted_count = max(expected_count - missing_count, 0) if expected_count > 0 else 0
+            else:
+                expected_count = int(s["expected_by_course"].get(course_code, 0))
+                missing_count = int(missing_by_course.get(course_code, 0))
+                submitted_course = s["submitted_by_course"].get(course_code)
+                if submitted_course is not None:
+                    submitted_count = len(submitted_course)
+                else:
+                    submitted_count = max(expected_count - missing_count, 0) if expected_count > 0 else 0
+            total = expected_count if expected_count > 0 else (submitted_count + missing_count)
+            completion = round((submitted_count / total) * 100, 1) if total > 0 else 0.0
+            return submitted_count, missing_count, completion
 
         def _extract_grade_and_aol(gb_course_rows):
             """从 gradebook 行中提取 current_grade 和 aol_details。"""
@@ -570,13 +635,7 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
 
             if not matched_nids:
                 # 无 NID 分组（无 gradebook 数据或所有行 NID 为空）→ 原始单条逻辑
-                expected_count = int(s["expected_by_course"].get(c, 0))
-                missing_count  = int(missing_by_course.get(c, 0))
-                submitted_from_expected = max(expected_count - missing_count, 0) if expected_count > 0 else 0
-                sbc_val = s["submitted_by_course"].get(c)
-                submitted_count = len(sbc_val) if sbc_val is not None else submitted_from_expected
-                total = expected_count if expected_count > 0 else (submitted_count + missing_count)
-                completion = round((submitted_count / total) * 100, 1) if total > 0 else 0.0
+                submitted_count, missing_count, completion = _compute_progress_counts(c, "")
                 current_grade, grade_updated_at, aol_details = _extract_grade_and_aol(
                     _gb_rows_by_course.get(c, [])
                 )
@@ -605,34 +664,9 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
                 sem_label  = sem_info.get("session", "")
 
                 current_grade, grade_updated_at, aol_details = _extract_grade_and_aol(gb_course_rows)
-
-                if is_current:
-                    # 当前学期：按学期精确统计提交/缺交，避免多学期重叠时分母错误
-                    if sem_label and (c, sem_label) in lib_by_course_sem:
-                        expected_count = int(lib_by_course_sem[(c, sem_label)])
-                        missing_count  = int(missing_by_course_sem.get((c, sem_label), 0))
-                        sbc_sem_val = s["submitted_by_course_sem"].get((c, sem_label))
-                        if sbc_sem_val is not None:
-                            submitted_count = len(sbc_sem_val)
-                        else:
-                            submitted_count = max(expected_count - missing_count, 0) if expected_count > 0 else 0
-                    else:
-                        # 无学期标签（旧数据兼容）：退回课程维度统计
-                        expected_count = int(s["expected_by_course"].get(c, 0))
-                        missing_count  = int(missing_by_course.get(c, 0))
-                        sbc_val = s["submitted_by_course"].get(c)
-                        submitted_count = len(sbc_val) if sbc_val is not None else max(expected_count - missing_count, 0) if expected_count > 0 else 0
-                    total = expected_count if expected_count > 0 else (submitted_count + missing_count)
-                    completion = round((submitted_count / total) * 100, 1) if total > 0 else 0.0
-                    aol_submitted = aol_submitted_by_course.get(c, 0)
-                    aol_missing   = aol_missing_by_course.get(c, 0)
-                else:
-                    # 上学期：只展示成绩，不计入提交/缺交统计
-                    submitted_count = 0
-                    missing_count   = 0
-                    completion      = 0.0
-                    aol_submitted   = 0
-                    aol_missing     = 0
+                submitted_count, missing_count, completion = _compute_progress_counts(c, sem_label)
+                aol_submitted = aol_submitted_by_course.get(c, 0)
+                aol_missing = aol_missing_by_course.get(c, 0)
 
                 cp_entry = {
                     "course":         c,
@@ -767,8 +801,8 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
 
         row = {
             "学生姓名": name,
-            "关联学生": [s["roster_record_id"]] if s.get("roster_record_id") else [],
-            "课程清单JSON": chunk_text_json(s["courses"]),
+            "关联学生": s.get("roster_record_ids", []),
+            "课程清单JSON": chunk_text_json(all_courses),
             "缺交总数": missing_total,
             "已提交总数": submitted_total,
             "缺交按课程JSON": chunk_text_json(missing_by_course),

@@ -168,6 +168,20 @@ function clampText(value, maxLen) {
   return `${text.slice(0, Math.max(1, maxLen - 1))}…`;
 }
 
+function mergeCourseNames(...courseLists) {
+  const seen = new Set();
+  const merged = [];
+  for (const courseList of courseLists) {
+    for (const course of courseList || []) {
+      const value = String(course || "").trim();
+      if (!value || seen.has(value)) continue;
+      seen.add(value);
+      merged.push(value);
+    }
+  }
+  return merged;
+}
+
 function deadlineDisplayType(deadline) {
   const name = `${deadline?.name || ""} ${deadline?.category || ""}`;
   if (deadline?.is_aol || /assessment\s+of\s+learning|aol/i.test(name)) return "AoL";
@@ -343,13 +357,34 @@ function normalizeApiResponse(raw) {
     sectionNid: course.sectionNid || null,
     isCurrentSemester: course.isCurrentSemester !== false,
   }));
+  const courseProgressCodes = new Set(courseProgress.map((course) => String(course.course || "").trim()).filter(Boolean));
+  const missingByCourseRaw = raw.missingByCourse || {};
+  const missingCounts = new Map();
+  for (const [courseName, count] of Object.entries(missingByCourseRaw)) {
+    const key = String(courseName || "").trim();
+    if (!key) continue;
+    missingCounts.set(key, Number(count) || 0);
+  }
+  for (const item of missingItems) {
+    const key = String(item.course || "").trim();
+    if (!key || missingCounts.has(key)) continue;
+    missingCounts.set(key, (missingCounts.get(key) || 0) + 1);
+  }
 
-  const finalCourseProgress = courseProgress.length
-    ? courseProgress
-    : (raw.courses || []).map((course) => ({
-        course: typeof course === "string" ? course : course.name || "",
+  const fallbackCourses = mergeCourseNames(
+    (raw.courses || []).map((course) => (typeof course === "string" ? course : course?.name || "")),
+    missingItems.map((item) => item.course || ""),
+    attentionItems.map((item) => item.course || ""),
+    recentSubmitted.map((item) => item.course || ""),
+    upcomingDeadlines.map((item) => item.course || ""),
+  )
+    .filter((course) => !courseProgressCodes.has(course))
+    .map((course) => {
+      const missingCount = missingCounts.get(course) || 0;
+      return {
+        course,
         submittedCount: 0,
-        missingCount: 0,
+        missingCount,
         completion: 0,
         current_grade: null,
         grade_updated_at: null,
@@ -359,7 +394,10 @@ function normalizeApiResponse(raw) {
         semester: null,
         sectionNid: null,
         isCurrentSemester: true,
-      }));
+      };
+    });
+
+  const finalCourseProgress = [...courseProgress, ...fallbackCourses];
 
   const schoolYear = raw.schoolYear || "";
   const semesterNum = raw.semesterNum || "";
@@ -661,63 +699,90 @@ function buildTerminalRows(items, kind) {
   `;
 }
 
+function renderCourseCard(course, data, options = {}) {
+  const missingItems = (data.missing_items || []).filter((item) => item.course === course.course);
+  const recentItems = (data.recent_submitted || []).filter((item) => item.course === course.course);
+  const semesterChip = course.semester ? `<span class="course-card__chip">${esc(course.semester)}</span>` : "";
+  const risk = describeCourseRisk(course);
+  const gradeText = course.current_grade != null ? `${course.current_grade}%` : "--";
+  const updatedText = course.grade_updated_at ? `更新于 ${formatDateCN(course.grade_updated_at)}` : "暂无总评分";
+  const completion = Math.max(0, Math.min(Number(course.completion) || 0, 100));
+  const defaultMissingOpen = options.defaultMissingOpen === true;
+
+  return `
+    <article class="terminal-card terminal-card--${esc(risk.tone)}" data-course-card>
+      <div class="terminal-card__head">
+        <div class="course-card__title-block">
+          <div class="course-card__title">
+            <span class="course-card__code">&gt; ${esc(course.course)}</span>
+          </div>
+          <div class="course-card__chips">
+            ${semesterChip}
+          </div>
+        </div>
+        <div class="course-card__grade">
+          ${esc(gradeText)}
+          <span class="course-card__grade-sub">${esc(updatedText)}</span>
+        </div>
+      </div>
+      <div class="terminal-card__body">
+        <div class="course-card__progress-head">
+          <span>当前进度</span>
+          <div class="course-card__progress-meta">
+            <strong>${esc(completion)}%</strong>
+            <span class="course-card__chip course-card__chip--${esc(risk.tone)}">${esc(risk.label)}</span>
+          </div>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-bar__rail">
+            <div class="progress-bar__fill" style="width:${completion}%"></div>
+          </div>
+        </div>
+        <div class="course-card__stats">
+          <span class="course-card__stat"><strong>${esc(course.submittedCount)}</strong> 已交</span>
+          <span class="course-card__stat"><strong>${esc(course.missingCount)}</strong> 缺交</span>
+          <span class="course-card__stat"><strong>${esc(course.aol_details?.length || 0)}</strong> 已评分</span>
+        </div>
+
+        <div class="terminal-sections">
+          ${buildCourseSection("aol", "AoL 评分详情", course.aol_details || [], buildTerminalRows(course.aol_details || [], "aol"), false)}
+          ${buildCourseSection("missing", "未提交作业", missingItems, buildTerminalRows(missingItems, "missing"), defaultMissingOpen && missingItems.length > 0)}
+          ${buildCourseSection("recent", "本周提交记录", recentItems, buildTerminalRows(recentItems, "recent"), false)}
+        </div>
+      </div>
+    </article>
+  `;
+}
+
 function renderCourses(data) {
   const container = document.getElementById("courseList");
-  const list = (data.course_progress || []).map((course, index) => {
-    const missingItems = (data.missing_items || []).filter((item) => item.course === course.course);
-    const recentItems = (data.recent_submitted || []).filter((item) => item.course === course.course);
-    const semesterChip = course.semester ? `<span class="course-card__chip">${esc(course.semester)}</span>` : "";
-    const risk = describeCourseRisk(course);
-    const gradeText = course.current_grade != null ? `${course.current_grade}%` : "--";
-    const updatedText = course.grade_updated_at ? `更新于 ${formatDateCN(course.grade_updated_at)}` : "暂无总评分";
-    const completion = Math.max(0, Math.min(Number(course.completion) || 0, 100));
+  const currentCourses = (data.course_progress || []).filter((course) => course.isCurrentSemester !== false);
+  const historyCourses = (data.course_progress || []).filter((course) => course.isCurrentSemester === false);
 
-    return `
-      <article class="terminal-card terminal-card--${esc(risk.tone)}" data-course-card>
-        <div class="terminal-card__head">
-          <div class="course-card__title-block">
-            <div class="course-card__title">
-              <span class="course-card__code">&gt; ${esc(course.course)}</span>
-            </div>
-            <div class="course-card__chips">
-              ${semesterChip}
-            </div>
-          </div>
-          <div class="course-card__grade">
-            ${esc(gradeText)}
-            <span class="course-card__grade-sub">${esc(updatedText)}</span>
+  const currentHtml = currentCourses
+    .map((course) => renderCourseCard(course, data, { defaultMissingOpen: false }))
+    .join("");
+
+  const historyHtml = historyCourses.length
+    ? `
+      <section class="course-history-block terminal-section" data-terminal-section>
+        <button class="terminal-section__toggle" type="button">
+          <span class="terminal-section__toggle-main">
+            <span class="terminal-section__icon">[+]</span>
+            <span class="terminal-section__label">历史学期</span>
+          </span>
+          <span class="terminal-section__count">${historyCourses.length}</span>
+        </button>
+        <div class="terminal-section__body">
+          <div class="course-list course-list--history">
+            ${historyCourses.map((course) => renderCourseCard(course, data, { defaultMissingOpen: false })).join("")}
           </div>
         </div>
-        <div class="terminal-card__body">
-          <div class="course-card__progress-head">
-            <span>当前进度</span>
-            <div class="course-card__progress-meta">
-              <strong>${esc(completion)}%</strong>
-              <span class="course-card__chip course-card__chip--${esc(risk.tone)}">${esc(risk.label)}</span>
-            </div>
-          </div>
-          <div class="progress-bar">
-            <div class="progress-bar__rail">
-              <div class="progress-bar__fill" style="width:${completion}%"></div>
-            </div>
-          </div>
-          <div class="course-card__stats">
-            <span class="course-card__stat"><strong>${esc(course.submittedCount)}</strong> 已交</span>
-            <span class="course-card__stat"><strong>${esc(course.missingCount)}</strong> 缺交</span>
-            <span class="course-card__stat"><strong>${esc(course.aol_details?.length || 0)}</strong> 已评分</span>
-          </div>
+      </section>
+    `
+    : "";
 
-          <div class="terminal-sections">
-            ${buildCourseSection("aol", "AoL 评分详情", course.aol_details || [], buildTerminalRows(course.aol_details || [], "aol"), false)}
-            ${buildCourseSection("missing", "未提交作业", missingItems, buildTerminalRows(missingItems, "missing"), index === 0 && missingItems.length > 0)}
-            ${buildCourseSection("recent", "本周提交记录", recentItems, buildTerminalRows(recentItems, "recent"), false)}
-          </div>
-        </div>
-      </article>
-    `;
-  }).join("");
-
-  container.innerHTML = list || `<div class="terminal-empty">当前没有课程数据。</div>`;
+  container.innerHTML = `${currentHtml}${historyHtml}` || `<div class="terminal-empty">当前没有课程数据。</div>`;
 }
 
 function buildCourseSection(kind, label, items, body, isOpen) {
