@@ -698,7 +698,8 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
                     "aolMissing":     aol_missing,
                     "isCurrentSemester": is_current,
                 }
-                if has_multi and sem_label:
+                # 只要能解析出学期标签就写入，避免单 section 课程丢失 semester
+                if sem_label:
                     cp_entry["semester"] = sem_label
                 if nid:
                     cp_entry["sectionNid"] = nid
