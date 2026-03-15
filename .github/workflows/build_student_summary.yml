@@ -1,0 +1,81 @@
+name: Build Student Summary
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_missing_sync:
+        description: "先运行 check_missing_sync.py（建议在换学期或大批量变更后开启）"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      cache_tenant_key:
+        description: "写入 PostgreSQL/JSON 缓存使用的 tenant key"
+        required: true
+        default: "qea"
+      active_semesters:
+        description: "可选：覆盖活跃学期，如 2025-2026 S2（多个用逗号分隔）"
+        required: false
+        default: ""
+
+jobs:
+  build-summary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: 1. 检出代码
+        uses: actions/checkout@v4
+
+      - name: 2. 配置 Python 环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: 3. 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests psycopg2-binary
+
+      - name: 4. 可选：同步缺交表
+        if: ${{ github.event.inputs.run_missing_sync == 'true' }}
+        env:
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          FEISHU_APP_TOKEN: ${{ secrets.FEISHU_APP_TOKEN }}
+          FEISHU_TABLE_ID: ${{ secrets.FEISHU_TABLE_ID }}
+          FEISHU_ROSTER_TABLE_ID: ${{ secrets.FEISHU_ROSTER_TABLE_ID }}
+          FEISHU_LIB_TABLE_ID: ${{ secrets.FEISHU_LIB_TABLE_ID }}
+          FEISHU_MISSING_TABLE_ID: ${{ secrets.FEISHU_MISSING_TABLE_ID }}
+          FEISHU_GRADEBOOK_TABLE_ID: ${{ secrets.FEISHU_GRADEBOOK_TABLE_ID }}
+        run: python pipeline/check_missing_sync.py
+
+      - name: 5. 构建学生汇总
+        env:
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          FEISHU_APP_TOKEN: ${{ secrets.FEISHU_APP_TOKEN }}
+          FEISHU_TABLE_ID: ${{ secrets.FEISHU_TABLE_ID }}
+          FEISHU_ROSTER_TABLE_ID: ${{ secrets.FEISHU_ROSTER_TABLE_ID }}
+          FEISHU_LIB_TABLE_ID: ${{ secrets.FEISHU_LIB_TABLE_ID }}
+          FEISHU_MISSING_TABLE_ID: ${{ secrets.FEISHU_MISSING_TABLE_ID }}
+          FEISHU_SUMMARY_TABLE_ID: ${{ secrets.FEISHU_SUMMARY_TABLE_ID }}
+          FEISHU_GRADEBOOK_TABLE_ID: ${{ secrets.FEISHU_GRADEBOOK_TABLE_ID }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          CACHE_TENANT_KEY: ${{ github.event.inputs.cache_tenant_key }}
+          ACTIVE_SEMESTERS: ${{ github.event.inputs.active_semesters }}
+          CACHE_DIR: artifacts/cache
+        run: |
+          mkdir -p artifacts/cache
+          python pipeline/build_student_summary.py
+
+      - name: 6. 上传缓存产物
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: student-summary-cache-${{ github.run_id }}
+          path: artifacts/cache
+          if-no-files-found: warn
+

@@ -395,7 +395,12 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
                 break
         if not assignment:
             assignment = assignment_by_link.get(clean_schoology_url(normalize_link(f.get("作业链接"))), {})
-        course_name = assignment.get("course", "").strip() or "未分类"
+        # 优先使用作业库课程；若作业库未关联成功，回退到提交表里的所属课程，避免大量"未分类"污染课程统计
+        course_name = (
+            assignment.get("course", "").strip()
+            or str(f.get("所属课程", "")).strip()
+            or "未分类"
+        )
         sub_link = (
             (f.get("作业链接", {}) or {}).get("link", "")
             if isinstance(f.get("作业链接"), dict)
@@ -409,6 +414,7 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
                 "link": sub_link,
                 "course": course_name,
                 "nature": assignment.get("nature", ""),
+                "semester": (assignment.get("semester") or "").strip(),
             }
         )
         # 去重计数：同一作业多次提交只算 1 次（用作业链接作为唯一键，链接为空则用作业名）
@@ -476,6 +482,7 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
                     "assignmentName": assignment_name,
                     "assignmentLink": assignment_link,
                     "nature": assignment.get("nature", ""),
+                    "semester": miss_sem,
                 }
             )
 
@@ -520,16 +527,26 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
             missing_by_course_sem[(c, sem)] = missing_by_course_sem.get((c, sem), 0) + 1
         # AoL 统计
         aol_submitted_by_course = {}
+        aol_submitted_by_course_sem = {}
         for sub in s["submitted"]:
             if is_aol(sub.get("nature", "")):
                 c = sub.get("course", "未分类")
                 aol_submitted_by_course[c] = aol_submitted_by_course.get(c, 0) + 1
+                sem = str(sub.get("semester", "")).strip()
+                if sem:
+                    key = (c, sem)
+                    aol_submitted_by_course_sem[key] = aol_submitted_by_course_sem.get(key, 0) + 1
 
         aol_missing_by_course = {}
+        aol_missing_by_course_sem = {}
         for item in s["missing_items"]:
             if is_aol(item.get("nature", "")):
                 c = item.get("course", "未分类")
                 aol_missing_by_course[c] = aol_missing_by_course.get(c, 0) + 1
+                sem = str(item.get("semester", "")).strip()
+                if sem:
+                    key = (c, sem)
+                    aol_missing_by_course_sem[key] = aol_missing_by_course_sem.get(key, 0) + 1
 
         course_progress = []
         # 按课程分组本学生的 gradebook 行，用于填充成绩数据
@@ -553,7 +570,7 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
         all_courses = sorted(set(merge_course_lists(
             s["courses"],
             [item.get("course", "") for item in s["missing"]],
-            [item.get("course", "") for item in s["submitted"]],
+            [item.get("course", "") for item in s["submitted"] if str(item.get("course", "")).strip() != "未分类"],
             list(_gb_rows_by_course.keys()),
         )))
 
@@ -665,8 +682,12 @@ def build_summaries(roster, submissions, missing, assignment_lookup, assignment_
 
                 current_grade, grade_updated_at, aol_details = _extract_grade_and_aol(gb_course_rows)
                 submitted_count, missing_count, completion = _compute_progress_counts(c, sem_label)
-                aol_submitted = aol_submitted_by_course.get(c, 0)
-                aol_missing = aol_missing_by_course.get(c, 0)
+                aol_submitted = aol_submitted_by_course_sem.get((c, sem_label))
+                if aol_submitted is None:
+                    aol_submitted = aol_submitted_by_course.get(c, 0)
+                aol_missing = aol_missing_by_course_sem.get((c, sem_label))
+                if aol_missing is None:
+                    aol_missing = aol_missing_by_course.get(c, 0)
 
                 cp_entry = {
                     "course":         c,
