@@ -71,7 +71,51 @@ jobs:
           mkdir -p artifacts/cache
           python pipeline/build_student_summary.py
 
-      - name: 6. 上传缓存产物
+      - name: 6. 产物快检（semester 标签覆盖）
+        if: always()
+        run: |
+          python - <<'PY'
+          import glob, json
+          files = glob.glob("artifacts/cache/*.json")
+          total = 0
+          with_sem = 0
+          without_sem = 0
+          prev_rows = 0
+          sem_labels = {}
+          for f in files:
+            try:
+              data = json.load(open(f, encoding="utf-8"))
+            except Exception:
+              continue
+            for cp in data.get("courseProgress", []) or []:
+              total += 1
+              sem = str(cp.get("semester", "")).strip()
+              if sem:
+                with_sem += 1
+                sem_labels[sem] = sem_labels.get(sem, 0) + 1
+              else:
+                without_sem += 1
+              if cp.get("isCurrentSemester") is False:
+                prev_rows += 1
+          print("cache_files =", len(files))
+          print("course_progress_rows =", total)
+          print("with_semester =", with_sem)
+          print("without_semester =", without_sem)
+          print("isCurrentSemester_false_rows =", prev_rows)
+          print("semester_labels =", sem_labels)
+          PY
+
+      - name: 7. 收集调试文件
+        if: always()
+        run: |
+          mkdir -p artifacts/debug
+          for f in pipeline/grading_period.json pipeline/section_semesters.json pipeline/category_weights.json; do
+            if [ -f "$f" ]; then
+              cp "$f" artifacts/debug/
+            fi
+          done
+
+      - name: 8. 上传缓存产物
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -79,3 +123,10 @@ jobs:
           path: artifacts/cache
           if-no-files-found: warn
 
+      - name: 9. 上传调试产物
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: student-summary-debug-${{ github.run_id }}
+          path: artifacts/debug
+          if-no-files-found: warn
