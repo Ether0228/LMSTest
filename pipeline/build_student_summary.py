@@ -1151,6 +1151,50 @@ def get_active_semesters_from_calendar(calendar, grace_days=14):
     return active, current
 
 
+def normalize_semester_label(raw_session, start_date="", end_date="", calendar=None):
+    """将 Session 3 / S3 / 2025-S3 等格式归一化为学期日历 key（优先）。
+    归一化顺序：
+    1) 若 start/end 与 calendar 精确匹配，直接返回对应 key（最可靠）
+    2) 若 raw_session 已是 calendar key，直接返回
+    3) 解析 Session 3 / S3，并结合 start_date 推断学年（如 2026-01 属于 2025 学年）
+    4) 否则返回原值
+    """
+    session = str(raw_session or "").strip()
+    start = str(start_date or "").strip()
+    end = str(end_date or "").strip()
+    cal = calendar or {}
+
+    # 1) 精确日期匹配
+    if start and end and cal:
+        for key, dates in cal.items():
+            if str(dates.get("start", "")).strip() == start and str(dates.get("end", "")).strip() == end:
+                return key
+
+    # 2) 已是标准 key
+    if session and session in cal:
+        return session
+
+    # 3) Session 3 / S3
+    m = re.search(r"(?:session\s*|s)(\d+)$", session, re.IGNORECASE)
+    if m:
+        s_num = int(m.group(1))
+        year_prefix = None
+        if start:
+            try:
+                dt = datetime.strptime(start, "%Y-%m-%d")
+                # 学年从 9 月开始：2026-01 仍属于 2025 学年
+                year_prefix = dt.year if dt.month >= 9 else dt.year - 1
+            except Exception:
+                year_prefix = None
+        if year_prefix is not None:
+            key = f"{year_prefix}-S{s_num}"
+            if (not cal) or key in cal:
+                return key
+        return f"S{s_num}"
+
+    return session
+
+
 def main():
     conf = get_env_config()
     token = get_feishu_token(conf)
@@ -1278,6 +1322,25 @@ def main():
             print(f">>> Section 学期映射 [本地文件]: {len(section_semesters)} 个 section → {list(section_semesters.keys())[:5]}")
         except Exception as e:
             print(f"WARNING: 读取 section_semesters.json 失败: {e}")
+
+    # 统一 section 的学期标签格式（Session 3 -> 2025-S3）
+    if section_semesters:
+        normalized_cnt = 0
+        for nid, info in section_semesters.items():
+            if not isinstance(info, dict):
+                continue
+            old = str(info.get("session", "")).strip()
+            new = normalize_semester_label(
+                old,
+                start_date=info.get("start_date", ""),
+                end_date=info.get("end_date", ""),
+                calendar=calendar,
+            )
+            if new and new != old:
+                info["session"] = new
+                normalized_cnt += 1
+        if normalized_cnt:
+            print(f">>> Section 学期标签归一化: {normalized_cnt} 个 section")
 
     # 确定"当前学期"的 section nids：end_date >= 今天
     today_str = datetime.now().date().isoformat()

@@ -11,6 +11,14 @@ on:
         options:
           - "false"
           - "true"
+      run_scrape_gradebook:
+        description: "先运行 scrape_gradebook.py 生成 section_semesters（建议开启）"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
       cache_tenant_key:
         description: "写入 PostgreSQL/JSON 缓存使用的 tenant key"
         required: true
@@ -52,7 +60,22 @@ jobs:
           FEISHU_GRADEBOOK_TABLE_ID: ${{ secrets.FEISHU_GRADEBOOK_TABLE_ID }}
         run: python pipeline/check_missing_sync.py
 
-      - name: 5. 构建学生汇总
+      - name: 5. 可选：抓取 Gradebook（生成 section_semesters）
+        if: ${{ github.event.inputs.run_scrape_gradebook == 'true' }}
+        env:
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          FEISHU_APP_TOKEN: ${{ secrets.FEISHU_APP_TOKEN }}
+          FEISHU_GRADEBOOK_TABLE_ID: ${{ secrets.FEISHU_GRADEBOOK_TABLE_ID }}
+          FEISHU_LIB_TABLE_ID: ${{ secrets.FEISHU_LIB_TABLE_ID }}
+          FEISHU_CONFIG_TABLE_ID: ${{ secrets.FEISHU_CONFIG_TABLE_ID }}
+          SCHOOLOGY_COOKIES: ${{ secrets.SCHOOLOGY_COOKIES }}
+          SCHOOLOGY_SECTION_NIDS: ${{ secrets.SCHOOLOGY_SECTION_NIDS }}
+          SCHOOLOGY_GRADING_PERIOD: ${{ secrets.SCHOOLOGY_GRADING_PERIOD }}
+          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
+        run: python pipeline/scrape_gradebook.py
+
+      - name: 6. 构建学生汇总
         env:
           FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
           FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
@@ -71,7 +94,7 @@ jobs:
           mkdir -p artifacts/cache
           python pipeline/build_student_summary.py
 
-      - name: 6. 产物快检（semester 标签覆盖）
+      - name: 7. 产物快检（semester 标签覆盖）
         if: always()
         run: |
           python - <<'PY'
@@ -105,7 +128,7 @@ jobs:
           print("semester_labels =", sem_labels)
           PY
 
-      - name: 7. 收集调试文件
+      - name: 8. 收集调试文件
         if: always()
         run: |
           mkdir -p artifacts/debug
@@ -115,7 +138,7 @@ jobs:
             fi
           done
 
-      - name: 8. 上传缓存产物
+      - name: 9. 上传缓存产物
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -123,7 +146,7 @@ jobs:
           path: artifacts/cache
           if-no-files-found: warn
 
-      - name: 9. 上传调试产物
+      - name: 10. 上传调试产物
         if: always()
         uses: actions/upload-artifact@v4
         with:
