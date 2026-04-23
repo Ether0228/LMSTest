@@ -57,6 +57,31 @@ def clean_schoology_url(url):
     match = re.search(r'(https://.*?/(?:assignment|assessment|discussion)/\d+)', url)
     return match.group(1) if match else url
 
+
+def normalize_semester_value(raw):
+    """归一化学期标签，去重脏值如 ['2025-S4', '2025-S4'] / '2025-S4,2025-S4'。"""
+    if raw is None:
+        return ""
+
+    values = raw if isinstance(raw, list) else [raw]
+    cleaned = []
+    seen = set()
+    for value in values:
+        parts = re.split(r"[,\n]+", str(value or ""))
+        for part in parts:
+            sem = part.strip()
+            if not sem:
+                continue
+            m = re.search(r"\d{4}-S\d+", sem, re.IGNORECASE)
+            sem = m.group(0).upper() if m else sem
+            if sem not in seen:
+                seen.add(sem)
+                cleaned.append(sem)
+
+    if not cleaned:
+        return ""
+    return cleaned[0]
+
 # === 修复：更严格的时间解析 ===
 def parse_time_to_str(text):
     """
@@ -130,11 +155,29 @@ def parse_notification_simple(text):
     main_text = text[:clean_text_end].strip()
     
     # 5. 拆解学生和作业名
-    name_pattern = r"^(.*?) (submitted|resubmitted) an item to (.*)$"
-    m = re.search(name_pattern, main_text, re.IGNORECASE)
-    
-    if m:
-        return m.group(1).strip(), m.group(3).strip(), m.group(2).capitalize(), time_str
+    patterns = [
+        r"^(.*?) (submitted|resubmitted) an item to (.*)$",
+        r"^(.*?) (submitted|resubmitted) the test/quiz for (.*)$",
+        r"^(.*?) (submitted|resubmitted) the assessment for (.*)$",
+        r"^(.*?) (submitted|resubmitted) the discussion for (.*)$",
+    ]
+    for pattern in patterns:
+        m = re.search(pattern, main_text, re.IGNORECASE)
+        if m:
+            return m.group(1).strip(), m.group(3).strip(), m.group(2).capitalize(), time_str
+
+    generic_match = re.search(
+        r"^(.*?) (submitted|resubmitted) (?:the )?.*? (?:to|for) (.*)$",
+        main_text,
+        re.IGNORECASE,
+    )
+    if generic_match:
+        return (
+            generic_match.group(1).strip(),
+            generic_match.group(3).strip(),
+            generic_match.group(2).capitalize(),
+            time_str,
+        )
     else:
         # 如果匹配失败，说明作业名可能包含特殊字符
         # 此时直接返回 main_text 作为作业名
@@ -181,6 +224,7 @@ def add_assignment_to_lib(token, app_token, lib_table_id, name, clean_url, semes
         "作业链接": clean_url,
         "作业性质": "✅ 必交"
     }
+    semester = normalize_semester_value(semester)
     if semester:
         fields["学期"] = semester
 
@@ -231,7 +275,7 @@ def start_cloud_scraper():
         print(f">>> 目标回溯日期: {target_date} (凡是早于此日期的将被忽略)")
 
         # 当前学期标签（用于自动建档时写入作业库）
-        current_semester = os.environ.get("CURRENT_SEMESTER", "").strip()
+        current_semester = normalize_semester_value(os.environ.get("CURRENT_SEMESTER", ""))
         if current_semester:
             print(f">>> 当前学期: {current_semester}（新建档作业将自动打标签）")
         else:
@@ -402,4 +446,3 @@ def start_cloud_scraper():
 
 if __name__ == "__main__":
     start_cloud_scraper()
-

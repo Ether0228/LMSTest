@@ -525,6 +525,38 @@ def parse_semester_label(title: str) -> str:
     return f"{year}-{sem}"
 
 
+def normalize_semester_value(raw) -> str:
+    """归一化学期标签，去重脏值如 ['2025-S4', '2025-S4'] / '2025-S4,2025-S4'。"""
+    if raw is None:
+        return ""
+
+    values = raw if isinstance(raw, list) else [raw]
+    cleaned = []
+    seen = set()
+    for value in values:
+        parts = re.split(r"[,\n]+", str(value or ""))
+        for part in parts:
+            sem = part.strip()
+            if not sem:
+                continue
+            m = re.search(r"\d{4}-S\d+", sem, re.IGNORECASE)
+            sem = m.group(0).upper() if m else sem
+            if sem not in seen:
+                seen.add(sem)
+                cleaned.append(sem)
+
+    if not cleaned:
+        return ""
+    return cleaned[0]
+
+
+def normalize_assignment_name(raw) -> str:
+    """标准化作业名，尽量让通知文案与 gradebook 标题能稳定匹配。"""
+    text = str(raw or "").strip().lower()
+    text = re.sub(r"\s+", " ", text)
+    return text
+
+
 def sync_enrollment_to_roster(
     token: str, app_token: str, roster_table_id: str,
     enrollment_by_sem: dict,  # {sem_short: {student_name: set(course_name)}}
@@ -619,24 +651,44 @@ def update_lib_from_gradebook(token: str, app_token: str, lib_table_id: str,
     匹配策略：gradebook 的 作业NID 对应作业库的 作业链接 中的数字 ID。
     已标记为 🚫 忽略 的记录不覆盖。
     """
-    current_semester = os.environ.get("CURRENT_SEMESTER", "").strip()
-    # 1. 从 all_rows 收集 {nid: due_date_ms}（去重，取最早截止日期）
-    nid_due: dict[str, int] = {}
+    current_semester = normalize_semester_value(os.environ.get("CURRENT_SEMESTER", ""))
+    # 1. 从 all_rows 收集 {nid: {due_ms, semester, assignment_name, course_name}}。
+    # 学期优先用 section 标题里解析出的行级学期；截止日期去重后取最早。
+    nid_meta: dict[str, dict] = {}
     for row in all_rows:
         nid = str(row.get("作业NID", "")).strip()
+        if not nid:
+            continue
+        meta = nid_meta.setdefault(nid, {
+            "due_ms": None,
+            "semester": "",
+            "assignment_name": "",
+            "course_name": "",
+        })
+
+        row_semester = normalize_semester_value(row.get("学期", ""))
+        if row_semester and not meta["semester"]:
+            meta["semester"] = row_semester
+        assignment_name = str(row.get("作业名", "")).strip()
+        if assignment_name and not meta["assignment_name"]:
+            meta["assignment_name"] = assignment_name
+        course_name = str(row.get("课程名", "")).strip()
+        if course_name and not meta["course_name"]:
+            meta["course_name"] = course_name
+
         due_str = str(row.get("截止日期", "")).strip()
-        if not nid or not due_str:
+        if not due_str:
             continue
         try:
             dt = datetime.strptime(due_str, "%b %d, %Y at %I:%M %p")
             due_ms = calendar.timegm(dt.timetuple()) * 1000
         except Exception:
             continue
-        if nid not in nid_due or due_ms < nid_due[nid]:
-            nid_due[nid] = due_ms
+        if meta["due_ms"] is None or due_ms < meta["due_ms"]:
+            meta["due_ms"] = due_ms
 
-    if not nid_due:
-        print("  [更新作业库] 无有效作业 NID，跳过")
+    if not nid_meta:
+        print("  [更新作业库] 无有效作业 NID 元数据，跳过")
         return
 
     # 2. 拉取作业库全量，构建 NID → (record_id, nature) 映射
@@ -645,6 +697,8 @@ def update_lib_from_gradebook(token: str, app_token: str, lib_table_id: str,
     print(f"  作业库记录数: {len(lib_records)}")
 
     nid_to_record: dict[str, tuple] = {}
+    fallback_by_name_course_sem: dict[tuple[str, str, str], list] = {}
+    fallback_by_name_course: dict[tuple[str, str], list] = {}
     for rec in lib_records:
         rec_id = rec.get("record_id", "")
         f = rec.get("fields", {})
@@ -653,14 +707,30 @@ def update_lib_from_gradebook(token: str, app_token: str, lib_table_id: str,
             link_str = str(raw_link.get("link", "") or raw_link.get("text", "")).strip()
         else:
             link_str = str(raw_link or "").strip()
-        if not link_str:
-            continue
-        m = re.search(r'/(?:assignment|assessment|discussion)/(\d+)', link_str)
-        if not m:
-            continue
-        nid = m.group(1)
-        if nid not in nid_to_record:
-            nid_to_record[nid] = (rec_id, str(f.get("作业性质", "")).strip())
+        nature = str(f.get("作业性质", "")).strip()
+        semester = normalize_semester_value(f.get("学期", ""))
+        course_name = str(f.get("所属课程", "")).strip()
+        assignment_name = str(f.get("作业名称", "")).strip()
+        record_meta = {
+            "record_id": rec_id,
+            "nature": nature,
+            "semester": semester,
+            "course_name": course_name,
+            "assignment_name": assignment_name,
+        }
+
+        if link_str:
+            m = re.search(r'/(?:assignment|assessment|discussion)/(\d+)', link_str)
+            if m:
+                nid = m.group(1)
+                if nid not in nid_to_record:
+                    nid_to_record[nid] = record_meta
+
+        normalized_name = normalize_assignment_name(assignment_name)
+        if normalized_name and course_name:
+            fallback_by_name_course.setdefault((normalized_name, course_name), []).append(record_meta)
+            if semester:
+                fallback_by_name_course_sem.setdefault((normalized_name, course_name, semester), []).append(record_meta)
 
     # 3. 构建更新列表（匹配到的 + 排除 🚫 忽略）
     headers = {
@@ -669,19 +739,48 @@ def update_lib_from_gradebook(token: str, app_token: str, lib_table_id: str,
     }
     to_update = []
     skipped_ignore = 0
-    for nid, due_ms in nid_due.items():
-        if nid not in nid_to_record:
-            continue
-        rec_id, nature = nid_to_record[nid]
+    semester_fixed = 0
+    fallback_matched = 0
+    ambiguous_fallback = 0
+    for nid, meta in nid_meta.items():
+        record_meta = nid_to_record.get(nid)
+        if not record_meta:
+            norm_name = normalize_assignment_name(meta.get("assignment_name", ""))
+            course_name = str(meta.get("course_name", "")).strip()
+            semester = meta.get("semester") or current_semester
+            candidates = []
+            if norm_name and course_name and semester:
+                candidates = fallback_by_name_course_sem.get((norm_name, course_name, semester), [])
+            if not candidates and norm_name and course_name:
+                candidates = fallback_by_name_course.get((norm_name, course_name), [])
+            if len(candidates) == 1:
+                record_meta = candidates[0]
+                fallback_matched += 1
+            elif len(candidates) > 1:
+                ambiguous_fallback += 1
+                print(f"  [更新作业库] 名称兜底匹配歧义，跳过: {meta.get('assignment_name', '')} | {course_name} | {semester}")
+                continue
+            else:
+                continue
+
+        rec_id = record_meta["record_id"]
+        nature = record_meta["nature"]
+        existing_semester = record_meta["semester"]
         if nature == "🚫 忽略":
             skipped_ignore += 1
             continue
         fields = {
             "作业性质": "🔥 极其重要",
-            "截止日期": due_ms,
         }
-        if current_semester:
-            fields["学期"] = current_semester
+        due_ms = meta.get("due_ms")
+        if due_ms is not None:
+            fields["截止日期"] = due_ms
+
+        semester = meta.get("semester") or current_semester
+        if semester:
+            fields["学期"] = semester
+            if semester != existing_semester:
+                semester_fixed += 1
         to_update.append({"record_id": rec_id, "fields": fields})
 
     if skipped_ignore:
@@ -707,6 +806,12 @@ def update_lib_from_gradebook(token: str, app_token: str, lib_table_id: str,
         time.sleep(0.3)
 
     print(f"  ✓ 更新作业库 {updated} 条")
+    if semester_fixed:
+        print(f"  ✓ 规范化/补写学期 {semester_fixed} 条")
+    if fallback_matched:
+        print(f"  ✓ 名称兜底匹配并标记极其重要 {fallback_matched} 条")
+    if ambiguous_fallback:
+        print(f"  [提示] 名称兜底匹配存在歧义 {ambiguous_fallback} 条，已跳过避免误标")
 
 
 # ──────────────────────────────────────────────
