@@ -598,6 +598,7 @@ def sync_enrollment_to_roster(
     # 按学期构建每个学生的更新 payload
     # {record_id: {field: value}}
     updates = {}
+    creates_by_name = {}
     for sem_short, name_courses in enrollment_by_sem.items():
         field = f"{sem_short}所属课程"
         # 在册学生：写入课程；不在该学期的学生：清空（覆盖旧数据）
@@ -609,7 +610,15 @@ def sync_enrollment_to_roster(
             else:
                 updates[rid][field] = ""
 
-    if not updates:
+        # Gradebook 里有但花名册没有的学生：自动创建基础记录。
+        # 只填学生姓名和本次能确定的学期课程，其他基础信息后续人工补齐。
+        for name, courses in name_courses.items():
+            if name in all_names:
+                continue
+            fields = creates_by_name.setdefault(name, {"学生姓名": name})
+            fields[field] = "\n".join(sorted(courses))
+
+    if not updates and not creates_by_name:
         print("  选课同步：无数据")
         return
 
@@ -620,7 +629,22 @@ def sync_enrollment_to_roster(
         resp = requests.post(upd_url, json={"records": batch}, headers=headers).json()
         if resp.get("code") != 0:
             print(f"  [警告] 花名册选课更新失败: {resp.get('msg')}")
-    print(f"  选课同步完成：{len(to_update)} 名学生，学期={sorted(enrollment_by_sem.keys())}")
+
+    to_create = [{"fields": fields} for fields in creates_by_name.values()]
+    create_url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{roster_table_id}/records/batch_create"
+    created = 0
+    for i in range(0, len(to_create), 100):
+        batch = to_create[i:i + 100]
+        resp = requests.post(create_url, json={"records": batch}, headers=headers).json()
+        if resp.get("code") == 0:
+            created += len(batch)
+        else:
+            print(f"  [警告] 花名册新生创建失败: {resp.get('msg')} | {resp}")
+
+    print(
+        f"  选课同步完成：更新 {len(to_update)} 名已有学生，"
+        f"新建 {created} 名新学生，学期={sorted(enrollment_by_sem.keys())}"
+    )
 
 
 # ──────────────────────────────────────────────
