@@ -50,6 +50,11 @@ DEFAULT_COURSE_MAPPING = {
     "esl level 4":                         "ESLDO",
     "esl level 3":                         "ESLCO",
     "esl level 2":                         "ESLBO",
+    "grade 11 biology": "SBI3U",
+    "grade 10 science": "SNC2D",
+    "grade 12 computer science": "ICS4U",
+    "g12 international business fundamentals": "BBB4M",
+    "grade 12 simplified chinese": "LKBDU"
 }
 
 
