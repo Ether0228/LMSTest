@@ -62,6 +62,7 @@ jobs:
           FEISHU_LIB_TABLE_ID: ${{ secrets.FEISHU_LIB_TABLE_ID }}
           FEISHU_CONFIG_TABLE_ID: ${{ secrets.FEISHU_CONFIG_TABLE_ID }}
           SCHOOLOGY_COOKIES: ${{ secrets.SCHOOLOGY_COOKIES }}
+          SCHOOLOGY_SECTION_NIDS: ${{ secrets.SCHOOLOGY_SECTION_NIDS }}
         run: python "pipeline/fill_course_info.py"
 
       # === 阶段三：缺交核验 ===
