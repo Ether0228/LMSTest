@@ -40,7 +40,12 @@ DEFAULT_COURSE_MAPPING = {
     "esl level 5": "ESLEO",
     "esl level 4": "ESLDO",
     "esl level 3": "ESLCO",
-    "esl level 2": "ESLBO"
+    "esl level 2": "ESLBO",
+    "g12 international business fundamentals": "BBB4M",
+    "grade 12 simplified chinese": "LKBDU",
+    "grade 11 biology": "SBI3U",
+    "grade 10 science": "SNC2D",
+    "grade 12 computer science": "ICS4U",
 }
 
 def get_env_config():
@@ -121,15 +126,25 @@ def resolve_course_code(raw_name, course_mapping):
         return None, normalized_title
     return course_mapping.get(normalized_title), normalized_title
 
-# === 1. 获取所有"所属课程"为空的记录 ===
-def get_empty_course_records(token, app_token, table_id):
+def is_blank_value(value):
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return not value.strip()
+    if isinstance(value, list):
+        return len(value) == 0
+    return False
+
+
+# === 1. 获取所有需要补全课程或学期的记录 ===
+def get_incomplete_course_records(token, app_token, table_id):
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}/records"
     headers = {"Authorization": f"Bearer {token}"}
 
     records_to_process = []
     page_token = None
 
-    print(">>> 正在查找未分类的作业...")
+    print(">>> 正在查找缺少课程或学期的作业...")
     while True:
         params = {"page_size": 500}
         if page_token: params["page_token"] = page_token
@@ -142,6 +157,7 @@ def get_empty_course_records(token, app_token, table_id):
             record_id = item.get("record_id")
 
             course = fields.get("所属课程")
+            semester = fields.get("学期")
             link_obj = fields.get("作业链接")
 
             # 提取链接字符串
@@ -149,9 +165,19 @@ def get_empty_course_records(token, app_token, table_id):
             if isinstance(link_obj, dict): link_str = link_obj.get("link", "")
             elif isinstance(link_obj, str): link_str = link_obj
 
-            # 仅处理课程为空且有 Schoology 链接的记录
-            if not course and link_str and "schoology" in link_str:
-                records_to_process.append({"id": record_id, "url": link_str})
+            needs_course = is_blank_value(course)
+            needs_semester = is_blank_value(semester)
+
+            # 处理课程为空或学期为空，且有 Schoology 链接的记录。
+            if (needs_course or needs_semester) and link_str and "schoology" in link_str:
+                records_to_process.append({
+                    "id": record_id,
+                    "url": link_str,
+                    "needs_course": needs_course,
+                    "needs_semester": needs_semester,
+                    "existing_course": course,
+                    "existing_semester": semester,
+                })
 
         if not resp.get("data", {}).get("has_more"): break
         page_token = resp.get("data", {}).get("page_token")
@@ -160,19 +186,28 @@ def get_empty_course_records(token, app_token, table_id):
     return records_to_process
 
 # === 2. 更新飞书记录 ===
-def update_feishu_record(token, app_token, table_id, record_id, course_name, semester=""):
+def update_feishu_record(
+    token, app_token, table_id, record_id,
+    course_name=None, semester="", update_course=True, update_semester=True,
+):
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}/records/{record_id}"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=utf-8"}
 
-    fields = {"所属课程": course_name}
-    if semester:
+    fields = {}
+    if update_course and course_name:
+        fields["所属课程"] = course_name
+    if update_semester and semester:
         fields["学期"] = semester
+
+    if not fields:
+        print("   -> 无可写入字段，跳过")
+        return
 
     resp = requests.put(url, json={"fields": fields}, headers=headers)
     rj = resp.json()
-    semester_tag = f" | 学期={semester}" if semester else ""
+    desc = " | ".join(f"{k}={v}" for k, v in fields.items())
     if rj.get("code") == 0:
-        print(f"   -> 已更新飞书: {course_name}{semester_tag}")
+        print(f"   -> 已更新飞书: {desc}")
     else:
         print(f"   -> ✗ 飞书写入失败: {rj.get('msg', '')} | 详情: {rj}")
 
@@ -286,6 +321,10 @@ def scrape_course_name(driver, url, course_mapping, nid_to_course=None):
             print(f"   -> 标题未命中映射，降级使用 NID 结果: {nid_course_code}")
             return nid_course_code, nid_semester
 
+        if title_semester:
+            print(f"   -> 课程未匹配，但可补写学期: {title_semester}")
+            return None, title_semester
+
         print(f"   -> 未匹配到课程简称，跳过 (raw={raw_name.split(':')[0].strip()[:40]})")
         return None, ""
 
@@ -330,8 +369,8 @@ def start_course_filler():
                 print(f">>> SCHOOLOGY_SECTION_NIDS 解析失败: {e}")
 
         # 1. 获取任务列表
-        tasks = get_empty_course_records(token, app_token, lib_table_id)
-        print(f">>> 发现 {len(tasks)} 个作业缺少课程信息")
+        tasks = get_incomplete_course_records(token, app_token, lib_table_id)
+        print(f">>> 发现 {len(tasks)} 个作业缺少课程或学期信息")
 
         if not tasks:
             print(">>> 没有需要处理的任务，退出。")
@@ -360,10 +399,16 @@ def start_course_filler():
 
             course_code, semester = scrape_course_name(driver, task['url'], course_mapping, nid_to_course)
 
-            if course_code:
-                update_feishu_record(token, app_token, lib_table_id, task['id'], course_code, semester)
+            if course_code or semester:
+                update_feishu_record(
+                    token, app_token, lib_table_id, task['id'],
+                    course_name=course_code,
+                    semester=semester,
+                    update_course=task.get("needs_course", False),
+                    update_semester=task.get("needs_semester", False),
+                )
             else:
-                print("   无法识别课程名称")
+                print("   无法识别课程名称或学期")
 
             time.sleep(2)
 
