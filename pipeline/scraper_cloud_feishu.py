@@ -18,6 +18,13 @@ LOGIN_URL = "https://queenscanada.schoology.com"
 NOTIFICATION_URL = "https://queenscanada.schoology.com/home/notifications"
 # ===========================================
 
+def parse_semester_label_from_section_title(title):
+    m = re.search(r"(\d{2})(\d{2})(S\d)N", str(title or ""), re.IGNORECASE)
+    if not m:
+        return ""
+    return f"20{m.group(1)}-{m.group(3).upper()}"
+
+
 def get_env_config():
     app_id = os.environ.get("FEISHU_APP_ID", "").strip()
     app_secret = os.environ.get("FEISHU_APP_SECRET", "").strip()
@@ -42,7 +49,8 @@ def get_env_config():
     if not all([app_id, app_secret, app_token, table_id, s_cookies]):
         raise ValueError("GitHub Secrets 配置不完整")
         
-    return app_id, app_secret, app_token, table_id, roster_tid, lib_tid, json.loads(s_cookies), target_date, max_pages
+    section_nids_raw = os.environ.get("SCHOOLOGY_SECTION_NIDS", "").strip()
+    return app_id, app_secret, app_token, table_id, roster_tid, lib_tid, json.loads(s_cookies), target_date, max_pages, section_nids_raw
 
 def get_feishu_token(app_id, app_secret):
     url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
@@ -54,7 +62,10 @@ def get_feishu_token(app_id, app_secret):
 
 def clean_schoology_url(url):
     if not url: return ""
-    match = re.search(r'(https://.*?/(?:assignment|assessment|discussion)/\d+)', url)
+    match = re.search(
+        r'(https://.*?(?:/(?:assignment|assessment|discussion)/\d+|/materials/discussion/view/\d+))',
+        url,
+    )
     return match.group(1) if match else url
 
 
@@ -153,8 +164,18 @@ def parse_notification_simple(text):
 
     # 4. 截取主体文本
     main_text = text[:clean_text_end].strip()
+    main_text = re.sub(r"^(?:Submission|Discussion Response|Test/quiz|Course Materials)\s+Notification\.\s*", "", main_text, flags=re.IGNORECASE)
     
     # 5. 拆解学生和作业名
+    discussion_response = re.search(r"^(.*?) replied to (.*)$", main_text, re.IGNORECASE)
+    if discussion_response:
+        return (
+            discussion_response.group(1).strip(),
+            discussion_response.group(2).strip(),
+            "Replied",
+            time_str,
+        )
+
     patterns = [
         r"^(.*?) (submitted|resubmitted) an item to (.*)$",
         r"^(.*?) (submitted|resubmitted) the test/quiz for (.*)$",
@@ -182,6 +203,49 @@ def parse_notification_simple(text):
         # 如果匹配失败，说明作业名可能包含特殊字符
         # 此时直接返回 main_text 作为作业名
         return "Unknown", main_text, "Unknown", time_str
+
+
+def split_notification_students(student_text):
+    text = re.sub(r"\s+", " ", str(student_text or "")).strip()
+    if not text:
+        return []
+    text = re.sub(r"\band\s+\d+\s+other\s+(?:person|people)\b", "", text, flags=re.IGNORECASE).strip()
+    text = text.replace(" ,", ",")
+    parts = re.split(r"\s*,\s*|\s+and\s+", text)
+    students = []
+    seen = set()
+    for part in parts:
+        name = re.sub(r"\s+", " ", part).strip(" ,")
+        if not name or re.search(r"\bother\s+(?:person|people)\b", name, re.IGNORECASE):
+            continue
+        key = name.lower()
+        if key not in seen:
+            seen.add(key)
+            students.append(name)
+    return students
+
+
+def extract_notification_students_from_item(item, fallback_student_text):
+    """Return one record per concrete student; expand Schoology's hidden other-items-list when present."""
+    students = []
+    seen = set()
+    try:
+        detail_links = item.find_elements(By.CSS_SELECTOR, ".other-items-list .user-item > a[href*='/user/']")
+        for link in detail_links:
+            name = (link.get_attribute("textContent") or link.text or "").strip()
+            name = re.sub(r"\s+", " ", name)
+            if not name:
+                continue
+            key = name.lower()
+            if key not in seen:
+                seen.add(key)
+                students.append(name)
+    except Exception:
+        pass
+
+    if students:
+        return students
+    return split_notification_students(fallback_student_text)
 
 # === 辅助：加载映射表 ===
 def get_feishu_mapping(token, app_token, table_id, key_field_name):
@@ -215,6 +279,29 @@ def get_feishu_mapping(token, app_token, table_id, key_field_name):
         except: break
     return mapping
 
+
+def create_minimal_roster_student(token, app_token, roster_table_id, student_name):
+    if not roster_table_id or not student_name:
+        return None
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{roster_table_id}/records"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=utf-8"}
+    fields = {
+        "学生姓名": student_name,
+        "数据来源": "schoology_notification",
+        "资料状态": "待人工补全",
+    }
+    for payload_fields in (fields, {"学生姓名": student_name}):
+        resp = requests.post(url, json={"fields": payload_fields}, headers=headers).json()
+        if resp.get("code") == 0:
+            rec_id = resp.get("data", {}).get("record", {}).get("record_id")
+            print(f">>> [花名册新生] 已创建: {student_name}")
+            return rec_id
+        if payload_fields == fields:
+            print(f"INFO: 花名册缺少资料状态字段，降级只写学生姓名: {student_name}")
+    print(f"!!! [花名册新生] 创建失败: {student_name} | {resp.get('msg')} | {resp}")
+    return None
+
+
 def add_assignment_to_lib(token, app_token, lib_table_id, name, clean_url, semester=""):
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{lib_table_id}/records"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=utf-8"}
@@ -243,6 +330,30 @@ def add_assignment_to_lib(token, app_token, lib_table_id, name, clean_url, semes
         print(f"!!! [自动建档] 网络请求异常: {e}")
         return None
 
+
+def build_section_semester_map(section_nids_raw):
+    if not section_nids_raw:
+        return {}
+    try:
+        section_nids_raw = re.sub(r"[\x00-\x1f\x7f]", "", section_nids_raw)
+        parsed = json.loads(section_nids_raw)
+    except Exception as e:
+        print(f"INFO: SCHOOLOGY_SECTION_NIDS 解析失败，无法按课程链接推断学期: {e}")
+        return {}
+    mapping = {}
+    for nid, title in parsed.items():
+        sem = parse_semester_label_from_section_title(title)
+        if sem:
+            mapping[str(nid)] = sem
+    return mapping
+
+
+def semester_from_schoology_url(url, section_semester_map):
+    match = re.search(r"/course/(\d+)(?:/|$)", str(url or ""))
+    if not match:
+        return ""
+    return section_semester_map.get(match.group(1), "")
+
 def save_to_feishu_v2(token, app_token, table_id, records):
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{app_token}/tables/{table_id}/records/batch_create"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json; charset=utf-8"}
@@ -268,7 +379,7 @@ def save_to_feishu_v2(token, app_token, table_id, records):
 def start_cloud_scraper():
     print(">>> 启动调试版爬虫...")
     try:
-        app_id, app_secret, app_token, table_id, roster_tid, lib_tid, s_cookies, target_date, max_pages = get_env_config()
+        app_id, app_secret, app_token, table_id, roster_tid, lib_tid, s_cookies, target_date, max_pages, section_nids_raw = get_env_config()
 
         # 转换目标日期对象
         target_dt = datetime.strptime(target_date, "%Y-%m-%d")
@@ -276,10 +387,13 @@ def start_cloud_scraper():
 
         # 当前学期标签（用于自动建档时写入作业库）
         current_semester = normalize_semester_value(os.environ.get("CURRENT_SEMESTER", ""))
+        section_semester_map = build_section_semester_map(section_nids_raw)
         if current_semester:
             print(f">>> 当前学期: {current_semester}（新建档作业将自动打标签）")
         else:
             print("INFO: CURRENT_SEMESTER 未设置，新建档作业不会携带学期标签")
+        if section_semester_map:
+            print(f">>> Section 学期映射: {len(section_semester_map)} 个（优先用于 course/materials 链接）")
         
         token = get_feishu_token(app_id, app_secret)
         
@@ -367,7 +481,10 @@ def start_cloud_scraper():
                 raw_text = item.text.strip().replace("\n", " ")
                 if not raw_text: continue
                 if "comment" in raw_text.lower(): continue
-                if not any(k in raw_text.lower() for k in ["submitted", "resubmitted"]): continue
+                lowered = raw_text.lower()
+                is_submission_notice = any(k in lowered for k in ["submitted", "resubmitted"])
+                is_discussion_response = "discussion response notification" in lowered and " replied to " in lowered
+                if not (is_submission_notice or is_discussion_response): continue
                 
                 unique_id = hashlib.md5(raw_text.encode('utf-8')).hexdigest()
                 
@@ -382,7 +499,7 @@ def start_cloud_scraper():
                     all_links = item.find_elements(By.TAG_NAME, "a")
                     for l in all_links:
                         href = l.get_attribute("href")
-                        if href and ("/assignment/" in href or "/assessment/" in href):
+                        if href and ("/assignment/" in href or "/assessment/" in href or "/discussion/" in href or "/materials/discussion/view/" in href):
                             link_url = href
                             clean_link = clean_schoology_url(href)
                             break
@@ -394,6 +511,9 @@ def start_cloud_scraper():
                     continue
 
                 student, assign, status, time_str = parse_notification_simple(raw_text)
+                students = extract_notification_students_from_item(item, student)
+                if not students:
+                    students = [student]
                 
                 # === 调试日志 3: 检查日期过滤 ===
                 try:
@@ -409,28 +529,38 @@ def start_cloud_scraper():
                 # 自动建档与关联
                 assign_rec_id = lib_map.get(clean_link)
                 if not assign_rec_id:
-                    print(f">>> 自动建档: {assign}")
-                    assign_rec_id = add_assignment_to_lib(token, app_token, lib_tid, assign, clean_link, current_semester)
+                    inferred_semester = semester_from_schoology_url(clean_link or link_url, section_semester_map)
+                    lib_semester = inferred_semester or current_semester
+                    print(f">>> 自动建档: {assign} | 学期={lib_semester or '空'}")
+                    assign_rec_id = add_assignment_to_lib(token, app_token, lib_tid, assign, clean_link, lib_semester)
                     if assign_rec_id: lib_map[clean_link] = assign_rec_id
                 
-                student_rec_id = roster_map.get(student)
+                for student_name in students:
+                    student_unique_id = hashlib.md5(f"{raw_text}|{student_name}".encode("utf-8")).hexdigest()
+                    if student_unique_id in existing_ids:
+                        continue
+                    student_rec_id = roster_map.get(student_name)
+                    if not student_rec_id:
+                        student_rec_id = create_minimal_roster_student(token, app_token, roster_tid, student_name)
+                        if student_rec_id:
+                            roster_map[student_name] = student_rec_id
 
-                fields = {
-                    "学生姓名": student,
-                    "作业名称": assign,
-                    "提交状态": status,
-                    "原始通知": raw_text,
-                    "提交时间": time_str,
-                    "作业链接": {"text": link_url, "link": link_url}, # 修复：同时设置 text 和 link
-                    "唯一ID": unique_id
-                }
-                
-                if assign_rec_id: fields["关联作业"] = [assign_rec_id]
-                if student_rec_id: fields["关联学生"] = [student_rec_id]
+                    fields = {
+                        "学生姓名": student_name,
+                        "作业名称": assign,
+                        "提交状态": status,
+                        "原始通知": raw_text,
+                        "提交时间": time_str,
+                        "作业链接": {"text": link_url, "link": link_url}, # 修复：同时设置 text 和 link
+                        "唯一ID": student_unique_id
+                    }
 
-                print(f"✅ 捕获: {student} | {assign} | {time_str} | 关联作业={'✓' if assign_rec_id else '✗'} | 关联学生={'✓' if student_rec_id else '✗'}")
-                new_records.append(fields)
-                existing_ids.add(unique_id)
+                    if assign_rec_id: fields["关联作业"] = [assign_rec_id]
+                    if student_rec_id: fields["关联学生"] = [student_rec_id]
+
+                    print(f"✅ 捕获: {student_name} | {assign} | {time_str} | 关联作业={'✓' if assign_rec_id else '✗'} | 关联学生={'✓' if student_rec_id else '✗'}")
+                    new_records.append(fields)
+                    existing_ids.add(student_unique_id)
             except Exception as e:
                 print(f"!!! 单条处理出错: {e}")
                 continue

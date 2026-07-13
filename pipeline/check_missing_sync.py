@@ -113,14 +113,17 @@ def start_missing_sync():
         else:
             print("INFO: ACTIVE_SEMESTERS 未设置，所有非忽略作业计入考核（向后兼容模式）")
 
+    require_semester_tag = os.environ.get("REQUIRE_SEMESTER_TAG_FOR_MISSING", "1").strip() != "0"
     if active_semesters:
         lib_before = len(lib)
         lib = [
             rec for rec in lib
-            if not str(rec.get("fields", {}).get("学期", "")).strip()
-            or str(rec.get("fields", {}).get("学期", "")).strip() in active_semesters
+            if str(rec.get("fields", {}).get("学期", "")).strip() in active_semesters
+            or (not require_semester_tag and not str(rec.get("fields", {}).get("学期", "")).strip())
         ]
         print(f">>> 学期过滤 ({', '.join(sorted(active_semesters))}): {lib_before} → {len(lib)} 条作业参与考核")
+        if require_semester_tag:
+            print(">>> 严格学期模式：无学期标签的作业不参与缺交核验")
 
     # 【关键修正】使用 Unix 绝对时间戳，解决时区显示问题
     absolute_now_ms = int(time.time() * 1000)

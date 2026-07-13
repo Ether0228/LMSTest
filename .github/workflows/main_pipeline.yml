@@ -50,6 +50,8 @@ jobs:
           TZ: Asia/Shanghai
           TARGET_DATE: ${{ github.event.inputs.target_date }}
           MAX_PAGES: ${{ github.event.inputs.max_pages }}
+          CURRENT_SEMESTER: ${{ secrets.CURRENT_SEMESTER }}
+          SCHOOLOGY_SECTION_NIDS: ${{ secrets.SCHOOLOGY_SECTION_NIDS }}
         run: python "pipeline/scraper_cloud_feishu.py"
 
       # === 阶段二：补全课程信息 ===
@@ -65,6 +67,16 @@ jobs:
           SCHOOLOGY_SECTION_NIDS: ${{ secrets.SCHOOLOGY_SECTION_NIDS }}
         run: python "pipeline/fill_course_info.py"
 
+      - name: 5.5 修复提交记录学生关联
+        if: success()
+        env:
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          FEISHU_APP_TOKEN: ${{ secrets.FEISHU_APP_TOKEN }}
+          FEISHU_TABLE_ID: ${{ secrets.FEISHU_TABLE_ID }}
+          FEISHU_ROSTER_TABLE_ID: ${{ secrets.FEISHU_ROSTER_TABLE_ID }}
+        run: python "pipeline/repair_submission_student_links.py"
+
       # === 阶段三：缺交核验 ===
       - name: 6. 运行缺交核验 (Check Missing)
         if: success()
@@ -76,6 +88,8 @@ jobs:
           FEISHU_ROSTER_TABLE_ID: ${{ secrets.FEISHU_ROSTER_TABLE_ID }}
           FEISHU_LIB_TABLE_ID: ${{ secrets.FEISHU_LIB_TABLE_ID }}
           FEISHU_MISSING_TABLE_ID: ${{ secrets.FEISHU_MISSING_TABLE_ID }}
+          ACTIVE_SEMESTERS: ${{ secrets.ACTIVE_SEMESTERS }}
+          REQUIRE_SEMESTER_TAG_FOR_MISSING: "1"
         run: python "pipeline/check_missing_sync.py"
 
       # === 阶段三·五：抓取 Gradebook（写 grading_period 供汇总读取）===
@@ -92,6 +106,7 @@ jobs:
           SCHOOLOGY_COOKIES: ${{ secrets.SCHOOLOGY_COOKIES }}
           SCHOOLOGY_SECTION_NIDS: ${{ secrets.SCHOOLOGY_SECTION_NIDS }}
           FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
+          CURRENT_SEMESTER: ${{ secrets.CURRENT_SEMESTER }}
         run: python pipeline/scrape_gradebook.py
 
       - name: 6.5b 通知 Gradebook 失败
@@ -108,6 +123,23 @@ jobs:
                 "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "scrape_gradebook.py 执行失败（不影响其他步骤）\n\n[查看日志](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"}}]
               }
             }'
+
+      # === 阶段三·六：Schoology 学术过程结构化同步（PostgreSQL + JSON 快照）===
+      - name: 6.6 构建 Schoology 学术过程数据层
+        continue-on-error: true
+        id: schoology_process
+        env:
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          FEISHU_APP_TOKEN: ${{ secrets.FEISHU_APP_TOKEN }}
+          FEISHU_TABLE_ID: ${{ secrets.FEISHU_TABLE_ID }}
+          SCHOOLOGY_COOKIES: ${{ secrets.SCHOOLOGY_COOKIES }}
+          SCHOOLOGY_SECTION_NIDS: ${{ secrets.SCHOOLOGY_SECTION_NIDS }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          CACHE_TENANT_KEY: ${{ secrets.CACHE_TENANT_KEY }}
+          SCHOOLOGY_LOW_SCORE_THRESHOLD: "60"
+          SCHOOLOGY_SUSPECTED_MISSING_MIN_SUBMISSIONS: "3"
+        run: python pipeline/schoology_process_pipeline.py
 
       # === 阶段四：构建学生汇总（仪表盘数据源）===
       # 无论前面步骤是否成功都运行，确保汇总表始终是最新状态

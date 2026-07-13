@@ -615,7 +615,10 @@ def sync_enrollment_to_roster(
         for name, courses in name_courses.items():
             if name in all_names:
                 continue
-            fields = creates_by_name.setdefault(name, {"学生姓名": name})
+            fields = creates_by_name.setdefault(
+                name,
+                {"学生姓名": name, "数据来源": "schoology_gradebook", "资料状态": "待人工补全"},
+            )
             fields[field] = "\n".join(sorted(courses))
 
     if not updates and not creates_by_name:
@@ -639,7 +642,13 @@ def sync_enrollment_to_roster(
         if resp.get("code") == 0:
             created += len(batch)
         else:
-            print(f"  [警告] 花名册新生创建失败: {resp.get('msg')} | {resp}")
+            fallback = [{"fields": {"学生姓名": row["fields"]["学生姓名"]}} for row in batch]
+            fallback_resp = requests.post(create_url, json={"records": fallback}, headers=headers).json()
+            if fallback_resp.get("code") == 0:
+                created += len(fallback)
+                print("  [提示] 花名册缺少资料状态字段，新生已降级为仅创建姓名")
+            else:
+                print(f"  [警告] 花名册新生创建失败: {resp.get('msg')} | {resp}")
 
     print(
         f"  选课同步完成：更新 {len(to_update)} 名已有学生，"
@@ -806,10 +815,14 @@ def update_lib_from_gradebook(token: str, app_token: str, lib_table_id: str,
             fields["截止日期"] = due_ms
 
         semester = meta.get("semester") or current_semester
-        if semester:
+        if semester and not existing_semester:
             fields["学期"] = semester
-            if semester != existing_semester:
-                semester_fixed += 1
+            semester_fixed += 1
+        elif semester and existing_semester and semester != existing_semester:
+            print(
+                "  [保护] 作业库已有学期，跳过覆盖: "
+                f"{record_meta.get('assignment_name', '')} | existing={existing_semester} | incoming={semester}"
+            )
         to_update.append({"record_id": rec_id, "fields": fields})
 
     if skipped_ignore:
@@ -836,7 +849,7 @@ def update_lib_from_gradebook(token: str, app_token: str, lib_table_id: str,
 
     print(f"  ✓ 更新作业库 {updated} 条")
     if semester_fixed:
-        print(f"  ✓ 规范化/补写学期 {semester_fixed} 条")
+        print(f"  ✓ 补写空学期 {semester_fixed} 条")
     if fallback_matched:
         print(f"  ✓ 名称兜底匹配并标记极其重要 {fallback_matched} 条")
     if ambiguous_fallback:

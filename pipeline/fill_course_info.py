@@ -100,7 +100,7 @@ def parse_semester_from_section_id(text):
     """从课程标题中提取学期标签。
     如 "ESL Level 5: Section 2526S4N"       → "2025-S4"
        "Grade 12 Data Management: Section 2526S3N" → "2025-S3"
-    解析规则：2526S3N → start=2025, end=2026, sem=S3 → "2025-S3"（取开始学年）
+    解析规则：2526S3N → start=2025, end=2026, sem=S3 → "2025-S3"（取学年起始年）
     """
     m = re.search(r'[Ss]ection\s+(\d{2})(\d{2})(S\d+)N', text, re.IGNORECASE)
     if m:
@@ -362,7 +362,7 @@ def start_course_filler():
                     code = course_mapping.get(course_raw, title.split(":")[0].strip())
                     # 解析学期标签（如 2025-S4）
                     sm = re.search(r'(\d{2})(\d{2})(S\d)N', title)
-                    sem = f"20{sm.group(1)}-{sm.group(3)}" if sm else ""
+                    sem = f"20{sm.group(1)}-{sm.group(3).upper()}" if sm else ""
                     nid_to_course[str(nid)] = (code, sem)
                 print(f">>> NID→课程映射：{len(nid_to_course)} 个 section")
             except Exception as e:
