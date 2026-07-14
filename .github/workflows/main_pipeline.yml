@@ -67,23 +67,8 @@ jobs:
           SCHOOLOGY_SECTION_NIDS: ${{ secrets.SCHOOLOGY_SECTION_NIDS }}
         run: python "pipeline/fill_course_info.py"
 
-      # === 阶段三：缺交核验 ===
-      - name: 6. 运行缺交核验 (Check Missing)
-        if: success()
-        env:
-          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
-          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
-          FEISHU_APP_TOKEN: ${{ secrets.FEISHU_APP_TOKEN }}
-          FEISHU_TABLE_ID: ${{ secrets.FEISHU_TABLE_ID }}
-          FEISHU_ROSTER_TABLE_ID: ${{ secrets.FEISHU_ROSTER_TABLE_ID }}
-          FEISHU_LIB_TABLE_ID: ${{ secrets.FEISHU_LIB_TABLE_ID }}
-          FEISHU_MISSING_TABLE_ID: ${{ secrets.FEISHU_MISSING_TABLE_ID }}
-          ACTIVE_SEMESTERS: ${{ secrets.ACTIVE_SEMESTERS }}
-          REQUIRE_SEMESTER_TAG_FOR_MISSING: "1"
-        run: python "pipeline/check_missing_sync.py"
-
-      # === 阶段三·五：抓取 Gradebook（写 grading_period 供汇总读取）===
-      - name: 6.5 抓取 Gradebook (Scrape Gradebook)
+      # === 阶段三：抓取 Gradebook（补全作业库学期、同步花名册选课、写 grading_period）===
+      - name: 6. 抓取 Gradebook (Scrape Gradebook)
         continue-on-error: true   # 失败不阻塞后续汇总步骤
         id: scrape_gradebook
         env:
@@ -92,6 +77,7 @@ jobs:
           FEISHU_APP_TOKEN: ${{ secrets.FEISHU_APP_TOKEN }}
           FEISHU_GRADEBOOK_TABLE_ID: ${{ secrets.FEISHU_GRADEBOOK_TABLE_ID }}
           FEISHU_LIB_TABLE_ID: ${{ secrets.FEISHU_LIB_TABLE_ID }}
+          FEISHU_ROSTER_TABLE_ID: ${{ secrets.FEISHU_ROSTER_TABLE_ID }}
           FEISHU_CONFIG_TABLE_ID: ${{ secrets.FEISHU_CONFIG_TABLE_ID }}
           SCHOOLOGY_COOKIES: ${{ secrets.SCHOOLOGY_COOKIES }}
           SCHOOLOGY_SECTION_NIDS: ${{ secrets.SCHOOLOGY_SECTION_NIDS }}
@@ -99,7 +85,7 @@ jobs:
           CURRENT_SEMESTER: ${{ secrets.CURRENT_SEMESTER }}
         run: python pipeline/scrape_gradebook.py
 
-      - name: 6.5b 通知 Gradebook 失败
+      - name: 6b 通知 Gradebook 失败
         if: steps.scrape_gradebook.outcome == 'failure'
         env:
           FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
@@ -114,8 +100,36 @@ jobs:
               }
             }'
 
-      # === 阶段三·六：Schoology 学术过程结构化同步（PostgreSQL + JSON 快照）===
-      - name: 6.6 构建 Schoology 学术过程数据层
+      # === 阶段三·五：修复提交记录关联（让提交记录可通过关联作业获得所属课程）===
+      - name: 6.5 修复提交记录关联 (Repair Submission Links)
+        if: success()
+        env:
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          FEISHU_APP_TOKEN: ${{ secrets.FEISHU_APP_TOKEN }}
+          FEISHU_TABLE_ID: ${{ secrets.FEISHU_TABLE_ID }}
+          FEISHU_ROSTER_TABLE_ID: ${{ secrets.FEISHU_ROSTER_TABLE_ID }}
+          FEISHU_LIB_TABLE_ID: ${{ secrets.FEISHU_LIB_TABLE_ID }}
+          ACTIVE_SEMESTERS: ${{ secrets.ACTIVE_SEMESTERS }}
+        run: python pipeline/repair_submission_student_links.py
+
+      # === 阶段三·六：缺交核验 ===
+      - name: 6.6 运行缺交核验 (Check Missing)
+        if: success()
+        env:
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          FEISHU_APP_TOKEN: ${{ secrets.FEISHU_APP_TOKEN }}
+          FEISHU_TABLE_ID: ${{ secrets.FEISHU_TABLE_ID }}
+          FEISHU_ROSTER_TABLE_ID: ${{ secrets.FEISHU_ROSTER_TABLE_ID }}
+          FEISHU_LIB_TABLE_ID: ${{ secrets.FEISHU_LIB_TABLE_ID }}
+          FEISHU_MISSING_TABLE_ID: ${{ secrets.FEISHU_MISSING_TABLE_ID }}
+          ACTIVE_SEMESTERS: ${{ secrets.ACTIVE_SEMESTERS }}
+          REQUIRE_SEMESTER_TAG_FOR_MISSING: "1"
+        run: python "pipeline/check_missing_sync.py"
+
+      # === 阶段三·七：Schoology 学术过程结构化同步（PostgreSQL + JSON 快照）===
+      - name: 6.7 构建 Schoology 学术过程数据层
         continue-on-error: true
         id: schoology_process
         env:

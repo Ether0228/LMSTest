@@ -1,9 +1,12 @@
 """
-Repair Feishu submission records whose linked student is missing.
+Repair Feishu submission records whose linked student or assignment is missing.
 
 Rules:
   - If 学生姓名 exists in roster, write 关联学生.
   - If not in roster, create a minimal roster record and then write 关联学生.
+  - If 作业链接 exists in the assignment library, write 关联作业.
+  - When ACTIVE_SEMESTERS is set, only repair submissions whose assignment link
+    belongs to an active-semester assignment library record.
   - Never deletes submission data.
 """
 
@@ -78,7 +81,10 @@ def create_roster_student(token, app_token, roster_table_id, student_name):
 def clean_url(url):
     if not url:
         return ""
-    match = re.search(r'(https://.*?/(?:assignment|assessment|discussion)/\d+)', str(url))
+    match = re.search(
+        r'(https://.*?(?:/(?:assignment|assessment|discussion)/\d+|/materials/discussion/view/\d+))',
+        str(url),
+    )
     return match.group(1) if match else str(url).strip()
 
 
@@ -95,16 +101,14 @@ def active_semesters():
 
 def current_semester_assignment_links(lib_records):
     semesters = active_semesters()
-    if not semesters:
-        return set()
-    links = set()
+    links = {}
     for rec in lib_records:
         fields = rec.get("fields", {})
-        if str(fields.get("学期", "")).strip() not in semesters:
+        if semesters and str(fields.get("学期", "")).strip() not in semesters:
             continue
         link = clean_url(cell_link_url(fields.get("作业链接")))
         if link:
-            links.add(link)
+            links[link] = rec.get("record_id")
     return links
 
 
@@ -139,16 +143,22 @@ def main():
         if str(rec.get("fields", {}).get("学生姓名", "")).strip()
     }
 
-    active_links = set()
-    if lib_table_id and active_semesters():
+    active_assignment_by_link = {}
+    if lib_table_id:
         lib_records = fetch_all_records(token, app_token, lib_table_id)
-        active_links = current_semester_assignment_links(lib_records)
-        print(f"scope active semester links: {len(active_links)}")
+        active_assignment_by_link = current_semester_assignment_links(lib_records)
+        if active_semesters():
+            print(f"scope active semester assignment links: {len(active_assignment_by_link)}")
+        else:
+            print(f"scope all assignment links: {len(active_assignment_by_link)}")
 
     submission_records = fetch_all_records(token, app_token, submission_table_id)
     updates = []
     created = 0
-    already_linked = 0
+    already_student_linked = 0
+    already_assignment_linked = 0
+    assignment_linked = 0
+    missing_assignment_link = 0
     skipped_no_name = 0
     skipped_out_of_scope = 0
     skipped_new_students = set()
@@ -156,42 +166,59 @@ def main():
 
     for idx, rec in enumerate(submission_records, 1):
         fields = rec.get("fields", {})
-        if active_links:
-            sub_link = clean_url(cell_link_url(fields.get("作业链接")))
-            if sub_link not in active_links:
+        sub_link = clean_url(cell_link_url(fields.get("作业链接")))
+        if active_assignment_by_link and active_semesters():
+            if sub_link not in active_assignment_by_link:
                 skipped_out_of_scope += 1
                 continue
+
+        patch = {}
+
         if linked_record_ids(fields.get("关联学生")):
-            already_linked += 1
-            continue
-        student_name = str(fields.get("学生姓名", "")).strip()
-        if not student_name:
-            skipped_no_name += 1
-            continue
-        roster_id = roster_by_name.get(student_name)
-        if not roster_id:
-            if student_name in known_uncreatable_students:
-                skipped_new_students.add(student_name)
-                continue
-            try:
-                roster_id = create_roster_student(token, app_token, roster_table_id, student_name)
-                roster_by_name[student_name] = roster_id
-                created += 1
-            except RuntimeError as exc:
-                known_uncreatable_students.add(student_name)
-                skipped_new_students.add(student_name)
-                print(f"skip new student without roster permission: {exc}")
-                continue
-        updates.append({"record_id": rec["record_id"], "fields": {"关联学生": [roster_id]}})
+            already_student_linked += 1
+        else:
+            student_name = str(fields.get("学生姓名", "")).strip()
+            if not student_name:
+                skipped_no_name += 1
+            else:
+                roster_id = roster_by_name.get(student_name)
+                if not roster_id:
+                    if student_name in known_uncreatable_students:
+                        skipped_new_students.add(student_name)
+                    else:
+                        try:
+                            roster_id = create_roster_student(token, app_token, roster_table_id, student_name)
+                            roster_by_name[student_name] = roster_id
+                            created += 1
+                        except RuntimeError as exc:
+                            known_uncreatable_students.add(student_name)
+                            skipped_new_students.add(student_name)
+                            print(f"skip new student without roster permission: {exc}")
+                if roster_id:
+                    patch["关联学生"] = [roster_id]
+
+        if linked_record_ids(fields.get("关联作业")):
+            already_assignment_linked += 1
+        elif sub_link and sub_link in active_assignment_by_link:
+            patch["关联作业"] = [active_assignment_by_link[sub_link]]
+            assignment_linked += 1
+        elif sub_link:
+            missing_assignment_link += 1
+
+        if patch:
+            updates.append({"record_id": rec["record_id"], "fields": patch})
         if idx % 1000 == 0:
             print(f"scan progress: {idx}/{len(submission_records)} updates_pending={len(updates)}")
 
     updated = batch_update_records(token, app_token, submission_table_id, updates)
     print(
         f"repair complete: submissions={len(submission_records)} "
-        f"already_linked={already_linked} updated={updated} "
+        f"already_student_linked={already_student_linked} "
+        f"already_assignment_linked={already_assignment_linked} "
+        f"updated={updated} assignment_linked={assignment_linked} "
         f"created_roster={created} skipped_no_name={skipped_no_name} "
-        f"skipped_out_of_scope={skipped_out_of_scope}"
+        f"skipped_out_of_scope={skipped_out_of_scope} "
+        f"missing_assignment_link={missing_assignment_link}"
     )
     if skipped_new_students:
         print("new students need manual roster records:")
