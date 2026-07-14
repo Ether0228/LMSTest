@@ -46,6 +46,7 @@ DEFAULT_COURSE_MAPPING = {
     "grade 11 biology": "SBI3U",
     "grade 10 science": "SNC2D",
     "grade 12 computer science": "ICS4U",
+    "g12 ontario secondary school literacy":"OLC4O"
 }
 
 def get_env_config():
