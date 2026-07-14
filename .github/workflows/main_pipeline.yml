@@ -54,21 +54,8 @@ jobs:
           SCHOOLOGY_SECTION_NIDS: ${{ secrets.SCHOOLOGY_SECTION_NIDS }}
         run: python "pipeline/scraper_cloud_feishu.py"
 
-      # === 阶段二：补全课程信息 ===
-      - name: 5. 运行课程补全 (Fill Course Info)
-        if: success()
-        env:
-          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
-          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
-          FEISHU_APP_TOKEN: ${{ secrets.FEISHU_APP_TOKEN }}
-          FEISHU_LIB_TABLE_ID: ${{ secrets.FEISHU_LIB_TABLE_ID }}
-          FEISHU_CONFIG_TABLE_ID: ${{ secrets.FEISHU_CONFIG_TABLE_ID }}
-          SCHOOLOGY_COOKIES: ${{ secrets.SCHOOLOGY_COOKIES }}
-          SCHOOLOGY_SECTION_NIDS: ${{ secrets.SCHOOLOGY_SECTION_NIDS }}
-        run: python "pipeline/fill_course_info.py"
-
-      # === 阶段三：抓取 Gradebook（补全作业库学期、同步花名册选课、写 grading_period）===
-      - name: 6. 抓取 Gradebook (Scrape Gradebook)
+      # === 阶段二：抓取 Gradebook（补全作业库学期、同步花名册选课、写 grading_period）===
+      - name: 5. 抓取 Gradebook (Scrape Gradebook)
         continue-on-error: true   # 失败不阻塞后续汇总步骤
         id: scrape_gradebook
         env:
@@ -85,7 +72,7 @@ jobs:
           CURRENT_SEMESTER: ${{ secrets.CURRENT_SEMESTER }}
         run: python pipeline/scrape_gradebook.py
 
-      - name: 6b 通知 Gradebook 失败
+      - name: 5b 通知 Gradebook 失败
         if: steps.scrape_gradebook.outcome == 'failure'
         env:
           FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
@@ -99,6 +86,20 @@ jobs:
                 "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "scrape_gradebook.py 执行失败（不影响其他步骤）\n\n[查看日志](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"}}]
               }
             }'
+
+      # === 阶段三：课程信息补漏（Gradebook 未覆盖的 Schoology 作业页）===
+      - name: 6. 运行课程补全 (Fill Course Info)
+        if: success()
+        continue-on-error: true
+        env:
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          FEISHU_APP_TOKEN: ${{ secrets.FEISHU_APP_TOKEN }}
+          FEISHU_LIB_TABLE_ID: ${{ secrets.FEISHU_LIB_TABLE_ID }}
+          FEISHU_CONFIG_TABLE_ID: ${{ secrets.FEISHU_CONFIG_TABLE_ID }}
+          SCHOOLOGY_COOKIES: ${{ secrets.SCHOOLOGY_COOKIES }}
+          SCHOOLOGY_SECTION_NIDS: ${{ secrets.SCHOOLOGY_SECTION_NIDS }}
+        run: python "pipeline/fill_course_info.py"
 
       # === 阶段三·五：修复提交记录关联（让提交记录可通过关联作业获得所属课程）===
       - name: 6.5 修复提交记录关联 (Repair Submission Links)
