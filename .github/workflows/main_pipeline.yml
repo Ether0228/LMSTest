@@ -91,6 +91,7 @@ jobs:
       - name: 6. 运行课程补全 (Fill Course Info)
         if: success()
         continue-on-error: true
+        timeout-minutes: 3
         env:
           FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
           FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
