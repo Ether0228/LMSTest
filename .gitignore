@@ -5,6 +5,7 @@ schoology数据转飞书/.env
 
 # 磁盘缓存（由 pipeline 写入，不纳入版本管理）
 interactive_web/cache/
+outputs/schoology_process/
 
 # macOS 系统文件
 .DS_Store
@@ -13,3 +14,5 @@ interactive_web/cache/
 # Python
 __pycache__/
 *.pyc
+repository-secrets-handoff.env
+.venv-local/

@@ -46,6 +46,7 @@ DEFAULT_COURSE_MAPPING = {
     "grade 12 canadian and world issues":  "CGW4U",
     "grade 12 business leadership":        "BOH4M",
     "g12 analysing current economic issues": "CIA4U",
+    "g12 ontario secondary school literacy": "OLC4O",
     "esl level 5":                         "ESLEO",
     "esl level 4":                         "ESLDO",
     "esl level 3":                         "ESLCO",
@@ -1048,6 +1049,25 @@ def main():
             print(f">>> Section 学期映射已写入: {ss_path}（{len(section_gp)} 个 section）")
         except Exception as e:
             print(f"  [警告] Section 学期映射写入失败: {e}")
+
+    # 把 Schoology enrollment 合并成平铺快照，供 check_missing_sync.py 判定学生选课。
+    # 每次 scrape_gradebook 运行整体覆盖，避免依赖飞书花名册手动维护的 S1-S6 所属课程字段。
+    if enrollment_by_sem:
+        merged_enrollment = {}
+        for sem_short, name_courses in enrollment_by_sem.items():
+            for name, courses in name_courses.items():
+                merged_enrollment.setdefault(name, set()).update(courses)
+        enrollment_out = {
+            name: sorted(courses)
+            for name, courses in sorted(merged_enrollment.items())
+        }
+        enroll_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "section_enrollment.json")
+        try:
+            with open(enroll_path, "w", encoding="utf-8") as f:
+                json.dump(enrollment_out, f, ensure_ascii=False, indent=2)
+            print(f">>> 选课快照已写入: {enroll_path}（{len(enrollment_out)} 名学生）")
+        except Exception as e:
+            print(f"  [警告] 选课快照写入失败: {e}")
 
     # 学期元数据写入本地文件，供 build_student_summary.py 读取
     if gp_info:

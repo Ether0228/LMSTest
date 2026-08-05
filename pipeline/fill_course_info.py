@@ -37,6 +37,7 @@ DEFAULT_COURSE_MAPPING = {
     "grade 12 canadian and world issues": "CGW4U",
     "grade 12 business leadership": "BOH4M",
     "g12 analysing current economic issues": "CIA4U",
+    "g12 ontario secondary school literacy": "OLC4O",
     "esl level 5": "ESLEO",
     "esl level 4": "ESLDO",
     "esl level 3": "ESLCO",
