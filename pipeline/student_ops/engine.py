@@ -165,8 +165,13 @@ def participation(data: dict[str, Any], ai_adapter: Any) -> dict[str, Any]:
             "客观事实": event.get("evidence"), "证据来源": event.get("source"),
             "确认状态": "待确认",
         }))
-    overall = "partial" if any(row["status"] == "unmatched" for row in records) else "success"
-    warnings = ["存在无法唯一匹配的互动候选，已排除在对外事实之外"] if overall == "partial" else []
+    failed_states = {row["status"] for row in records} & {"unmatched", "ai_failed"}
+    overall = "partial" if failed_states else "success"
+    warnings = []
+    if "unmatched" in failed_states:
+        warnings.append("存在无法唯一匹配的互动候选，已排除在对外事实之外")
+    if "ai_failed" in failed_states:
+        warnings.append("部分互动来源AI提取失败，未生成对应候选")
     return make_result(overall, {"records": records}, warnings)
 
 
@@ -268,7 +273,9 @@ def pbl(data: dict[str, Any], ai_adapter: Any) -> dict[str, Any]:
             reviews.append({"任务ID": evidence.get("task_id"), "AI检查结果": review["结果"], "说明": review["说明"], "缺失项": review["缺失项"], "建议复核": review["建议复核"], "不得自动通过": True})
         except (AIAdapterError, CandidateSchemaError) as error:
             reviews.append({"任务ID": evidence.get("task_id"), "AI检查结果": "无法判断", "说明": "AI检查失败", "缺失项": "待人工检查", "建议复核": "人工确认", "不得自动通过": True})
-    return make_result("success", {"evidence_manifest": manifest, "AI检查候选": reviews})
+    incomplete = any(review["AI检查结果"] == "无法判断" for review in reviews)
+    warnings = ["部分PBL证据不可读、缺少完成标准或AI检查失败，结果保留为无法判断"] if incomplete else []
+    return make_result("partial" if incomplete else "success", {"evidence_manifest": manifest, "AI检查候选": reviews}, warnings)
 
 
 def weekly_payload(data: dict[str, Any], results: dict[str, Any]) -> dict[str, Any]:

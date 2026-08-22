@@ -142,6 +142,8 @@ class StudentOpsWorkflowTests(unittest.TestCase):
         review = self.all["pbl"]["payload"]["AI检查候选"][1]
         self.assertEqual(review["AI检查结果"], "无法判断")
         self.assertTrue(review["不得自动通过"])
+        self.assertEqual(self.all["pbl"]["status"], "partial")
+        self.assertTrue(self.all["pbl"]["warnings"])
 
     def test_structured_candidates_accept_fence_and_reject_missing_fields(self):
         self.assertEqual(self.all["course_weekly"]["status"], "success")
@@ -156,6 +158,10 @@ class StudentOpsWorkflowTests(unittest.TestCase):
         sample["participation_sources"] = [{"session_id": "session-demo-01", "text": "甲同学解释步骤", "mock_ai_response": '[{"speaker":"学生甲","category":"回答问题","direction":"正向","objective_fact":"解释步骤","source_ref":"line-1"}]'}]
         result = run_workflow("participation", sample)["participation"]
         self.assertEqual(result["payload"]["records"][0]["status"], "candidate")
+        sample["participation_sources"][0]["mock_ai_response"] = "not-json"
+        failed = run_workflow("participation", sample)["participation"]
+        self.assertEqual(failed["status"], "partial")
+        self.assertEqual(failed["payload"]["records"][0]["status"], "ai_failed")
         sample["student"].pop("IELTS已确认策略")
         self.assertEqual(run_workflow("ielts", sample)["ielts"]["payload"]["候选"], [])
 
