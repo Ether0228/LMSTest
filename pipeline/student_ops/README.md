@@ -3,6 +3,9 @@
 This package implements the dependency order defined by the school operations
 specification without writing to Feishu, Schoology, or any production service.
 Every run is a dry-run and emits auditable local/GitHub Actions artifacts.
+Selectors execute only their required dependency DAG; `all` executes the full
+chain. A blocked fact module never produces its module AI draft, and publishing
+also blocks when a critical fact module is blocked.
 
 | Workflow | Rule boundary | Output |
 | --- | --- | --- |
@@ -29,3 +32,8 @@ fixture's `mock_ai_response` models the AI adapter so schema/failure behavior
 is reproducible. Production adapters must be separately approved, use GitHub
 Secrets/environment variables, and retain the same no-write-on-AI-failure
 contract.
+
+The course minutes candidate and its human confirmation are separate fixture
+inputs. `publication.approved_at` and `publication.version` are mandatory for
+a stable, idempotent publication snapshot; no runtime timestamp becomes a
+published fact.

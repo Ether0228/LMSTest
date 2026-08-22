@@ -11,6 +11,7 @@ workflow。新模块不改动现有 `main_pipeline.yml`，避免影响生产同�
 `student_ops_workflows.yml` 只由 `workflow_dispatch` 触发。它运行匿名
 fixture、所有单元测试并上传工件；不会读取 Secrets，不会请求线上服务。
 每个阶段使用同一固定输入、同一周唯一键和稳定 hash，因此可重跑。
+单独选择某个阶段时，执行器只运行其必需依赖，而不是无条件运行整条链。
 
 1. `session_content`：只从文字纪要产生六段式 AI 候选；缺来源不调用 AI。
 2. `course_weekly`：仅消费已确认的实际课堂内容；没有确认事实时阻断。
@@ -22,7 +23,8 @@ fixture、所有单元测试并上传工件；不会读取 Secrets，不会请�
 8. `weekly_payload`：即使 AI 不可用也可组装事实与模块状态。
 9. `weekly_drafts`：所有内容均为待审核草稿，不含教育策略决策。
 10. `publish`：仅在 fixture 的“智育师已确认”旗标为真时产生本地 HTML/PDF
-    快照；不会生成对外链接或写入飞书。
+    快照；还必须有稳定的确认时间/版本，且课程、任务、成绩、IELTS、PBL等
+    关键事实模块不能为`blocked`。不会生成对外链接或写入飞书。
 
 ## 明确未做（需后续授权与规则落地）
 

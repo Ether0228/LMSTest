@@ -8,7 +8,6 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
-from collections import Counter
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -76,6 +75,7 @@ def validate_session_minutes(text: str, sections: dict[str, str] | None) -> list
 
 
 def session_content(data: dict[str, Any]) -> dict[str, Any]:
+    confirmations = {x.get("session_id"): x for x in data.get("human_confirmations", [])}
     results = []
     for session in data.get("sessions", []):
         source = str(session.get("source_text") or "").strip()
@@ -89,11 +89,17 @@ def session_content(data: dict[str, Any]) -> dict[str, Any]:
         if errors:
             results.append(make_result("invalid_schema", {**base, "candidate": candidate}, errors))
             continue
-        # This remains an AI candidate even when the fixture says it was reviewed.
+        # The AI candidate is never itself a confirmation. Confirmation is a
+        # separately supplied human fact, matching SESSION-05/06.
+        human_confirmation = confirmations.get(session.get("session_id"), {})
         results.append(make_result("success", {
             **base, "candidate": candidate, "structured": sections,
             "input_hash": stable_hash(source),
-            "confirmation_status": session.get("confirmation_status", "待确认"),
+            "human_confirmation": {
+                "status": human_confirmation.get("status", "待确认"),
+                "confirmed_by": human_confirmation.get("confirmed_by"),
+                "confirmed_at": human_confirmation.get("confirmed_at"),
+            },
         }))
     overall = "success" if results and all(x["status"] == "success" for x in results) else "partial"
     return make_result(overall, {"records": results})
@@ -102,7 +108,7 @@ def session_content(data: dict[str, Any]) -> dict[str, Any]:
 def course_weekly(data: dict[str, Any], sessions_result: dict[str, Any]) -> dict[str, Any]:
     confirmed = []
     for row in sessions_result["payload"]["records"]:
-        if row["status"] == "success" and row["payload"].get("confirmation_status") == "已确认":
+        if row["status"] == "success" and row["payload"]["human_confirmation"].get("status") == "已确认":
             confirmed.append(row["payload"])
     if not confirmed:
         return make_result("blocked", {"records": []}, ["没有已确认的实际课程内容，不能以计划内容替代"])
@@ -130,11 +136,16 @@ def participation(data: dict[str, Any]) -> dict[str, Any]:
             "客观事实": event.get("evidence"), "证据来源": event.get("source"),
             "确认状态": "待确认",
         }))
-    return make_result("success", {"records": records})
+    overall = "partial" if any(row["status"] == "unmatched" for row in records) else "success"
+    warnings = ["存在无法唯一匹配的互动候选，已排除在对外事实之外"] if overall == "partial" else []
+    return make_result(overall, {"records": records}, warnings)
 
 
 def effective_deadline(task: dict[str, Any]) -> str | None:
-    return task.get("返工Deadline") or task.get("补做Deadline") or task.get("原始Deadline")
+    """TASK-002: use rework deadline only while the task is in rework."""
+    if task.get("检查状态") in ("需返工", "已返工待确认") and task.get("返工Deadline"):
+        return task["返工Deadline"]
+    return task.get("补做Deadline") or task.get("原始Deadline")
 
 
 def tasks(data: dict[str, Any]) -> dict[str, Any]:
@@ -144,12 +155,29 @@ def tasks(data: dict[str, Any]) -> dict[str, Any]:
         record = copy.deepcopy(task)
         deadline = effective_deadline(task)
         record["当前有效Deadline"] = deadline
-        submitted = task.get("当前提交状态") in ("已提交", "已重交")
-        passed = task.get("检查状态") == "已通过"
-        overdue = bool(deadline and date.fromisoformat(deadline) < today and not passed)
-        record["Backlog状态"] = "积压" if overdue else "非积压"
-        record["积压天数"] = max((today - date.fromisoformat(deadline)).days, 0) if overdue else 0
-        record["当前任务状态"] = "已通过" if passed else ("已提交待检查" if submitted else "未提交")
+        submission = task.get("当前提交状态", "未提交")
+        check = task.get("检查状态", "待确认")
+        submitted = submission in ("已提交", "已重新提交")
+        rework_resubmitted = submission == "已重新提交"
+        passed = check == "已通过"
+        overdue = bool(deadline and date.fromisoformat(deadline) < today)
+        if passed:
+            task_state, display_state, backlog = "已完成", "已通过", "正常"
+        elif check == "需返工":
+            task_state, display_state = "需返工", "需返工"
+            backlog = "返工积压" if overdue and not rework_resubmitted else "正常"
+        elif check == "已返工待确认":
+            task_state, display_state, backlog = "待确认", "已提交待审", "正常"
+        elif submitted:
+            task_state, display_state, backlog = "待确认", "已提交待审", "正常"
+        elif overdue:
+            task_state, display_state, backlog = "未完成", "未提交", "缺交积压"
+        else:
+            task_state, display_state, backlog = "未完成", "未提交", "未提交"
+        record["Backlog状态"] = backlog
+        record["积压天数"] = max((today - date.fromisoformat(deadline)).days, 0) if backlog in ("缺交积压", "返工积压") else 0
+        record["当前任务状态"] = task_state
+        record["当前执行状态"] = display_state
         records.append(record)
     return make_result("success", {"records": records, "backlog_count": sum(x["Backlog状态"] == "积压" for x in records)})
 
@@ -215,15 +243,24 @@ def weekly_payload(data: dict[str, Any], results: dict[str, Any]) -> dict[str, A
 
 def weekly_drafts(data: dict[str, Any], payload_result: dict[str, Any]) -> dict[str, Any]:
     p = payload_result["payload"]
-    drafts = {
-        "任务执行AI草稿": f"本周共有{p['tasks']['总数']}项任务，当前积压{p['tasks']['backlog']}项；提交与通过需由老师核对。",
-        "成绩总结AI草稿": "本段仅整理近期作业分数与变化，不推断低分原因。",
-        "IELTS周总结AI草稿": "本段仅列出已确认IELTS任务；候选需经智育师批准。",
-        "PBL周总结AI草稿": "本段仅整理可读证据与待人工复核项，不判断项目阶段或质量。",
-        "本周总体AI草稿": "以下为待智育师审核的事实性草稿，不构成教育策略或正式发布内容。",
-        "确认状态": "待智育师审核",
+    integrity = p.get("data_integrity", {})
+    modules = {
+        "course_weekly": ("课程学习AI草稿", "本段仅使用已确认的实际课堂内容和已确认互动事实。"),
+        "tasks": ("任务执行AI草稿", f"本周共有{p['tasks']['总数']}项任务，当前积压{p['tasks']['backlog']}项；提交与通过需由老师核对。"),
+        "grades": ("成绩总结AI草稿", "本段仅整理近期作业分数与变化，不推断低分原因。"),
+        "ielts": ("IELTS周总结AI草稿", "本段仅列出已确认IELTS任务；候选需经智育师批准。"),
+        "pbl": ("PBL周总结AI草稿", "本段仅整理可读证据与待人工复核项，不判断项目阶段或质量。"),
     }
-    return make_result("success", {"drafts": drafts, "payload_hash": stable_hash(p)})
+    drafts, warnings = {}, []
+    for module, (field, text) in modules.items():
+        if integrity.get(module) == "blocked":
+            warnings.append(f"{module}为blocked，未生成{field}")
+        else:
+            drafts[field] = text
+    drafts["本周总体AI草稿"] = "以下为仅基于可用模块的待审核事实性草稿，不构成教育策略或正式发布内容。"
+    drafts["确认状态"] = "待智育师审核"
+    status = "partial" if warnings else "success"
+    return make_result(status, {"drafts": drafts, "payload_hash": stable_hash(p)}, warnings)
 
 
 def render_html(payload: dict[str, Any], drafts: dict[str, Any]) -> str:
@@ -245,9 +282,21 @@ def minimal_pdf(text: str) -> bytes:
 
 
 def publish(data: dict[str, Any], payload_result: dict[str, Any], drafts_result: dict[str, Any]) -> dict[str, Any]:
-    if not data.get("publication", {}).get("approved_by_educator"):
+    publication = data.get("publication", {})
+    if not publication.get("approved_by_educator"):
         return make_result("blocked", {}, ["未获智育师确认；不得发布或生成对外链接"])
-    snapshot = {"payload": payload_result["payload"], "drafts": drafts_result["payload"], "published_at": iso_now(), "version": 1}
+    if not publication.get("approved_at") or not publication.get("version"):
+        return make_result("blocked", {}, ["缺少明确的人工确认时间或发布版本；不得产生不稳定快照"])
+    critical_modules = ("course_weekly", "tasks", "grades", "ielts", "pbl")
+    blocked = [name for name in critical_modules if payload_result["payload"].get("data_integrity", {}).get(name) == "blocked"]
+    if blocked:
+        return make_result("blocked", {}, [f"关键事实模块blocked：{', '.join(blocked)}；不得发布"])
+    payload_hash = stable_hash(payload_result["payload"])
+    snapshot = {
+        "payload": payload_result["payload"], "drafts": drafts_result["payload"],
+        "approved_at": publication["approved_at"], "version": publication["version"],
+        "published_id": stable_hash({"payload_hash": payload_hash, "approved_at": publication["approved_at"], "version": publication["version"]})[:24],
+    }
     return make_result("success", {"snapshot": snapshot, "html": render_html(snapshot["payload"], snapshot["drafts"]), "pdf": minimal_pdf("Weekly feedback snapshot")})
 
 
@@ -255,17 +304,30 @@ def run_workflow(name: str, data: dict[str, Any]) -> dict[str, Any]:
     if name not in WORKFLOWS:
         raise ValueError(f"未知workflow: {name}")
     results: dict[str, Any] = {}
-    results["session_content"] = session_content(data)
-    results["course_weekly"] = course_weekly(data, results["session_content"])
-    results["participation"] = participation(data)
-    results["tasks"] = tasks(data)
-    results["grades"] = grades(data)
-    results["ielts"] = ielts(data, results["tasks"])
-    results["pbl"] = pbl(data)
-    results["weekly_payload"] = weekly_payload(data, results)
-    results["weekly_drafts"] = weekly_drafts(data, results["weekly_payload"])
-    results["publish"] = publish(data, results["weekly_payload"], results["weekly_drafts"])
-    return results if name == "all" else {name: results[name]}
+    dependencies = {
+        "session_content": (), "course_weekly": ("session_content",), "participation": (), "tasks": (), "grades": (),
+        "ielts": ("tasks",), "pbl": (), "weekly_payload": ("course_weekly", "participation", "tasks", "grades", "ielts", "pbl"),
+        "weekly_drafts": ("weekly_payload",), "publish": ("weekly_payload", "weekly_drafts"),
+    }
+    runners: dict[str, Callable[[], dict[str, Any]]] = {
+        "session_content": lambda: session_content(data), "course_weekly": lambda: course_weekly(data, results["session_content"]),
+        "participation": lambda: participation(data), "tasks": lambda: tasks(data), "grades": lambda: grades(data),
+        "ielts": lambda: ielts(data, results["tasks"]), "pbl": lambda: pbl(data),
+        "weekly_payload": lambda: weekly_payload(data, results), "weekly_drafts": lambda: weekly_drafts(data, results["weekly_payload"]),
+        "publish": lambda: publish(data, results["weekly_payload"], results["weekly_drafts"]),
+    }
+    def execute(target: str) -> None:
+        if target in results:
+            return
+        for dependency in dependencies[target]:
+            execute(dependency)
+        results[target] = runners[target]()
+    if name == "all":
+        for workflow in dependencies:
+            execute(workflow)
+        return results
+    execute(name)
+    return {name: results[name]}
 
 
 def write_artifacts(result: dict[str, Any], output_dir: Path, workflow: str, dry_run: bool = True) -> list[Path]:
