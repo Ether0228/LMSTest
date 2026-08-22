@@ -15,6 +15,7 @@ from typing import Any, Callable
 from .ai import AIAdapterError, FixtureAIAdapter
 from .prompts import SESSION_COURSE_MINUTES_PROMPT_V1
 from .publishing import PDFRenderError, render_pdf, render_weekly_html
+from .validation import CandidateSchemaError, parse_json_candidate, require_list, require_object
 
 SIX_HEADINGS = ("本节主题", "学习内容", "课堂活动", "课堂任务与评价", "学习情况与问题", "后续安排")
 WORKFLOWS = (
@@ -112,27 +113,48 @@ def session_content(data: dict[str, Any], ai_adapter: Any) -> dict[str, Any]:
     return make_result(overall, {"records": results})
 
 
-def course_weekly(data: dict[str, Any], sessions_result: dict[str, Any]) -> dict[str, Any]:
+COURSE_FIELDS = {"内容", "进度", "重点", "任务Deadline", "测评", "中教支持", "课程问题", "下周方向"}
+
+
+def course_weekly(data: dict[str, Any], sessions_result: dict[str, Any], ai_adapter: Any) -> dict[str, Any]:
     confirmed = []
     for row in sessions_result["payload"]["records"]:
         if row["status"] == "success" and row["payload"]["human_confirmation"].get("status") == "已确认":
             confirmed.append(row["payload"])
     if not confirmed:
         return make_result("blocked", {"records": []}, ["没有已确认的实际课程内容，不能以计划内容替代"])
-    content = [r["structured"]["学习内容"] for r in confirmed]
+    facts = [{"session_id": r["session_id"], "sections": r["structured"]} for r in confirmed]
+    try:
+        candidate = require_object(parse_json_candidate(ai_adapter.generate(
+            system="只根据已确认的实际课程场次事实生成课程周摘要JSON，不补充计划内容。",
+            user=json.dumps(facts, ensure_ascii=False), fixture_response=data.get("mock_structured_responses", {}).get("course_weekly"),
+        )), COURSE_FIELDS)
+    except (AIAdapterError, CandidateSchemaError) as error:
+        return make_result("partial", {"records": []}, [f"课程周AI候选失败：{error}"])
     record = {
         "课程周唯一键": f"{data['course']['course_offering_id']}:{data['week']['number']}:全班",
         "课程开设": data["course"]["course_offering_id"], "教学周": data["week"]["number"],
-        "本周内容AI候选": "\n".join(content), "来源场次": [r["session_id"] for r in confirmed],
+        "本周内容AI候选": candidate["内容"], "实际进度候选": candidate["进度"], "本周重点候选": candidate["重点"],
+        "任务与Deadline": candidate["任务Deadline"], "测评": candidate["测评"], "中教支持": candidate["中教支持"],
+        "课程问题": candidate["课程问题"], "下周方向": candidate["下周方向"], "来源场次": [r["session_id"] for r in confirmed],
         "确认状态": "待课程责任老师确认", "事实截止时间": data["week"]["end"],
     }
     return make_result("success", {"records": [record]})
 
 
-def participation(data: dict[str, Any]) -> dict[str, Any]:
+def participation(data: dict[str, Any], ai_adapter: Any) -> dict[str, Any]:
     roster = set(data.get("student", {}).get("aliases", [])) | {data.get("student", {}).get("name", "")}
-    records = []
-    for event in data.get("participation_events", []):
+    records, events = [], data.get("participation_events", [])
+    for source in data.get("participation_sources", []):
+        try:
+            extracted = require_list(parse_json_candidate(ai_adapter.generate(
+                system="从课堂纪要/逐字稿提取客观互动JSON，不推测态度或能力。",
+                user=str(source.get("text", "")), fixture_response=source.get("mock_ai_response"),
+            )), {"speaker", "category", "direction", "objective_fact", "source_ref"}, {"direction": {"正向", "中性", "需支持"}})
+            events += [{"session_id": source.get("session_id"), "speaker": x["speaker"], "category": x["category"], "direction": x["direction"], "evidence": x["objective_fact"], "source": x["source_ref"]} for x in extracted]
+        except (AIAdapterError, CandidateSchemaError) as error:
+            records.append(make_result("ai_failed", {"session_id": source.get("session_id")}, [str(error)]))
+    for event in events:
         speaker = event.get("speaker")
         if speaker not in roster:
             records.append(make_result("unmatched", {"session_id": event.get("session_id"), "speaker": speaker}, ["无法唯一匹配学生；不进入对外稿"]))
@@ -186,7 +208,7 @@ def tasks(data: dict[str, Any]) -> dict[str, Any]:
         record["当前任务状态"] = task_state
         record["当前执行状态"] = display_state
         records.append(record)
-    return make_result("success", {"records": records, "backlog_count": sum(x["Backlog状态"] == "积压" for x in records)})
+    return make_result("success", {"records": records, "backlog_count": sum(x["Backlog状态"] in ("缺交积压", "返工积压") for x in records)})
 
 
 def grades(data: dict[str, Any]) -> dict[str, Any]:
@@ -212,22 +234,40 @@ def grades(data: dict[str, Any]) -> dict[str, Any]:
     return make_result("success", {"append_only_events": events, "近期作业分数": current, "课程总分": trend})
 
 
-def ielts(data: dict[str, Any], task_result: dict[str, Any]) -> dict[str, Any]:
+def ielts(data: dict[str, Any], task_result: dict[str, Any], ai_adapter: Any) -> dict[str, Any]:
     ielts_tasks = [x for x in task_result["payload"]["records"] if x.get("所属模块") == "IELTS"]
     candidates = []
-    if data.get("student", {}).get("IELTS目标") and not ielts_tasks:
-        candidates.append({"事项类型": "IELTS候选任务", "建议": "请智育师根据已确认策略决定是否创建训练任务", "状态": "待人工批准"})
+    strategy = data.get("student", {}).get("IELTS已确认策略")
+    if data.get("student", {}).get("IELTS目标") and strategy:
+        try:
+            candidate = require_object(parse_json_candidate(ai_adapter.generate(
+                system="根据已确认IELTS策略和任务容量生成候选JSON；不得创建正式任务。",
+                user=json.dumps({"目标": data["student"]["IELTS目标"], "策略": strategy, "现有任务": ielts_tasks}, ensure_ascii=False), fixture_response=data.get("mock_structured_responses", {}).get("ielts"),
+            )), {"标题", "原因", "建议Deadline", "需讨论"})
+            candidates.append({"事项类型": "IELTS候选任务", **candidate, "状态": "待人工批准"})
+        except (AIAdapterError, CandidateSchemaError) as error:
+            return make_result("partial", {"正式任务": ielts_tasks, "候选": [], "说明": "候选不会自动创建学生任务"}, [f"IELTS候选失败：{error}"])
     return make_result("success", {"正式任务": ielts_tasks, "候选": candidates, "说明": "候选不会自动创建学生任务"})
 
 
-def pbl(data: dict[str, Any]) -> dict[str, Any]:
+def pbl(data: dict[str, Any], ai_adapter: Any) -> dict[str, Any]:
     manifest = []
     reviews = []
     for evidence in data.get("pbl_evidence", []):
         readable = bool(evidence.get("content"))
         item = {"任务ID": evidence.get("task_id"), "来源URL": evidence.get("url"), "hash": stable_hash(evidence.get("content", "")), "可读状态": "可读" if readable else "无法读取"}
         manifest.append(item)
-        reviews.append({"任务ID": evidence.get("task_id"), "AI检查结果": "待人工复核" if readable else "无法检查", "不得自动通过": True})
+        if not readable or not evidence.get("completion_standard"):
+            reviews.append({"任务ID": evidence.get("task_id"), "AI检查结果": "无法判断", "说明": "证据不可读或缺少已确认完成标准", "缺失项": "待补充", "建议复核": "人工确认", "不得自动通过": True})
+            continue
+        try:
+            review = require_object(parse_json_candidate(ai_adapter.generate(
+                system="仅按已确认完成标准检查PBL证据JSON，不自动通过任务或推进项目阶段。",
+                user=json.dumps({"standard": evidence["completion_standard"], "evidence": evidence["content"]}, ensure_ascii=False), fixture_response=evidence.get("mock_ai_response"),
+            )), {"结果", "说明", "缺失项", "建议复核"}, {"结果": {"达标", "基本达标", "需修改", "无法判断"}})
+            reviews.append({"任务ID": evidence.get("task_id"), "AI检查结果": review["结果"], "说明": review["说明"], "缺失项": review["缺失项"], "建议复核": review["建议复核"], "不得自动通过": True})
+        except (AIAdapterError, CandidateSchemaError) as error:
+            reviews.append({"任务ID": evidence.get("task_id"), "AI检查结果": "无法判断", "说明": "AI检查失败", "缺失项": "待人工检查", "建议复核": "人工确认", "不得自动通过": True})
     return make_result("success", {"evidence_manifest": manifest, "AI检查候选": reviews})
 
 
@@ -260,6 +300,7 @@ def weekly_drafts(data: dict[str, Any], payload_result: dict[str, Any], ai_adapt
     }
     drafts, warnings = {}, []
     responses = data.get("mock_weekly_responses", {})
+    slices = {"course_weekly": p.get("course_weekly"), "tasks": p.get("tasks"), "grades": p.get("grades"), "ielts": p.get("ielts"), "pbl": p.get("pbl")}
     for module, (field, fallback) in modules.items():
         if integrity.get(module) == "blocked":
             warnings.append(f"{module}为blocked，未生成{field}")
@@ -267,7 +308,7 @@ def weekly_drafts(data: dict[str, Any], payload_result: dict[str, Any], ai_adapt
             try:
                 drafts[field] = ai_adapter.generate(
                     system="你是学生学习运营系统的草稿助手。只依据输入事实，不作人格、动机、质量或教育策略判断。输出中文候选草稿。",
-                    user=f"模块：{module}\n事实摘要：{json.dumps(p, ensure_ascii=False, sort_keys=True)}",
+                    user=f"模块：{module}\n事实摘要：{json.dumps(slices[module], ensure_ascii=False, sort_keys=True)}",
                     fixture_response=responses.get(module, fallback if getattr(ai_adapter, "mode", "") == "fixture" else None),
                 )
             except AIAdapterError as error:
@@ -275,7 +316,7 @@ def weekly_drafts(data: dict[str, Any], payload_result: dict[str, Any], ai_adapt
     try:
         drafts["本周总体AI草稿"] = ai_adapter.generate(
             system="你是学生学习运营系统的草稿助手。只综合可用事实，不作教育策略或最终判断。",
-            user=f"事实摘要：{json.dumps(p, ensure_ascii=False, sort_keys=True)}",
+            user=f"可用模块状态：{json.dumps(integrity, ensure_ascii=False, sort_keys=True)}\n已生成草稿：{json.dumps(drafts, ensure_ascii=False, sort_keys=True)}",
             fixture_response=responses.get("overall", "以下为仅基于可用模块的待审核事实性草稿，不构成教育策略或正式发布内容。" if getattr(ai_adapter, "mode", "") == "fixture" else None),
         )
     except AIAdapterError as error:
@@ -315,9 +356,9 @@ def run_workflow(name: str, data: dict[str, Any], ai_adapter: Any | None = None)
         "weekly_drafts": ("weekly_payload",), "publish": ("weekly_payload", "weekly_drafts"),
     }
     runners: dict[str, Callable[[], dict[str, Any]]] = {
-        "session_content": lambda: session_content(data, ai_adapter), "course_weekly": lambda: course_weekly(data, results["session_content"]),
-        "participation": lambda: participation(data), "tasks": lambda: tasks(data), "grades": lambda: grades(data),
-        "ielts": lambda: ielts(data, results["tasks"]), "pbl": lambda: pbl(data),
+        "session_content": lambda: session_content(data, ai_adapter), "course_weekly": lambda: course_weekly(data, results["session_content"], ai_adapter),
+        "participation": lambda: participation(data, ai_adapter), "tasks": lambda: tasks(data), "grades": lambda: grades(data),
+        "ielts": lambda: ielts(data, results["tasks"], ai_adapter), "pbl": lambda: pbl(data, ai_adapter),
         "weekly_payload": lambda: weekly_payload(data, results), "weekly_drafts": lambda: weekly_drafts(data, results["weekly_payload"], ai_adapter),
         "publish": lambda: publish(data, results["weekly_payload"], results["weekly_drafts"]),
     }

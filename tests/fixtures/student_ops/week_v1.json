@@ -1,7 +1,8 @@
 {
   "course": {"course_offering_id": "course-MDM4U-S6", "course_code": "MDM4U"},
   "week": {"number": 3, "start": "2026-07-20", "end": "2026-07-24"},
-  "student": {"id": "student-demo-01", "student_term_id": "term-demo-01", "name": "学生甲", "aliases": ["学生甲", "甲同学"], "IELTS目标": "Academic 6.5"},
+  "student": {"id": "student-demo-01", "student_term_id": "term-demo-01", "name": "学生甲", "aliases": ["学生甲", "甲同学"], "IELTS目标": "Academic 6.5", "IELTS已确认策略": "本周完成一项阅读训练"},
+  "mock_structured_responses": {"course_weekly": "{\"内容\":\"离散随机变量期望值\",\"进度\":\"完成概念与例题\",\"重点\":\"期望值计算\",\"任务Deadline\":\"Quiz与Homework已布置\",\"测评\":\"Quiz（随堂小测）\",\"中教支持\":\"协助练习\",\"课程问题\":\"纪要未记录明显共性问题\",\"下周方向\":\"继续练习\"}", "ielts": "```json\n{\"标题\":\"IELTS阅读训练\",\"原因\":\"对应已确认策略\",\"建议Deadline\":\"2026-07-25\",\"需讨论\":\"任务容量\"}\n```"},
   "sessions": [
     {
       "session_id": "session-demo-01", "source_text": "教师讲解离散随机变量的期望值，并完成两个例题练习。布置随堂小测和课后练习。",
@@ -22,6 +23,6 @@
   "prior_grades": [{"grade_id": "grade-01", "score": 72, "out_of": 100, "comment": ""}],
   "grades": [{"grade_id": "grade-01", "score": 78, "out_of": 100, "comment": "已补交"}, {"grade_id": "grade-02", "score": 85, "out_of": 100, "comment": ""}],
   "course_grade_observations": [{"at": "2026-07-20", "overall": 74}, {"at": "2026-07-24", "overall": 77}],
-  "pbl_evidence": [{"task_id": "task-pbl-01", "url": "https://example.invalid/evidence/01", "content": "anonymized evidence"}, {"task_id": "task-pbl-02", "url": "https://example.invalid/evidence/02", "content": ""}],
+  "pbl_evidence": [{"task_id": "task-pbl-01", "url": "https://example.invalid/evidence/01", "content": "anonymized evidence", "completion_standard": "包含研究问题和来源", "mock_ai_response": "{\"结果\":\"基本达标\",\"说明\":\"有可读证据\",\"缺失项\":\"来源链接\",\"建议复核\":\"负责人核对\"}"}, {"task_id": "task-pbl-02", "url": "https://example.invalid/evidence/02", "content": ""}],
   "publication": {"approved_by_educator": true, "approved_at": "2026-07-25T10:00:00+08:00", "version": 1}
 }

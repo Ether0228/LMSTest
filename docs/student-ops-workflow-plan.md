@@ -37,6 +37,14 @@ fixture、所有单元测试并上传工件；不会读取 Secrets，不会请�
 - 分支 push 在 CI matrix 分别执行十个 selector 与 `all`；manual dispatch 保留
   单段或全链运行。所有 CI 运行使用 fixture adapter，不注入真实 AI 密钥。
 
+## 第三阶段：结构化候选契约
+
+- 课程周摘要、互动、IELTS候选与PBL检查均使用严格JSON契约；可去除完整
+  Markdown code fence，但缺少字段、枚举错误或无效JSON均不自动补齐。
+- 课程周摘要只消费已确认场次；互动先从纪要/逐字稿候选抽取，再做确定性学生
+  匹配。IELTS没有已确认策略不产生候选；PBL没有可读证据或完成标准只能“无法判断”。
+- 全部候选仍待老师/负责人确认，不更新正式任务完成状态、PBL阶段或课程事实。
+
 ## 明确未做（需后续授权与规则落地）
 
 - 真实 Feishu/Schoology 适配器与任何写操作；应单独添加 dry-run write-plan

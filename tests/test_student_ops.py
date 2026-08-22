@@ -140,8 +140,24 @@ class StudentOpsWorkflowTests(unittest.TestCase):
 
     def test_pbl_unreadable_evidence_is_not_graded(self):
         review = self.all["pbl"]["payload"]["AI检查候选"][1]
-        self.assertEqual(review["AI检查结果"], "无法检查")
+        self.assertEqual(review["AI检查结果"], "无法判断")
         self.assertTrue(review["不得自动通过"])
+
+    def test_structured_candidates_accept_fence_and_reject_missing_fields(self):
+        self.assertEqual(self.all["course_weekly"]["status"], "success")
+        self.assertEqual(self.all["ielts"]["payload"]["候选"][0]["状态"], "待人工批准")
+        invalid = json.loads(json.dumps(self.data))
+        invalid["mock_structured_responses"]["course_weekly"] = '{"内容":"only"}'
+        self.assertEqual(run_workflow("course_weekly", invalid)["course_weekly"]["status"], "partial")
+
+    def test_participation_source_ai_and_no_ielts_strategy_degrade_safely(self):
+        sample = json.loads(json.dumps(self.data))
+        sample["participation_events"] = []
+        sample["participation_sources"] = [{"session_id": "session-demo-01", "text": "甲同学解释步骤", "mock_ai_response": '[{"speaker":"学生甲","category":"回答问题","direction":"正向","objective_fact":"解释步骤","source_ref":"line-1"}]'}]
+        result = run_workflow("participation", sample)["participation"]
+        self.assertEqual(result["payload"]["records"][0]["status"], "candidate")
+        sample["student"].pop("IELTS已确认策略")
+        self.assertEqual(run_workflow("ielts", sample)["ielts"]["payload"]["候选"], [])
 
 
 if __name__ == "__main__":
