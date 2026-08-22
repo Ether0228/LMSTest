@@ -106,13 +106,33 @@ class StudentOpsWorkflowTests(unittest.TestCase):
 
     def test_html_has_fixed_feedback_sections_and_pdf_engine_failure_is_explicit(self):
         html = run_workflow("publish", self.data)["publish"]["payload"]["html"]
-        for heading in ("出勤观察", "课程内容与互动", "任务与Backlog", "成绩", "IELTS", "PBL", "总体与下周支持"):
+        for heading in ("本周学习节奏", "课堂里发生了什么", "任务与学业进展", "IELTS 与个人项目", "下周，我们一起这样推进"):
             self.assertIn(heading, html)
         self.assertNotIn("<pre>", html)
         with tempfile.TemporaryDirectory() as directory:
             page = Path(directory) / "page.html"; page.write_text("<p>中文</p>", encoding="utf-8")
             with self.assertRaisesRegex(PDFRenderError, "pdf_render_failed"):
                 render_pdf(page, Path(directory) / "page.pdf", binary="/definitely/missing/chrome")
+
+    def test_full_report_binds_confirmed_data_and_filters_unconfirmed_facts(self):
+        html = run_workflow("publish", self.data)["publish"]["payload"]["html"]
+        for marker in ("data-template='student-weekly-feedback-v1'", "学生一周出勤透视表", "任务明细", "MDM4U · 近期作业分数", "校园节能倡议", "研究问题文档", "继续完成期望值练习"):
+            self.assertIn(marker, html)
+        self.assertNotIn("计划课程（不展示）", html)
+        self.assertNotIn("计划教学内容不得展示", html)
+        self.assertNotIn("AI建议但未确认", html)
+        self.assertIn("@media print", html)
+        self.assertIn(".toolbar,.prototype-note,.annotation{display:none!important}", html)
+
+    def test_html_artifact_is_exact_pdf_source(self):
+        published = run_workflow("publish", self.data)
+        source_html = published["publish"]["payload"]["html"]
+        with tempfile.TemporaryDirectory() as directory:
+            paths = write_artifacts(published, Path(directory), "publish")
+            html_path = next(path for path in paths if path.suffix == ".html")
+            pdf_path = next(path for path in paths if path.suffix == ".pdf")
+            self.assertEqual(html_path.read_text(encoding="utf-8"), source_html)
+            self.assertTrue(pdf_path.read_bytes().startswith(b"%PDF-"))
 
     def test_publish_is_idempotent_and_requires_key_fact_modules(self):
         first = run_workflow("publish", self.data)["publish"]["payload"]["snapshot"]

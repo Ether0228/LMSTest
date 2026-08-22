@@ -39,6 +39,14 @@ Chinese is rendered by the browser font stack. A missing or failing browser is
 recorded as `pdf_status: failed`; the system never creates an ASCII fallback
 PDF. GitHub Actions installs Chrome before fixture runs.
 
+The single report renderer is `report_template.py`, migrated from the accepted
+`student_weekly_feedback_template.html` information architecture. It binds
+report metadata, confirmed attendance cells, confirmed actual course content,
+task rows, per-course grade sequences, confirmed IELTS plans, confirmed PBL
+stage/evidence, and confirmed next-week actions. Screen controls and source
+annotations remain interactive; print CSS hides those tools and controls A4
+page breaks. There is no separate PDF-only or simplified HTML template.
+
 The course minutes candidate and its human confirmation are separate fixture
 inputs. `publication.approved_at` and `publication.version` are mandatory for
 a stable, idempotent publication snapshot; no runtime timestamp becomes a

@@ -2,6 +2,7 @@
   "course": {"course_offering_id": "course-MDM4U-S6", "course_code": "MDM4U"},
   "week": {"number": 3, "start": "2026-07-20", "end": "2026-07-24"},
   "student": {"id": "student-demo-01", "student_term_id": "term-demo-01", "name": "学生甲", "aliases": ["学生甲", "甲同学"], "IELTS目标": "Academic 6.5", "IELTS已确认策略": "本周完成一项阅读训练"},
+  "report": {"title": "学生甲第3周学习反馈", "term": "2026 · S6", "educator": "智育师甲", "version_label": "家校确认版", "subtitle": "我们一起回看这一周发生了什么，也一起确定下一步怎样更顺利。", "opening_title": "这一周，我们看见了你的投入", "confirmed_opening": "本周按计划参与课程，并完成一项已通过任务；下一步继续处理待检查和返工事项。", "next_focus": "概念与证据连接", "confirmed_at": "2026-07-25 10:00"},
   "mock_structured_responses": {"course_weekly": "{\"内容\":\"离散随机变量期望值\",\"进度\":\"完成概念与例题\",\"重点\":\"期望值计算\",\"任务Deadline\":\"Quiz与Homework已布置\",\"测评\":\"Quiz（随堂小测）\",\"中教支持\":\"协助练习\",\"课程问题\":\"纪要未记录明显共性问题\",\"下周方向\":\"继续练习\"}", "ielts": "```json\n{\"标题\":\"IELTS阅读训练\",\"原因\":\"对应已确认策略\",\"建议Deadline\":\"2026-07-25\",\"需讨论\":\"任务容量\"}\n```"},
   "sessions": [
     {
@@ -15,7 +16,8 @@
     {"session_id": "session-demo-01", "speaker": "学生甲", "category": "回答问题", "direction": "正向", "evidence": "解释了例题中概率相加的步骤", "source": "纪要片段#2"},
     {"session_id": "session-demo-01", "speaker": "未知说话人", "category": "发言", "direction": "中性", "evidence": "提出问题", "source": "逐字稿#9"}
   ],
-  "attendance": {"应参加场次": 2, "观察到参与场次": 2, "状态": "观察事实，非正式Attendance%"},
+  "attendance": {"应参加场次": 4, "观察到参与场次": 3, "offline_count": 2, "online_count": 1, "support_summary": "1场待支持", "状态": "观察事实，非正式Attendance%", "days": [{"key":"mon","label":"周一","date":"07/20"},{"key":"tue","label":"周二","date":"07/21"}], "slots": ["08:30–10:00","14:00–16:00"], "sessions": [{"slot":"08:30–10:00","day":"mon","title":"MDM4U","mode":"线上","observation":"线上参与 · 画面稳定","fact_status":"confirmed"},{"slot":"08:30–10:00","day":"tue","title":"MDM4U","mode":"线下","observation":"线下参与","fact_status":"confirmed"},{"slot":"14:00–16:00","day":"mon","title":"PBL","mode":"PBL","observation":"研究问题整理","fact_status":"confirmed"},{"slot":"14:00–16:00","day":"tue","title":"计划课程（不展示）","mode":"线下","observation":"尚未发生","fact_status":"planned"}]},
+  "report_courses": [{"code":"MDM4U","title":"离散随机变量与期望值","session_summary":"本周1次已确认课程","actual_content":"离散随机变量取值、概率分布与期望值计算。","actual_content_confirmed":true,"confirmed_interaction":"解释了概率相加步骤。","confirmed_support":"下周辅导继续练习期望值计算。"},{"code":"ENG4U","title":"计划主题","actual_content":"计划教学内容不得展示","actual_content_confirmed":false}],
   "tasks": [
     {"task_id": "task-os-01", "所属模块": "OSSD", "任务名称": "期望值练习", "原始Deadline": "2026-07-21", "补做Deadline": "2026-07-23", "返工Deadline": "2026-07-24", "当前提交状态": "已提交", "检查状态": "待检查"},
     {"task_id": "task-ielts-01", "所属模块": "IELTS", "任务名称": "阅读练习", "原始Deadline": "2026-07-22", "当前提交状态": "未提交", "检查状态": "未检查"}
@@ -23,6 +25,10 @@
   "prior_grades": [{"grade_id": "grade-01", "score": 72, "out_of": 100, "comment": ""}],
   "grades": [{"grade_id": "grade-01", "score": 78, "out_of": 100, "comment": "已补交"}, {"grade_id": "grade-02", "score": 85, "out_of": 100, "comment": ""}],
   "course_grade_observations": [{"at": "2026-07-20", "overall": 74}, {"at": "2026-07-24", "overall": 77}],
+  "grade_series": [{"course_code":"MDM4U","points":[{"label":"Quiz 1","score":72},{"label":"Assignment","score":78},{"label":"Quiz 2","score":85}]}],
+  "ielts_report": {"confirmed_plan":[{"title":"阅读练习","status":"未提交","evidence_status":"暂无提交证据"}]},
+  "pbl_report": {"name":"校园节能倡议","stage":"问题定义","stage_confirmed":true,"milestones":[{"title":"研究问题已确认","detail":"围绕校园节能形成可验证问题。"}],"evidence_cards":[{"label":"研究问题文档","caption":"证据01 · 问题定义"}]},
+  "confirmed_next_actions": [{"action":"继续完成期望值练习","school_support":"课程老师将在辅导中检查计算步骤。","confirmation_status":"已确认"},{"action":"AI建议但未确认","school_support":"不得进入对外版","confirmation_status":"待确认"}],
   "pbl_evidence": [{"task_id": "task-pbl-01", "url": "https://example.invalid/evidence/01", "content": "anonymized evidence", "completion_standard": "包含研究问题和来源", "mock_ai_response": "{\"结果\":\"基本达标\",\"说明\":\"有可读证据\",\"缺失项\":\"来源链接\",\"建议复核\":\"负责人核对\"}"}, {"task_id": "task-pbl-02", "url": "https://example.invalid/evidence/02", "content": ""}],
   "publication": {"approved_by_educator": true, "approved_at": "2026-07-25T10:00:00+08:00", "version": 1}
 }
