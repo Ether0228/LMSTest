@@ -25,7 +25,10 @@ def render_pdf(html_path: Path, pdf_path: Path, binary: str | None = None) -> No
     if not chrome:
         raise PDFRenderError("chromium_not_available")
     try:
-        subprocess.run([chrome, "--headless", "--disable-gpu", "--no-sandbox", f"--print-to-pdf={pdf_path}", html_path.resolve().as_uri()], check=True, capture_output=True, timeout=60)
+        subprocess.run([
+            chrome, "--headless", "--disable-gpu", "--no-sandbox", "--no-pdf-header-footer",
+            f"--print-to-pdf={pdf_path}", html_path.resolve().as_uri(),
+        ], check=True, capture_output=True, timeout=60)
     except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
         raise PDFRenderError("pdf_render_failed") from None
     if not pdf_path.exists() or not pdf_path.read_bytes().startswith(b"%PDF-"):
@@ -48,7 +51,7 @@ def render_weekly_html(payload: dict[str, Any], drafts: dict[str, Any]) -> str:
     pbl = payload.get("pbl", {})
     body = [
         "<!doctype html><html lang='zh-CN'><head><meta charset='utf-8'><title>学生周反馈</title>",
-        "<style>body{font-family:'Noto Sans CJK SC','Microsoft YaHei',sans-serif;max-width:860px;margin:32px auto;color:#172033;line-height:1.65}header{border-bottom:3px solid #2f6fed}section{padding:12px 0;border-bottom:1px solid #dce3ef}h1,h2{margin-bottom:6px}small{color:#5e6b82}.notice{background:#fff7e6;padding:10px}</style></head><body>",
+        "<style>@page{size:A4;margin:16mm}body{font-family:'Noto Sans CJK SC','Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;max-width:860px;margin:32px auto;color:#172033;line-height:1.65}header{border-bottom:3px solid #2f6fed}section{padding:12px 0;border-bottom:1px solid #dce3ef;break-inside:avoid}h1,h2{margin-bottom:6px}small{color:#5e6b82}.notice{background:#fff7e6;padding:10px}@media print{body{margin:0;max-width:none}}</style></head><body>",
         f"<header><h1>{html.escape(payload.get('student', {}).get('name', '学生'))}｜第{html.escape(str(payload.get('week', {}).get('number', '')))}周学习反馈</h1><small>状态：待智育师审核；本页为本地预览快照。</small></header>",
         _section("出勤观察", f"应参加 {attendance.get('应参加场次', '—')} 场；观察到参与 {attendance.get('观察到参与场次', '—')} 场。{attendance.get('状态', '')}"),
         _section("课程内容与互动", f"课程内容：{course_text}\n互动证据：{interaction}"),

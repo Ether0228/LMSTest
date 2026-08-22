@@ -42,6 +42,8 @@ jobs:
         with:
           python-version: "3.10"
       - uses: browser-actions/setup-chrome@v1
+      - name: Install Chinese fonts for PDF rendering
+        run: sudo apt-get update && sudo apt-get install -y fonts-noto-cjk
       - name: Run offline unit tests
         run: python -m unittest discover -s tests -v
       - name: Run fixture workflow in dry-run mode
@@ -70,6 +72,8 @@ jobs:
         with:
           python-version: "3.10"
       - uses: browser-actions/setup-chrome@v1
+      - name: Install Chinese fonts for PDF rendering
+        run: sudo apt-get update && sudo apt-get install -y fonts-noto-cjk
       - name: Run offline unit tests
         run: python -m unittest discover -s tests -v
       - name: Run selected fixture workflow in dry-run mode
