@@ -1,6 +1,9 @@
 name: Student Learning Operations Fixtures
 
 on:
+  push:
+    branches:
+      - codex/workflow-pipeline
   workflow_dispatch:
     inputs:
       workflow:
@@ -38,7 +41,7 @@ jobs:
       - name: Run selected fixture workflow in dry-run mode
         run: >-
           python pipeline/run_student_ops.py
-          --workflow "${{ inputs.workflow }}"
+          --workflow "${{ inputs.workflow || 'all' }}"
           --fixture tests/fixtures/student_ops/week_v1.json
           --output-dir artifacts/student_ops
           --dry-run
@@ -46,6 +49,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: student-ops-${{ inputs.workflow }}-${{ github.run_id }}
+          name: student-ops-${{ inputs.workflow || 'all' }}-${{ github.run_id }}
           path: artifacts/student_ops
           if-no-files-found: warn
