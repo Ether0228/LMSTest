@@ -1,0 +1,34 @@
+# 学生学习运营 Workflow 实施计划（V1 fixture 骨架）
+
+## 审计结论
+
+现有 LMSTest 已实现 Schoology 的提交/作业库/Gradebook 同步及飞书汇总，
+但没有学习场次、课程周摘要、互动、IELTS、PBL、周反馈或发布的可测试
+workflow。新模块不改动现有 `main_pipeline.yml`，避免影响生产同步链。
+
+## 已实现的离线闭环
+
+`student_ops_workflows.yml` 只由 `workflow_dispatch` 触发。它运行匿名
+fixture、所有单元测试并上传工件；不会读取 Secrets，不会请求线上服务。
+每个阶段使用同一固定输入、同一周唯一键和稳定 hash，因此可重跑。
+
+1. `session_content`：只从文字纪要产生六段式 AI 候选；缺来源不调用 AI。
+2. `course_weekly`：仅消费已确认的实际课堂内容；没有确认事实时阻断。
+3. `participation`：仅保留有来源且能唯一匹配学生的互动候选。
+4. `tasks`：按返工→补做→原始 Deadline 计算，不把提交当作通过。
+5. `grades`：生成稳定的 append-only 候选事件；无历史不声称趋势。
+6. `ielts`：生成 Exception Queue 式候选，不自动创建正式学生任务。
+7. `pbl`：生成证据 manifest 和待复核候选；不可读证据不作质量结论。
+8. `weekly_payload`：即使 AI 不可用也可组装事实与模块状态。
+9. `weekly_drafts`：所有内容均为待审核草稿，不含教育策略决策。
+10. `publish`：仅在 fixture 的“智育师已确认”旗标为真时产生本地 HTML/PDF
+    快照；不会生成对外链接或写入飞书。
+
+## 明确未做（需后续授权与规则落地）
+
+- 真实 Feishu/Schoology 适配器与任何写操作；应单独添加 dry-run write-plan
+  和经审批的最小权限凭证。
+- OpenAI/其他模型线上调用；现由 `mock_ai_response` 测试解析和降级。
+- `OPEN-001—004` 所涉正式 Attendance、A&P、Final Grade 规则。
+- `OPEN-007/008/009/015/018` 所涉 AI 检查白名单、确认机制、证据粒度、并发
+  Base append 策略。它们不能被此实现自行补全。

@@ -1,0 +1,31 @@
+# Student Learning Operations Workflows (V1 fixture harness)
+
+This package implements the dependency order defined by the school operations
+specification without writing to Feishu, Schoology, or any production service.
+Every run is a dry-run and emits auditable local/GitHub Actions artifacts.
+
+| Workflow | Rule boundary | Output |
+| --- | --- | --- |
+| `session_content` | `SESSION-01—06` | Six-section AI candidate plus deterministic schema result |
+| `course_weekly` | `COURSEW-01—04` | Candidate based only on confirmed actual session facts |
+| `participation` | `PART-01—03` | Objectively sourced, uniquely matched candidates only |
+| `tasks` | `TASK-03—06` | Effective deadline and backlog facts; no completion inference |
+| `grades` | `GRD-03—05` | Stable append-only grade events and observations |
+| `ielts` | `IELTS-01—04` | Candidate/approved-task separation |
+| `pbl` | `PBL-03—04` | Evidence manifest and review candidates only |
+| `weekly_payload` | `WEEK-01—04/10` | Deterministic fact payload with module state |
+| `weekly_drafts` | `WEEK-05—08` | Review-only module and overall drafts |
+| `publish` | `WEEK-11—13` | Local immutable HTML/PDF preview only after confirmation |
+
+Run all fixtures locally:
+
+```bash
+python -m unittest discover -s tests -v
+python pipeline/run_student_ops.py --workflow all --fixture tests/fixtures/student_ops/week_v1.json --output-dir artifacts/student_ops --dry-run
+```
+
+`AI_API_KEY` is not required by this V1 harness and is never logged. The
+fixture's `mock_ai_response` models the AI adapter so schema/failure behavior
+is reproducible. Production adapters must be separately approved, use GitHub
+Secrets/environment variables, and retain the same no-write-on-AI-failure
+contract.
