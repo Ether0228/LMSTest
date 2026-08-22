@@ -116,13 +116,31 @@ class StudentOpsWorkflowTests(unittest.TestCase):
 
     def test_full_report_binds_confirmed_data_and_filters_unconfirmed_facts(self):
         html = run_workflow("publish", self.data)["publish"]["payload"]["html"]
-        for marker in ("data-template='student-weekly-feedback-v1'", "学生一周出勤透视表", "任务明细", "MDM4U · 近期作业分数", "校园节能倡议", "研究问题文档", "继续完成期望值练习"):
+        for marker in ("data-template='student-weekly-feedback-v1'", "学生一周出勤透视表", "任务明细", "近期作业分数", "事实性成绩说明与学校支持", "校园节能倡议", "研究问题文档", "继续完成期望值练习"):
             self.assertIn(marker, html)
         self.assertNotIn("计划课程（不展示）", html)
         self.assertNotIn("计划教学内容不得展示", html)
         self.assertNotIn("AI建议但未确认", html)
+        self.assertNotIn("完成一项已通过任务", html)
+        self.assertIn("已提交待审", html)
+        self.assertIn("<polyline", html)
+        self.assertIn("不表示课程总分趋势", html)
+        self.assertIn("不作为监视工具", html)
         self.assertIn("@media print", html)
         self.assertIn(".toolbar,.prototype-note,.annotation{display:none!important}", html)
+
+    def test_unconfirmed_course_interaction_and_support_do_not_publish(self):
+        sample = json.loads(json.dumps(self.data))
+        course = sample["report_courses"][0]
+        course["confirmed_interaction"] = "未确认互动机密文本"
+        course["interaction_confirmation_status"] = "待确认"
+        course["confirmed_support"] = "未确认支持机密文本"
+        course["support_confirmation_status"] = "待确认"
+        html = run_workflow("publish", sample)["publish"]["payload"]["html"]
+        self.assertNotIn("未确认互动机密文本", html)
+        self.assertNotIn("未确认支持机密文本", html)
+        self.assertIn("本周无已确认互动事实", html)
+        self.assertIn("学校支持安排待老师确认", html)
 
     def test_html_artifact_is_exact_pdf_source(self):
         published = run_workflow("publish", self.data)
