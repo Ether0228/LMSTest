@@ -12,6 +12,10 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+from .ai import AIAdapterError, FixtureAIAdapter
+from .prompts import SESSION_COURSE_MINUTES_PROMPT_V1
+from .publishing import PDFRenderError, render_pdf, render_weekly_html
+
 SIX_HEADINGS = ("本节主题", "学习内容", "课堂活动", "课堂任务与评价", "学习情况与问题", "后续安排")
 WORKFLOWS = (
     "session_content", "course_weekly", "participation", "tasks", "grades",
@@ -31,9 +35,8 @@ def make_result(status: str, payload: dict[str, Any], warnings: list[str] | None
     return {"status": status, "payload": payload, "warnings": warnings or []}
 
 
-def mock_session_minutes(session: dict[str, Any]) -> str:
-    """A test-only adapter. Real AI is deliberately opt-in outside CI."""
-    return str(session.get("mock_ai_response") or "")
+def session_prompt_user(session: dict[str, Any]) -> str:
+    return f"课程：{session.get('course_code', '未提供')}\n场次：{session.get('session_id', '未提供')}\n\n已确认纪要来源：\n{session.get('source_text', '')}"
 
 
 def parse_six_sections(text: str) -> tuple[dict[str, str] | None, list[str]]:
@@ -74,7 +77,7 @@ def validate_session_minutes(text: str, sections: dict[str, str] | None) -> list
     return errors
 
 
-def session_content(data: dict[str, Any]) -> dict[str, Any]:
+def session_content(data: dict[str, Any], ai_adapter: Any) -> dict[str, Any]:
     confirmations = {x.get("session_id"): x for x in data.get("human_confirmations", [])}
     results = []
     for session in data.get("sessions", []):
@@ -83,7 +86,11 @@ def session_content(data: dict[str, Any]) -> dict[str, Any]:
         if not source:
             results.append(make_result("missing_source", base, ["缺少已确认的纪要来源；未调用AI"]))
             continue
-        candidate = mock_session_minutes(session)
+        try:
+            candidate = ai_adapter.generate(system=SESSION_COURSE_MINUTES_PROMPT_V1, user=session_prompt_user(session), fixture_response=session.get("mock_ai_response"))
+        except AIAdapterError as error:
+            results.append(make_result("ai_failed", {**base, "ai_mode": getattr(ai_adapter, "mode", "unknown")}, [str(error)]))
+            continue
         sections, parse_errors = parse_six_sections(candidate)
         errors = parse_errors + validate_session_minutes(candidate, sections)
         if errors:
@@ -241,7 +248,7 @@ def weekly_payload(data: dict[str, Any], results: dict[str, Any]) -> dict[str, A
     return make_result("success", payload)
 
 
-def weekly_drafts(data: dict[str, Any], payload_result: dict[str, Any]) -> dict[str, Any]:
+def weekly_drafts(data: dict[str, Any], payload_result: dict[str, Any], ai_adapter: Any) -> dict[str, Any]:
     p = payload_result["payload"]
     integrity = p.get("data_integrity", {})
     modules = {
@@ -252,33 +259,30 @@ def weekly_drafts(data: dict[str, Any], payload_result: dict[str, Any]) -> dict[
         "pbl": ("PBL周总结AI草稿", "本段仅整理可读证据与待人工复核项，不判断项目阶段或质量。"),
     }
     drafts, warnings = {}, []
-    for module, (field, text) in modules.items():
+    responses = data.get("mock_weekly_responses", {})
+    for module, (field, fallback) in modules.items():
         if integrity.get(module) == "blocked":
             warnings.append(f"{module}为blocked，未生成{field}")
         else:
-            drafts[field] = text
-    drafts["本周总体AI草稿"] = "以下为仅基于可用模块的待审核事实性草稿，不构成教育策略或正式发布内容。"
+            try:
+                drafts[field] = ai_adapter.generate(
+                    system="你是学生学习运营系统的草稿助手。只依据输入事实，不作人格、动机、质量或教育策略判断。输出中文候选草稿。",
+                    user=f"模块：{module}\n事实摘要：{json.dumps(p, ensure_ascii=False, sort_keys=True)}",
+                    fixture_response=responses.get(module, fallback if getattr(ai_adapter, "mode", "") == "fixture" else None),
+                )
+            except AIAdapterError as error:
+                warnings.append(f"{module} AI失败：{error}")
+    try:
+        drafts["本周总体AI草稿"] = ai_adapter.generate(
+            system="你是学生学习运营系统的草稿助手。只综合可用事实，不作教育策略或最终判断。",
+            user=f"事实摘要：{json.dumps(p, ensure_ascii=False, sort_keys=True)}",
+            fixture_response=responses.get("overall", "以下为仅基于可用模块的待审核事实性草稿，不构成教育策略或正式发布内容。" if getattr(ai_adapter, "mode", "") == "fixture" else None),
+        )
+    except AIAdapterError as error:
+        warnings.append(f"overall AI失败：{error}")
     drafts["确认状态"] = "待智育师审核"
     status = "partial" if warnings else "success"
     return make_result(status, {"drafts": drafts, "payload_hash": stable_hash(p)}, warnings)
-
-
-def render_html(payload: dict[str, Any], drafts: dict[str, Any]) -> str:
-    escaped = json.dumps({"payload": payload, "drafts": drafts}, ensure_ascii=False, indent=2).replace("&", "&amp;").replace("<", "&lt;")
-    return f"<!doctype html><meta charset='utf-8'><title>周反馈预览</title><h1>周反馈预览（待确认）</h1><pre>{escaped}</pre>"
-
-
-def minimal_pdf(text: str) -> bytes:
-    # A dependency-free, valid one-page PDF preview. It is a snapshot, not a typeset final report.
-    safe = text.encode("ascii", "replace").decode("ascii").replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")[:1000]
-    body = f"BT /F1 10 Tf 40 760 Td ({safe}) Tj ET"
-    objects = ["<< /Type /Catalog /Pages 2 0 R >>", "<< /Type /Pages /Kids [3 0 R] /Count 1 >>", "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>", "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>", f"<< /Length {len(body)} >>\nstream\n{body}\nendstream"]
-    out = "%PDF-1.4\n"; offsets = [0]
-    for i, obj in enumerate(objects, 1):
-        offsets.append(len(out.encode()))
-        out += f"{i} 0 obj\n{obj}\nendobj\n"
-    xref = len(out.encode()); out += f"xref\n0 {len(objects)+1}\n0000000000 65535 f \n" + "".join(f"{o:010d} 00000 n \n" for o in offsets[1:])
-    return (out + f"trailer << /Size {len(objects)+1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n").encode()
 
 
 def publish(data: dict[str, Any], payload_result: dict[str, Any], drafts_result: dict[str, Any]) -> dict[str, Any]:
@@ -297,23 +301,24 @@ def publish(data: dict[str, Any], payload_result: dict[str, Any], drafts_result:
         "approved_at": publication["approved_at"], "version": publication["version"],
         "published_id": stable_hash({"payload_hash": payload_hash, "approved_at": publication["approved_at"], "version": publication["version"]})[:24],
     }
-    return make_result("success", {"snapshot": snapshot, "html": render_html(snapshot["payload"], snapshot["drafts"]), "pdf": minimal_pdf("Weekly feedback snapshot")})
+    return make_result("success", {"snapshot": snapshot, "html": render_weekly_html(snapshot["payload"], snapshot["drafts"]["drafts"])})
 
 
-def run_workflow(name: str, data: dict[str, Any]) -> dict[str, Any]:
+def run_workflow(name: str, data: dict[str, Any], ai_adapter: Any | None = None) -> dict[str, Any]:
     if name not in WORKFLOWS:
         raise ValueError(f"未知workflow: {name}")
     results: dict[str, Any] = {}
+    ai_adapter = ai_adapter or FixtureAIAdapter()
     dependencies = {
         "session_content": (), "course_weekly": ("session_content",), "participation": (), "tasks": (), "grades": (),
         "ielts": ("tasks",), "pbl": (), "weekly_payload": ("course_weekly", "participation", "tasks", "grades", "ielts", "pbl"),
         "weekly_drafts": ("weekly_payload",), "publish": ("weekly_payload", "weekly_drafts"),
     }
     runners: dict[str, Callable[[], dict[str, Any]]] = {
-        "session_content": lambda: session_content(data), "course_weekly": lambda: course_weekly(data, results["session_content"]),
+        "session_content": lambda: session_content(data, ai_adapter), "course_weekly": lambda: course_weekly(data, results["session_content"]),
         "participation": lambda: participation(data), "tasks": lambda: tasks(data), "grades": lambda: grades(data),
         "ielts": lambda: ielts(data, results["tasks"]), "pbl": lambda: pbl(data),
-        "weekly_payload": lambda: weekly_payload(data, results), "weekly_drafts": lambda: weekly_drafts(data, results["weekly_payload"]),
+        "weekly_payload": lambda: weekly_payload(data, results), "weekly_drafts": lambda: weekly_drafts(data, results["weekly_payload"], ai_adapter),
         "publish": lambda: publish(data, results["weekly_payload"], results["weekly_drafts"]),
     }
     def execute(target: str) -> None:
@@ -330,17 +335,25 @@ def run_workflow(name: str, data: dict[str, Any]) -> dict[str, Any]:
     return {name: results[name]}
 
 
-def write_artifacts(result: dict[str, Any], output_dir: Path, workflow: str, dry_run: bool = True) -> list[Path]:
+def write_artifacts(result: dict[str, Any], output_dir: Path, workflow: str, dry_run: bool = True, chrome_binary: str | None = None) -> list[Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
     serializable = copy.deepcopy(result)
     publish_result = serializable.get("publish", {}).get("payload", {})
-    pdf = publish_result.pop("pdf", None)
     html = publish_result.pop("html", None)
+    paths = []
+    if html is not None:
+        html_path = output_dir / "weekly_feedback_preview.html"
+        html_path.write_text(html, encoding="utf-8")
+        paths.append(html_path)
+        try:
+            pdf_path = output_dir / "weekly_feedback_preview.pdf"
+            render_pdf(html_path, pdf_path, chrome_binary)
+            publish_result["pdf_status"] = "success"
+            paths.append(pdf_path)
+        except PDFRenderError as error:
+            publish_result["pdf_status"] = "failed"
+            serializable.setdefault("publish", {}).setdefault("warnings", []).append(str(error))
     result_path = output_dir / f"{workflow}_result.json"
     result_path.write_text(json.dumps({"workflow": workflow, "dry_run": dry_run, "generated_at": iso_now(), "result": serializable}, ensure_ascii=False, indent=2), encoding="utf-8")
-    paths = [result_path]
-    if html is not None:
-        html_path = output_dir / "weekly_feedback_preview.html"; html_path.write_text(html, encoding="utf-8"); paths.append(html_path)
-    if pdf is not None:
-        pdf_path = output_dir / "weekly_feedback_preview.pdf"; pdf_path.write_bytes(pdf); paths.append(pdf_path)
+    paths.insert(0, result_path)
     return paths

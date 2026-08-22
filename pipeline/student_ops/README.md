@@ -27,11 +27,17 @@ python -m unittest discover -s tests -v
 python pipeline/run_student_ops.py --workflow all --fixture tests/fixtures/student_ops/week_v1.json --output-dir artifacts/student_ops --dry-run
 ```
 
-`AI_API_KEY` is not required by this V1 harness and is never logged. The
-fixture's `mock_ai_response` models the AI adapter so schema/failure behavior
-is reproducible. Production adapters must be separately approved, use GitHub
-Secrets/environment variables, and retain the same no-write-on-AI-failure
-contract.
+`--ai-mode fixture` is the default and uses the anonymized fixture responses.
+`--ai-mode live` uses an OpenAI-compatible HTTP endpoint with `AI_API_KEY`,
+`AI_BASE_URL`, and `AI_MODEL`; missing configuration exits explicitly without
+printing a value. The session adapter sends the complete confirmed
+`session_course_minutes_v1` prompt. Weekly module calls only receive a fact
+payload and failure leaves that module's draft absent/partial.
+
+PDF is rendered by installed Chromium/Chrome from the same HTML preview, so
+Chinese is rendered by the browser font stack. A missing or failing browser is
+recorded as `pdf_status: failed`; the system never creates an ASCII fallback
+PDF. GitHub Actions installs Chrome before fixture runs.
 
 The course minutes candidate and its human confirmation are separate fixture
 inputs. `publication.approved_at` and `publication.version` are mandatory for

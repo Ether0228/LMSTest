@@ -8,7 +8,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "pipeline"))
 
 from student_ops import run_workflow
+from student_ops.ai import AIAdapterError, OpenAICompatibleAdapter
 from student_ops.engine import write_artifacts
+from student_ops.publishing import PDFRenderError, render_pdf
+from student_ops.prompts import SESSION_COURSE_MINUTES_PROMPT_V1
 
 
 class StudentOpsWorkflowTests(unittest.TestCase):
@@ -38,6 +41,34 @@ class StudentOpsWorkflowTests(unittest.TestCase):
         bad["sessions"][0]["mock_ai_response"] = "【本节主题】不完整候选"
         result = run_workflow("session_content", bad)["session_content"]
         self.assertEqual(result["payload"]["records"][0]["status"], "invalid_schema")
+
+    def test_openai_compatible_adapter_uses_full_prompt_and_safe_error(self):
+        captured = {}
+        def fake_transport(request):
+            captured["url"] = request.full_url
+            captured["auth"] = request.get_header("Authorization")
+            captured["body"] = json.loads(request.data.decode("utf-8"))
+            return b'{"choices":[{"message":{"content":"fixture answer"}}]}'
+        adapter = OpenAICompatibleAdapter("secret-value", "https://ai.example/v1", "test-model", fake_transport)
+        self.assertEqual(adapter.generate(system=SESSION_COURSE_MINUTES_PROMPT_V1, user="source"), "fixture answer")
+        self.assertEqual(captured["url"], "https://ai.example/v1/chat/completions")
+        self.assertEqual(captured["body"]["messages"][0]["content"], SESSION_COURSE_MINUTES_PROMPT_V1)
+        self.assertNotIn("secret-value", repr(adapter))
+        broken = OpenAICompatibleAdapter("secret-value", "https://ai.example/v1", "test-model", lambda request: b"not-json")
+        with self.assertRaisesRegex(AIAdapterError, "ai_request_failed"):
+            broken.generate(system="x", user="y")
+
+    def test_ai_failure_degrades_workflows_without_exposing_input_or_secret(self):
+        class FailingAdapter:
+            mode = "live"
+            def generate(self, **kwargs):
+                raise AIAdapterError("ai_request_failed")
+        session = run_workflow("session_content", self.data, ai_adapter=FailingAdapter())["session_content"]
+        self.assertEqual(session["payload"]["records"][0]["status"], "ai_failed")
+        drafts = run_workflow("weekly_drafts", self.data, ai_adapter=FailingAdapter())["weekly_drafts"]
+        self.assertEqual(drafts["status"], "partial")
+        self.assertNotIn("任务执行AI草稿", drafts["payload"]["drafts"])
+        self.assertTrue(all("学生甲" not in warning for warning in drafts["warnings"]))
 
     def test_task_states_deadlines_and_backlog_follow_task_rules(self):
         sample = json.loads(json.dumps(self.data))
@@ -72,6 +103,16 @@ class StudentOpsWorkflowTests(unittest.TestCase):
         not_approved = json.loads(json.dumps(self.data))
         not_approved["publication"]["approved_by_educator"] = False
         self.assertEqual(run_workflow("publish", not_approved)["publish"]["status"], "blocked")
+
+    def test_html_has_fixed_feedback_sections_and_pdf_engine_failure_is_explicit(self):
+        html = run_workflow("publish", self.data)["publish"]["payload"]["html"]
+        for heading in ("出勤观察", "课程内容与互动", "任务与Backlog", "成绩", "IELTS", "PBL", "总体与下周支持"):
+            self.assertIn(heading, html)
+        self.assertNotIn("<pre>", html)
+        with tempfile.TemporaryDirectory() as directory:
+            page = Path(directory) / "page.html"; page.write_text("<p>中文</p>", encoding="utf-8")
+            with self.assertRaisesRegex(PDFRenderError, "pdf_render_failed"):
+                render_pdf(page, Path(directory) / "page.pdf", binary="/definitely/missing/chrome")
 
     def test_publish_is_idempotent_and_requires_key_fact_modules(self):
         first = run_workflow("publish", self.data)["publish"]["payload"]["snapshot"]

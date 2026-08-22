@@ -26,6 +26,17 @@ fixture、所有单元测试并上传工件；不会读取 Secrets，不会请�
     快照；还必须有稳定的确认时间/版本，且课程、任务、成绩、IELTS、PBL等
     关键事实模块不能为`blocked`。不会生成对外链接或写入飞书。
 
+## 第二阶段：可配置 AI 与发布预览
+
+- 真实 AI 是显式 `--ai-mode live` 才启用的 OpenAI-compatible HTTP adapter；
+  `AI_API_KEY`、`AI_BASE_URL`、`AI_MODEL` 缺一不可，错误只记录安全错误码。
+- `session_content` 使用已确认的完整六段式 Prompt。周度草稿按模块单独调用；
+  模块被阻断或 AI 失败时不会产生该模块草稿。
+- 发布预览改为固定中文 HTML 结构（出勤、课程/互动、任务、成绩、IELTS、PBL、
+  总体/下周支持）；PDF 使用 Chrome/Chromium headless 从同一 HTML 生成。
+- 分支 push 在 CI matrix 分别执行十个 selector 与 `all`；manual dispatch 保留
+  单段或全链运行。所有 CI 运行使用 fixture adapter，不注入真实 AI 密钥。
+
 ## 明确未做（需后续授权与规则落地）
 
 - 真实 Feishu/Schoology 适配器与任何写操作；应单独添加 dry-run write-plan
