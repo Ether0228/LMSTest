@@ -50,10 +50,10 @@ def find_feedback_record(base_token: str, table_id: str, unique_key: str, identi
     return rows_from_matrix(run_cli(command))
 
 
-def load_result(path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+def load_result(path: Path) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     raw = json.loads(path.read_text(encoding="utf-8"))
     result = raw.get("result", raw)
-    return result["weekly_payload"]["payload"], result["weekly_drafts"]
+    return result["weekly_payload"]["payload"], result["weekly_drafts"], dict(raw.get("run_metadata") or {})
 
 
 def main() -> int:
@@ -64,10 +64,13 @@ def main() -> int:
     parser.add_argument("--student-term-record-id", required=True)
     parser.add_argument("--as", dest="identity", choices=("user", "bot"), default="bot")
     parser.add_argument("--profile")
+    parser.add_argument("--allow-nonlive-artifact", action="store_true", help="local fixture/demo only; never use for real Base data")
     parser.add_argument("--apply", action="store_true", help="omit to print the exact safe write plan only")
     args = parser.parse_args()
 
-    payload, drafts = load_result(args.result)
+    payload, drafts, metadata = load_result(args.result)
+    if metadata.get("ai_mode") != "live" and not args.allow_nonlive_artifact:
+        raise RuntimeError("non_live_ai_artifact")
     fields = build_weekly_feedback_fields(payload, drafts)
     matches = find_feedback_record(args.base_token, args.table_id, fields["反馈唯一键"], args.identity, args.profile)
     if len(matches) > 1:

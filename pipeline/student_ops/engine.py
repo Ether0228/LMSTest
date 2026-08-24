@@ -405,7 +405,7 @@ def run_workflow(name: str, data: dict[str, Any], ai_adapter: Any | None = None)
     return {name: results[name]}
 
 
-def write_artifacts(result: dict[str, Any], output_dir: Path, workflow: str, dry_run: bool = True, chrome_binary: str | None = None) -> list[Path]:
+def write_artifacts(result: dict[str, Any], output_dir: Path, workflow: str, dry_run: bool = True, chrome_binary: str | None = None, run_metadata: dict[str, Any] | None = None) -> list[Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
     serializable = copy.deepcopy(result)
     publish_result = serializable.get("publish", {}).get("payload", {})
@@ -424,6 +424,6 @@ def write_artifacts(result: dict[str, Any], output_dir: Path, workflow: str, dry
             publish_result["pdf_status"] = "failed"
             serializable.setdefault("publish", {}).setdefault("warnings", []).append(str(error))
     result_path = output_dir / f"{workflow}_result.json"
-    result_path.write_text(json.dumps({"workflow": workflow, "dry_run": dry_run, "generated_at": iso_now(), "result": serializable}, ensure_ascii=False, indent=2), encoding="utf-8")
+    result_path.write_text(json.dumps({"workflow": workflow, "dry_run": dry_run, "generated_at": iso_now(), "run_metadata": run_metadata or {}, "result": serializable}, ensure_ascii=False, indent=2), encoding="utf-8")
     paths.insert(0, result_path)
     return paths

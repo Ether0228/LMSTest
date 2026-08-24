@@ -18,7 +18,7 @@ class PublicationFreezeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             result_path = root / "all_result.json"
-            result_path.write_text(json.dumps({"result": result}, ensure_ascii=False), encoding="utf-8")
+            result_path.write_text(json.dumps({"result": result, "run_metadata": {"ai_mode": "live"}}, ensure_ascii=False), encoding="utf-8")
             completed = subprocess.run([
                 sys.executable, str(ROOT / "pipeline/publish_weekly_feedback.py"),
                 "--result", str(result_path), "--approved-at", "2026-09-05 18:00", "--version", "v1",
@@ -37,7 +37,7 @@ class PublicationFreezeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             result_path = root / "all_result.json"
-            result_path.write_text(json.dumps({"result": result}, ensure_ascii=False), encoding="utf-8")
+            result_path.write_text(json.dumps({"result": result, "run_metadata": {"ai_mode": "live"}}, ensure_ascii=False), encoding="utf-8")
             payload = result["weekly_payload"]["payload"]
             payload["反馈状态"] = "已确认"
             drafts = dict(result["weekly_drafts"]["payload"]["drafts"])
@@ -60,7 +60,7 @@ class PublicationFreezeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             result_path = root / "all_result.json"
-            result_path.write_text(json.dumps({"result": result}, ensure_ascii=False), encoding="utf-8")
+            result_path.write_text(json.dumps({"result": result, "run_metadata": {"ai_mode": "live"}}, ensure_ascii=False), encoding="utf-8")
             preview = root / "draft_preview.json"
             preview.write_text(json.dumps({"payload": result["weekly_payload"]["payload"], "drafts": result["weekly_drafts"]["payload"]["drafts"]}, ensure_ascii=False), encoding="utf-8")
             completed = subprocess.run([

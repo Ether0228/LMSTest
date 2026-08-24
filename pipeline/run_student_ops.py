@@ -27,7 +27,7 @@ def main() -> int:
         print(json.dumps({"workflow": args.workflow, "dry_run": args.dry_run, "ai_mode": args.ai_mode, "status": "ai_configuration_failed", "error": str(error)}, ensure_ascii=False))
         return 2
     result = run_workflow(args.workflow, data, ai_adapter=adapter)
-    paths = write_artifacts(result, args.output_dir, args.workflow, args.dry_run)
+    paths = write_artifacts(result, args.output_dir, args.workflow, args.dry_run, run_metadata={"ai_mode": args.ai_mode})
     # Do not emit fixture content: it can include student data in a real run.
     print(json.dumps({"workflow": args.workflow, "dry_run": args.dry_run, "ai_mode": args.ai_mode, "artifacts": [str(p) for p in paths]}, ensure_ascii=False))
     return 0

@@ -32,9 +32,12 @@ def main() -> int:
     parser.add_argument("--public-base-url", required=True, help="e.g. https://zy.queenscanada.com")
     parser.add_argument("--token", help="optional pre-generated publication token")
     parser.add_argument("--drafts-file", type=Path, help="teacher-preview snapshot or JSON text overrides; freezes these current drafts")
+    parser.add_argument("--allow-nonlive-artifact", action="store_true", help="local fixture/demo only; never use for parent/student publication")
     args = parser.parse_args()
     raw = json.loads(args.result.read_text(encoding="utf-8"))
     result = raw.get("result", raw)
+    if (raw.get("run_metadata") or {}).get("ai_mode") != "live" and not args.allow_nonlive_artifact:
+        raise SystemExit("non_live_ai_artifact")
     payload = result["weekly_payload"]["payload"]
     drafts = result["weekly_drafts"]["payload"]["drafts"]
     if args.drafts_file:
