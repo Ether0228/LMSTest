@@ -51,6 +51,8 @@ python3 pipeline/sync_weekly_feedback_base.py --result var/weeks/<学生学期Re
   --base-token <BaseToken> --student-term-record-id <学生学期RecordID> --as "$LARK_IDENTITY" --profile "$LARK_PROFILE"
 ```
 
+生产草稿写入与发布会检查该运行工件的`ai_mode`，默认只接受`live`。`fixture`仅可用于本地演示，不能通过普通`sync`或`publish`命令写入真实 Base 或生成对外版本。
+
 老师在`学生周反馈`记录中修改草稿字段后，生成内部预览：
 
 ```bash
