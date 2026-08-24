@@ -22,6 +22,7 @@ class SchoologyAdapterTests(unittest.TestCase):
         self.assertEqual(plan["student_task_updates"][0]["fields"]["当前提交状态"], ["已提交"])
         self.assertEqual(plan["grade_updates"][0]["fields"]["得分"], 80)
         self.assertEqual(plan["grade_updates"][0]["fields"]["学生学期任务"], [{"id": "student_task_1"}])
+        self.assertNotIn("分数%", plan["grade_updates"][0]["fields"])
         self.assertEqual(plan["course_grade_observations"][0]["overall"], 82)
         self.assertFalse(plan["exceptions"])
 

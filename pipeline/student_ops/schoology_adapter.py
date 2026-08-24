@@ -118,7 +118,6 @@ def build_schoology_write_plan(
             "学生学期任务": [{"id": str(task["record_id"])}],
             "得分": grade.get("score"),
             "满分": grade.get("max_points"),
-            "分数%": grade.get("pct"),
             "老师评语": grade.get("comment_text"),
             "更新时间": grade.get("observed_at"),
         }
