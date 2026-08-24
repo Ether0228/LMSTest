@@ -1,0 +1,19 @@
+[
+  {"学期":"S6","课程编码":"MDM4U","教师":"Atousa","上课时段":"08:00-10:00","chat_id":"oc_2587790a31d775c6e6b4dbe959989f3e","启用":true},
+  {"学期":"S6","课程编码":"BOH4M","教师":"Catherine","上课时段":"08:00-10:00","chat_id":"oc_9222b14762a685b8aba82d0abb14167e","启用":true},
+  {"学期":"S6","课程编码":"MHF4U","教师":"Taylor","上课时段":"08:00-10:00","chat_id":"oc_081a36cee4f4cb59c7ccde272b41214b","启用":true},
+  {"学期":"S6","课程编码":"OLC4O","教师":"Keth","上课时段":"08:00-10:00","chat_id":"oc_01c464ee5b073328d4e8432f9121b8dd","启用":true},
+  {"学期":"S6","课程编码":"CIA4U","教师":"Bianca","上课时段":"10:00-12:00","chat_id":"oc_c41db7be5a012e4c3066c7ac6e923371","启用":true},
+  {"学期":"S6","课程编码":"ESLDO","教师":"Dionne","上课时段":"10:00-12:00","chat_id":"oc_5edacde6c63b1eaf93d9ca857cfb0c45","启用":true},
+  {"学期":"S6","课程编码":"LKBDU","教师":"Grace","上课时段":"10:00-12:00","chat_id":"oc_f26a7e32fbadd519b4d865ae900ab915","启用":true},
+  {"学期":"S6","课程编码":"SPH3U","教师":"Michael","上课时段":"10:00-12:00","chat_id":"oc_2c94a8b0fd50fcdf4db2e8a52114f12d","启用":true},
+  {"学期":"S5（历史）","课程编码":"ENG4U","教师":"Bianca","上课时段":"","chat_id":"oc_ac7d007cfbd828ad4bbf667f4f59febb","启用":false},
+  {"学期":"S5（历史）","课程编码":"MCR3U","教师":"Taylor","上课时段":"","chat_id":"oc_7bf458b807c21ea250fafead22d3d017","启用":false},
+  {"学期":"S5（历史）","课程编码":"CGW4U","教师":"Catherine Wang","上课时段":"","chat_id":"oc_ebf11beae86a31fa7231be9aa5243d6b","启用":false},
+  {"学期":"S5（历史）","课程编码":"MDM4U","教师":"Yehuda Friedman","上课时段":"","chat_id":"oc_b9aa22ac6b67730a5b100027a1953d2d","启用":false},
+  {"学期":"S5（历史）","课程编码":"CHC2D","教师":"Ramolen Laruan","上课时段":"","chat_id":"oc_36bd89e49cc24daeef275dde810de84a","启用":false},
+  {"学期":"S5（历史）","课程编码":"BBB4M","教师":"Catherine","上课时段":"","chat_id":"oc_6d8cdc98ace8a3f1c591aac730330e33","启用":false},
+  {"学期":"S5（历史）","课程编码":"MCV4U","教师":"Michael","上课时段":"","chat_id":"oc_55eba96eab890ab6a7c09a204a79cb34","启用":false},
+  {"学期":"S5（历史）","课程编码":"LKBDU","教师":"Grace Chen","上课时段":"","chat_id":"oc_ad442490588f997fd20118961ebf5e3f","启用":false},
+  {"学期":"S5（历史）","课程编码":"ESLEO","教师":"Bianca","上课时段":"","chat_id":"oc_f398eb3d085ef62d8c0216b0a00a6af0","启用":false}
+]

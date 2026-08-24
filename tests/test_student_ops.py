@@ -8,7 +8,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "pipeline"))
 
 from student_ops import run_workflow
+from student_ops.weekly_feedback_base import build_publication_fields, build_weekly_feedback_fields
 from student_ops.ai import AIAdapterError, OpenAICompatibleAdapter
+from student_ops.attendance_adapter import AttendanceAdapterError, build_weekly_attendance_payload
 from student_ops.engine import write_artifacts
 from student_ops.publishing import PDFRenderError, render_pdf
 from student_ops.prompts import SESSION_COURSE_MINUTES_PROMPT_V1
@@ -127,6 +129,11 @@ class StudentOpsWorkflowTests(unittest.TestCase):
         self.assertIn("<polyline", html)
         self.assertIn("不表示课程总分趋势", html)
         self.assertIn("不作为监视工具", html)
+        self.assertIn("所属校区", html)
+        self.assertIn("线上出勤：出勤", html)
+        self.assertIn("摄像头状态暂无记录", html)
+        self.assertNotIn("线下出勤：", html)
+        self.assertNotIn("线下参与：", html)
         self.assertIn("@media print", html)
         self.assertIn(".toolbar,.prototype-note,.annotation{display:none!important}", html)
 
@@ -156,6 +163,170 @@ class StudentOpsWorkflowTests(unittest.TestCase):
             "下周，我们一起这样推进", "下周行动尚未由师生确认",
         ):
             self.assertIn(marker, html)
+
+    def test_offline_campus_only_renders_offline_attendance_and_classroom(self):
+        payload = {
+            "student": {"name": "演示学生"},
+            "week": {"number": 1},
+            "report": {},
+            "attendance": {
+                "校区": "上海校区", "出勤口径": "线下", "应参加场次": 1,
+                "已记录出勤场次": 1,
+                "days": [{"key": "mon", "label": "周一", "date": "09/02"}],
+                "slots": ["08:30–10:00"],
+                "sessions": [{
+                    "slot": "08:30–10:00", "day": "mon", "title": "ENG4U",
+                    "线下出勤情况": "出勤", "线下出勤教室": "A201",
+                    "线上出勤情况": "出勤", "摄像头开启状态": "全程开启",
+                    "fact_status": "confirmed",
+                }],
+            },
+        }
+        html = render_weekly_report(payload, {})
+        self.assertIn("线下出勤：出勤 · A201", html)
+        self.assertNotIn("线上出勤：", html)
+        self.assertNotIn("摄像头：", html)
+        self.assertNotIn("关于线上画面", html)
+
+    @staticmethod
+    def base_session(record_id, term_id, student_term_id="student-term-1", date_value="2026-09-02", time="8:30-10:00", course="ENG4U", category="外教课", campus="线上", online=None, offline=None, camera=None, classroom=None):
+        return {
+            "record_id": record_id,
+            "学生学期": [{"id": student_term_id}], "学期场次": [{"id": term_id}],
+            "学生场次唯一键": f"{student_term_id}|{date_value}|{course}|{record_id}",
+            "学生校区": campus, "上课日期": f"{date_value}T00:00:00.000+08:00",
+            "时间": time, "课程编码": course, "场次类别": category,
+            "线上出勤情况": [] if online is None else [online],
+            "线下出勤情况": [] if offline is None else [offline],
+            "摄像头开启状态": [] if camera is None else [camera],
+            "线下出勤教室": classroom,
+        }
+
+    @staticmethod
+    def term_session(record):
+        return {"record_id": record["学期场次"][0]["id"], **{key: record[key] for key in ("上课日期", "时间", "课程编码", "场次类别")}}
+
+    def test_base_adapter_online_null_future_and_same_cell_are_auditable(self):
+        records = [
+            self.base_session("ss-present", "ts-present", online="出勤"),
+            self.base_session("ss-null", "ts-null", course="MHF4U"),
+            self.base_session("ss-same-cell", "ts-same-cell", course="ESLDO", online="迟到", camera="中途关闭"),
+            self.base_session("ss-future", "ts-future", date_value="2026-09-03", online="缺勤", camera="未开启"),
+        ]
+        payload = build_weekly_attendance_payload(
+            records, [self.term_session(record) for record in records],
+            student_term_id="student-term-1", week_start="2026-09-02", week_end="2026-09-08", as_of="2026-09-02",
+        )
+        self.assertEqual(payload["出勤口径"], "线上")
+        self.assertIsNone(payload["应参加场次"])
+        self.assertEqual(payload["出勤已记录场次"], 2)
+        self.assertEqual(payload["出勤待记录场次"], 1)
+        self.assertEqual(payload["未来场次"], 1)
+        future = next(item for item in payload["sessions"] if item["source_record_id"] == "ss-future")
+        self.assertEqual(future["fact_status"], "future")
+        self.assertIsNone(future["线上出勤情况"])
+        html = render_weekly_report({"student": {}, "week": {}, "report": {}, "attendance": payload}, {})
+        self.assertEqual(html.count("未来场次 · 出勤尚未发生"), 1)
+        self.assertIn("线上出勤：暂无记录", html)
+        # Three records share the same date/time cell and none is overwritten.
+        self.assertIn("ENG4U", html)
+        self.assertIn("MHF4U", html)
+        self.assertIn("ESLDO", html)
+        self.assertEqual(len(payload["audit"]), 4)
+
+    def test_base_adapter_offline_ignores_online_camera_and_preserves_empty(self):
+        record = self.base_session(
+            "ss-offline", "ts-offline", campus="上海", online="出勤", offline="未记录",
+            camera="全程开启", classroom="A201",
+        )
+        payload = build_weekly_attendance_payload(
+            [record], [self.term_session(record)], student_term_id="student-term-1",
+            week_start="2026-09-02", week_end="2026-09-08", as_of="2026-09-02",
+        )
+        session = payload["sessions"][0]
+        self.assertEqual(payload["出勤口径"], "线下")
+        self.assertEqual(session["fact_status"], "unrecorded")
+        self.assertNotIn("线上出勤情况", session)
+        self.assertNotIn("摄像头开启状态", session)
+        html = render_weekly_report({"student": {}, "week": {}, "report": {}, "attendance": payload}, {})
+        self.assertIn("线下出勤：暂无记录", html)
+        self.assertNotIn("A201", html)
+        self.assertNotIn("摄像头", html)
+
+    def test_base_adapter_surfaces_unassigned_1230_support_slot_without_fabricating_cell(self):
+        student = self.base_session(
+            "ss-beijing", "ts-morning", campus="北京", course="ENG4U",
+        )
+        morning = self.term_session(student)
+        support = {
+            "record_id": "ts-support-1230",
+            "上课日期": "2026-09-02T00:00:00.000+08:00",
+            "时间": "12:30-13:00",
+            "课程编码": [],
+            "场次类别": "智育辅导",
+            "北京": None,
+        }
+        payload = build_weekly_attendance_payload(
+            [student], [morning, support], student_term_id="student-term-1",
+            week_start="2026-09-02", week_end="2026-09-08", as_of="2026-09-02",
+        )
+        self.assertEqual(payload["slots"], ["8:30-10:00"])
+        self.assertEqual(len(payload["sessions"]), 1)
+        self.assertEqual(payload["diagnostics"][0]["status"], "upstream_campus_unassigned")
+        self.assertEqual(payload["diagnostics"][0]["学期场次记录数"], 1)
+        self.assertEqual(payload["diagnostics"][0]["学生场次记录数"], 0)
+        html = render_weekly_report({"student": {}, "week": {}, "report": {}, "attendance": payload}, {})
+        self.assertIn("上游存在 12:30-13:00 智育辅导", html)
+        self.assertIn("校区字段为空", html)
+        self.assertNotIn("12:30-13:00</td>", html)
+
+    def test_support_slot_diagnostic_does_not_treat_unprojected_campus_as_empty(self):
+        student = self.base_session("ss-beijing", "ts-morning", campus="北京")
+        support_without_campus_projection = {
+            "record_id": "ts-support-1230",
+            "上课日期": "2026-09-02T00:00:00.000+08:00",
+            "时间": "12:30-13:00", "课程编码": [], "场次类别": "智育辅导",
+        }
+        payload = build_weekly_attendance_payload(
+            [student], [self.term_session(student), support_without_campus_projection],
+            student_term_id="student-term-1", week_start="2026-09-02",
+            week_end="2026-09-08", as_of="2026-09-02",
+        )
+        self.assertEqual(payload["diagnostics"], [])
+
+    def test_base_adapter_rejects_unknown_campus_and_upstream_mismatch(self):
+        record = self.base_session("ss-unknown", "ts-unknown", campus="未配置校区")
+        with self.assertRaisesRegex(AttendanceAdapterError, "unknown_campus_scope"):
+            build_weekly_attendance_payload(
+                [record], [self.term_session(record)], student_term_id="student-term-1",
+                week_start="2026-09-02", week_end="2026-09-08", as_of="2026-09-02",
+            )
+        term = self.term_session(record)
+        record["学生校区"] = "线上"
+        term["课程编码"] = "MHF4U"
+        with self.assertRaisesRegex(AttendanceAdapterError, "upstream_mismatch"):
+            build_weekly_attendance_payload(
+                [record], [term], student_term_id="student-term-1",
+                week_start="2026-09-02", week_end="2026-09-08", as_of="2026-09-02",
+            )
+
+    def test_weekly_payload_prefers_base_records_over_handwritten_pivot(self):
+        sample = json.loads(json.dumps(self.data))
+        record = self.base_session(
+            "ss-production", "ts-production", student_term_id=sample["student"]["student_term_id"],
+            online="出勤",
+        )
+        sample["week"].update({"start": "2026-09-02", "end": "2026-09-08"})
+        sample["attendance"] = {"source": "handwritten_should_not_win", "days": [{"key": "fake"}]}
+        sample["base_attendance"] = {
+            "student_session_records": [record],
+            "term_session_records": [self.term_session(record)],
+            "as_of": "2026-09-02",
+        }
+        attendance = run_workflow("weekly_payload", sample)["weekly_payload"]["payload"]["attendance"]
+        self.assertEqual(attendance["source"], "feishu_base_student_session_records")
+        self.assertEqual(attendance["sessions"][0]["source_record_id"], "ss-production")
+        self.assertNotEqual(attendance["days"][0]["key"], "fake")
 
     def test_unconfirmed_grade_explanations_do_not_publish(self):
         sample = json.loads(json.dumps(self.data))
@@ -254,6 +425,33 @@ class StudentOpsWorkflowTests(unittest.TestCase):
         self.assertEqual(failed["payload"]["records"][0]["status"], "ai_failed")
         sample["student"].pop("IELTS已确认策略")
         self.assertEqual(run_workflow("ielts", sample)["ielts"]["payload"]["候选"], [])
+
+    def test_weekly_feedback_base_contract_only_writes_editable_fields(self):
+        result = run_workflow("all", self.data)
+        payload = result["weekly_payload"]["payload"]
+        fields = build_weekly_feedback_fields(
+            payload,
+            result["weekly_drafts"],
+            educator_overrides={"课程学习AI草稿": "老师修订后的课程学习反馈"},
+        )
+        self.assertEqual(fields["反馈唯一键"], payload["反馈唯一键"])
+        self.assertEqual(fields["反馈状态"], ["草稿"])
+        self.assertEqual(fields["课程学习AI草稿"], "老师修订后的课程学习反馈")
+        self.assertNotIn("attendance", fields)
+        with self.assertRaises(ValueError):
+            build_weekly_feedback_fields(payload, result["weekly_drafts"], educator_overrides={"学生学期": "不得通过预览改关联"})
+
+    def test_publication_base_contract_requires_complete_versioned_urls(self):
+        fields = build_publication_fields(
+            version="v2026w1-r1",
+            published_at="2026-09-05 18:00",
+            html_url="https://feedback.example/v2026w1-r1",
+            pdf_url="https://feedback.example/v2026w1-r1.pdf",
+        )
+        self.assertEqual(fields["反馈状态"], ["已发布"])
+        self.assertEqual(fields["撤销状态"], ["有效"])
+        with self.assertRaises(ValueError):
+            build_publication_fields(version="", published_at="", html_url="", pdf_url="")
 
 
 if __name__ == "__main__":

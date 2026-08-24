@@ -1,0 +1,20 @@
+[
+  {
+    "type": "select",
+    "name": "互动情况",
+    "multiple": false,
+    "options": [
+      { "name": "待提取", "hue": "Gray", "lightness": "Lighter" },
+      { "name": "有可用互动证据", "hue": "Blue", "lightness": "Lighter" },
+      { "name": "未提取到", "hue": "Gray", "lightness": "Light" },
+      { "name": "无法匹配", "hue": "Orange", "lightness": "Lighter" },
+      { "name": "已确认", "hue": "Green", "lightness": "Lighter" }
+    ],
+    "description": "【AI候选/人工确认】按本场可读纪要或逐字稿提取；无法唯一匹配学生时不得进入周反馈。"
+  },
+  {
+    "type": "text",
+    "name": "互动内容",
+    "description": "【AI候选/老师可编辑】只写可定位到本学生、本场的客观互动事实；原始来源片段保存在服务器审计日志。"
+  }
+]

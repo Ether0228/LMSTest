@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .ai import AIAdapterError, FixtureAIAdapter
+from .attendance_adapter import build_weekly_attendance_payload
 from .prompts import SESSION_COURSE_MINUTES_PROMPT_V1
 from .publishing import PDFRenderError, render_pdf, render_weekly_html
 from .validation import CandidateSchemaError, parse_json_candidate, require_list, require_object
@@ -281,12 +282,26 @@ def pbl(data: dict[str, Any], ai_adapter: Any) -> dict[str, Any]:
 def weekly_payload(data: dict[str, Any], results: dict[str, Any]) -> dict[str, Any]:
     task_rows = results["tasks"]["payload"]["records"]
     participation_rows = results["participation"]["payload"]["records"]
+    base_attendance = data.get("base_attendance")
+    if base_attendance:
+        attendance = build_weekly_attendance_payload(
+            base_attendance["student_session_records"],
+            base_attendance["term_session_records"],
+            student_term_id=data["student"]["student_term_id"],
+            week_start=data["week"]["start"],
+            week_end=data["week"]["end"],
+            as_of=base_attendance["as_of"],
+        )
+    else:
+        # Backward-compatible fixture/demo path. Production callers provide
+        # base_attendance so days/slots/sessions are derived from Base records.
+        attendance = data.get("attendance", {"状态": "缺失", "source": "fixture_or_missing"})
     payload = {
         "反馈唯一键": f"{data['student']['student_term_id']}:{data['week']['number']}",
         "student": {"id": data["student"]["id"], "name": data["student"]["name"]}, "week": data["week"],
         "data_integrity": {name: result["status"] for name, result in results.items() if name != "weekly_payload"},
         "report": data.get("report", {}),
-        "attendance": data.get("attendance", {"状态": "缺失"}),
+        "attendance": attendance,
         "tasks": {"总数": len(task_rows), "backlog": results["tasks"]["payload"]["backlog_count"]},
         "task_records": task_rows,
         "grades": results["grades"]["payload"], "ielts": results["ielts"]["payload"], "pbl": results["pbl"]["payload"],

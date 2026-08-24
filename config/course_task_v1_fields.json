@@ -1,0 +1,12 @@
+[
+  {
+    "type": "text",
+    "name": "Schoology作业NID",
+    "description": "【自动化身份字段】Schoology作业的稳定来源ID；用于与成绩、提交事件可靠关联。"
+  },
+  {
+    "type": "text",
+    "name": "SchoologySectionNID",
+    "description": "【自动化身份字段】Schoology课程Section的稳定来源ID；与Schoology作业NID共同定位课程任务。"
+  }
+]

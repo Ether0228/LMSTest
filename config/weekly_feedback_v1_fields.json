@@ -1,0 +1,107 @@
+[
+  {
+    "type": "text",
+    "name": "反馈唯一键",
+    "description": "【自动化技术字段】学生学期记录ID与教学周的稳定组合；用于同一学生同一教学周的幂等生成，老师无需维护。"
+  },
+  {
+    "type": "datetime",
+    "name": "事实截止时间",
+    "style": { "format": "yyyy/MM/dd HH:mm" },
+    "description": "【自动化控制字段】本次周反馈读取事实的截止时刻；确认发布后作为版本快照依据。"
+  },
+  {
+    "type": "select",
+    "name": "数据完整性状态",
+    "multiple": false,
+    "options": [
+      { "name": "数据准备", "hue": "Blue", "lightness": "Lighter" },
+      { "name": "部分可用", "hue": "Orange", "lightness": "Lighter" },
+      { "name": "待处理", "hue": "Red", "lightness": "Light" }
+    ],
+    "description": "【自动化控制字段】汇总上游场次、任务、成绩等模块可用性；待处理时不得把缺失内容写成事实。"
+  },
+  {
+    "type": "text",
+    "name": "缺失/冲突摘要",
+    "description": "【自动化异常字段】列出本次生成中未匹配、不可读、陈旧或冲突的来源；老师可据此处理，但不作为对外内容。"
+  },
+  {
+    "type": "text",
+    "name": "课程学习AI草稿",
+    "description": "【AI候选/老师可编辑】基于本周已确认课程内容、客观互动与出勤事实生成；老师可直接修改。"
+  },
+  {
+    "type": "text",
+    "name": "任务执行AI草稿",
+    "description": "【AI候选/老师可编辑】基于任务、提交、检查、有效Deadline和Backlog事实生成；提交不等于通过。"
+  },
+  {
+    "type": "text",
+    "name": "成绩总结AI草稿",
+    "description": "【AI候选/老师可编辑】只依据作业分数、分数变化和老师评语；不得推断低分原因或学生态度。"
+  },
+  {
+    "type": "text",
+    "name": "IELTS周总结AI草稿",
+    "description": "【AI候选/老师可编辑】仅汇总已确认IELTS任务、证据和计划；不自动创建正式任务。"
+  },
+  {
+    "type": "text",
+    "name": "PBL周总结AI草稿",
+    "description": "【AI候选/老师可编辑】仅整理可读证据与待复核项；不自动判断任务通过或推进项目阶段。"
+  },
+  {
+    "type": "text",
+    "name": "本周总体AI草稿",
+    "description": "【AI候选/老师可编辑】只综合本周可用事实；最终对外措辞由智育师确认。"
+  },
+  {
+    "type": "text",
+    "name": "下周学生行动",
+    "description": "【老师确认字段】学生下一周可执行的行动；AI可提供候选，需老师编辑确认。"
+  },
+  {
+    "type": "text",
+    "name": "下周学校支持",
+    "description": "【老师确认字段】学校/老师将提供的具体支持；不得由AI自行承诺。"
+  },
+  {
+    "type": "text",
+    "name": "智育师修改稿",
+    "description": "【人工确认字段】智育师审核后采用的对外文字；可为空，发布时服务器冻结当前可编辑草稿与本字段。"
+  },
+  {
+    "type": "text",
+    "name": "发布版本",
+    "description": "【服务器发布字段】不可变发布快照的版本号；老师无需维护。"
+  },
+  {
+    "type": "datetime",
+    "name": "发布时间",
+    "style": { "format": "yyyy/MM/dd HH:mm" },
+    "description": "【服务器发布字段】本版本正式生成HTML/PDF的时间。"
+  },
+  {
+    "type": "text",
+    "name": "网页链接",
+    "style": { "type": "url" },
+    "description": "【服务器发布字段】当前已发布版本的受控网页链接。"
+  },
+  {
+    "type": "text",
+    "name": "PDF链接",
+    "style": { "type": "url" },
+    "description": "【服务器发布字段】当前已发布版本的受控PDF链接。"
+  },
+  {
+    "type": "select",
+    "name": "撤销状态",
+    "multiple": false,
+    "options": [
+      { "name": "有效", "hue": "Green", "lightness": "Lighter" },
+      { "name": "已撤销", "hue": "Red", "lightness": "Light" }
+    ],
+    "description": "【服务器发布字段】控制已发布链接是否仍有效；修订版应新建版本而不是覆盖历史。"
+  }
+]

@@ -1,0 +1,8 @@
+[
+  {
+    "type": "formula",
+    "name": "Schoology学生UID",
+    "expression": "ARRAYJOIN([学生姓名].[Schoology学生UID])",
+    "description": "【自动化只读字段】从学生主档带出经核对的Schoology学生UID，供任务、提交和成绩事实稳定关联。"
+  }
+]
