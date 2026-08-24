@@ -51,18 +51,20 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--as", dest="identity", choices=("user", "bot"), default="user")
     parser.add_argument("--profile")
+    parser.add_argument("--include-inactive", action="store_true", help="read historical registered groups without modifying their enabled state")
     args = parser.parse_args()
     registry = json.loads(args.registry.read_text(encoding="utf-8"))
     messages: list[dict[str, Any]] = []
     errors: list[dict[str, str]] = []
     for group in registry:
-        if not group.get("启用", True):
+        if not args.include_inactive and not group.get("启用", True):
             continue
         try:
             messages.extend(list_group_messages(group["chat_id"], args.start, args.end, args.identity, args.profile))
         except RuntimeError as error:
             errors.append({"chat_id": group["chat_id"], "课程编码": group["课程编码"], "错误": str(error)})
-    ledger = discover_smart_minutes(messages, registry)
+    discovery_registry = [dict(group, 启用=True) for group in registry] if args.include_inactive else registry
+    ledger = discover_smart_minutes(messages, discovery_registry)
     output = {"范围": {"开始": args.start, "结束": args.end}, "来源记录": ledger, "扫描异常": errors}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
