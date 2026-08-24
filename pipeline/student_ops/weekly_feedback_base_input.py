@@ -82,7 +82,10 @@ def build_weekly_feedback_input(
     missing = linked_session_ids - set(term_by_id)
     if missing:
         raise ValueError("missing_linked_term_sessions")
-    week_term_sessions = [term_by_id[record_id] for record_id in linked_session_ids]
+    week_term_sessions = sorted(
+        (term_by_id[record_id] for record_id in linked_session_ids),
+        key=lambda row: (_date(row, "上课日期"), _text(row, "时间"), str(row.get("record_id") or "")),
+    )
 
     sessions, confirmations = [], []
     for row in week_term_sessions:
