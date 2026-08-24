@@ -21,6 +21,7 @@ class SchoologyAdapterTests(unittest.TestCase):
         self.assertEqual(plan["student_task_updates"][0]["record_id"], "student_task_1")
         self.assertEqual(plan["student_task_updates"][0]["fields"]["当前提交状态"], ["已提交"])
         self.assertEqual(plan["grade_updates"][0]["fields"]["得分"], 80)
+        self.assertEqual(plan["grade_updates"][0]["fields"]["学生学期任务"], [{"id": "student_task_1"}])
         self.assertEqual(plan["course_grade_observations"][0]["overall"], 82)
         self.assertFalse(plan["exceptions"])
 
@@ -29,6 +30,15 @@ class SchoologyAdapterTests(unittest.TestCase):
         plan = build_schoology_write_plan(snapshot, student_uid="u1", student_term_id="term_1", course_task_records=[], student_task_records=[], grade_records=[])
         self.assertEqual(plan["student_task_updates"], [])
         self.assertEqual(plan["exceptions"][0]["类型"], "未匹配课程任务")
+
+    def test_grade_without_stable_task_mapping_is_an_exception(self):
+        snapshot = {
+            "grade_items": [{"grade_item_key": "s1:a1", "grade_item_nid": "a1"}],
+            "grade_records": [{"student_uid": "u1", "section_nid": "s1", "grade_item_key": "s1:a1", "score": 80}],
+        }
+        plan = build_schoology_write_plan(snapshot, student_uid="u1", student_term_id="term_1", course_task_records=[], student_task_records=[], grade_records=[])
+        self.assertEqual(plan["grade_updates"], [])
+        self.assertEqual(plan["exceptions"][0]["类型"], "成绩未匹配课程任务")
 
 
 if __name__ == "__main__":

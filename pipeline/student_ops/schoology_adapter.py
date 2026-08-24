@@ -101,11 +101,21 @@ def build_schoology_write_plan(
         if not assignment:
             plan["exceptions"].append({"类型": "成绩缺少作业稳定ID", "student_uid": student_uid, "SectionNID": section})
             continue
+        course_task = course_tasks.get((section, assignment))
+        if not course_task:
+            plan["exceptions"].append({"类型": "成绩未匹配课程任务", "student_uid": student_uid, "SectionNID": section, "作业NID": assignment})
+            continue
+        task = existing_tasks.get((student_term_id, str(course_task["record_id"])))
+        if not task:
+            plan["exceptions"].append({"类型": "成绩未匹配学生任务", "student_term_id": student_term_id, "课程任务record_id": course_task["record_id"], "SectionNID": section, "作业NID": assignment})
+            continue
         key = (student_uid, section, assignment)
         fields = {
             "学生UID": student_uid,
             "SectionNID": section,
             "作业NID": assignment,
+            "所属课程任务": [{"id": str(course_task["record_id"])}],
+            "学生学期任务": [{"id": str(task["record_id"])}],
             "得分": grade.get("score"),
             "满分": grade.get("max_points"),
             "分数%": grade.get("pct"),
