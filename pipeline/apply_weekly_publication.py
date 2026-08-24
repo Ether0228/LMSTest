@@ -30,10 +30,11 @@ def validate_publication(record: dict[str, Any], manifest: dict[str, Any]) -> di
     state = set(record.get("反馈状态") or [])
     if "已发布" in state:
         raise RuntimeError("feedback_already_published")
-    if not state & {"草稿", "已确认"}:
-        raise RuntimeError("feedback_state_not_publishable")
+    if "已确认" not in state:
+        raise RuntimeError("feedback_not_confirmed")
     fields = manifest.get("publication_fields")
-    if not isinstance(fields, dict) or not fields.get("网页链接") or not fields.get("PDF链接"):
+    required = ("发布版本", "发布时间", "网页链接", "PDF链接")
+    if not isinstance(fields, dict) or any(not fields.get(field) for field in required):
         raise RuntimeError("publication_manifest_incomplete")
     return fields
 

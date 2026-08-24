@@ -23,6 +23,9 @@ class WeeklyFeedbackBaseInputTests(unittest.TestCase):
         self.assertEqual(data["sessions"][0]["source_text"], "确认内容")
         self.assertEqual(data["sessions"][1]["source_text"], "")
         self.assertEqual(data["report_courses"][0]["actual_content"], "确认内容")
+        self.assertEqual(data["report_courses"][0]["session_count"], 1)
+        self.assertEqual(data["report_courses"][0]["total_session_count"], 2)
+        self.assertEqual(data["report_courses"][0]["session_summary"], "本周1场已确认课程")
         self.assertEqual(data["report_courses"][0]["confirmed_interaction"], "解释了计算步骤")
         self.assertEqual(data["report_courses"][0]["interaction_confirmation_status"], "已确认")
 

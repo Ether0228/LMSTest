@@ -110,11 +110,16 @@ def build_weekly_feedback_input(
     report_courses = []
     for course, contents in sorted(content_by_course.items()):
         interactions = interaction_by_course.get(course, [])
+        confirmed_session_count = sum(
+            bool(_text(row, "课程编码") == course and _text(row, "内容确认状态") == "已确认" and _text(row, "课程内容总结"))
+            for row in week_term_sessions
+        )
         report_courses.append({
             "code": course,
             "title": course,
-            "session_count": sum(_text(row, "课程编码") == course for row in week_term_sessions),
-            "session_summary": f"本周{sum(_text(row, '课程编码') == course for row in week_term_sessions)}场已确认课程",
+            "session_count": confirmed_session_count,
+            "total_session_count": sum(_text(row, "课程编码") == course for row in week_term_sessions),
+            "session_summary": f"本周{confirmed_session_count}场已确认课程",
             "actual_content": "\n\n".join(dict.fromkeys(contents)),
             "actual_content_confirmed": True,
             "confirmed_interaction": "\n".join(dict.fromkeys(interactions)),

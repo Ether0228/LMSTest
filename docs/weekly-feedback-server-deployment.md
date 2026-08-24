@@ -82,7 +82,7 @@ python3 pipeline/render_weekly_feedback_preview.py --result var/weeks/<学生学
   --output-dir var/weeks/<学生学期RecordID>-1/preview --as "$LARK_IDENTITY" --profile "$LARK_PROFILE"
 ```
 
-老师将`反馈状态`设为`已确认`后，使用上述预览快照冻结发布。`publish_weekly_feedback.py`会拒绝未确认快照；随后回写只会更新该条周反馈的发布字段。
+老师将`反馈状态`设为`已确认`后，使用上述预览快照冻结发布。`publish_weekly_feedback.py`会拒绝未确认快照；`apply_weekly_publication.py`也会再次拒绝仍为`草稿`的记录，并要求版本、发布时间、网页链接和 PDF 链接完整，随后才更新该条周反馈的发布字段。
 
 ```bash
 python3 pipeline/publish_weekly_feedback.py --result var/weeks/<学生学期RecordID>-1/run/all_result.json \
