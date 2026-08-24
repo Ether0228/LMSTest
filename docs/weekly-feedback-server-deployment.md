@@ -1,0 +1,74 @@
+# 周反馈静态发布：服务器最小部署
+
+本部署只服务已确认并冻结的 HTML/PDF；不把 Base 导出、课程纪要正文、AI 候选或老师预览目录公开到互联网。
+
+## 目录
+
+- 应用代码：`/srv/lmstest`
+- 对外冻结文件：`/srv/weekly-feedback/public/<随机token>/weekly_feedback.{html,pdf}`
+- 内部预览与运行中间件：应用目录下受权限控制的 `var/`；不得配置 Nginx alias。
+
+创建目录并授权给运行账户：
+
+```bash
+sudo install -d -o <运行用户> -g <运行组> -m 0750 /srv/lmstest
+sudo install -d -o <运行用户> -g <运行组> -m 0750 /srv/weekly-feedback/public
+```
+
+## 配置
+
+1. 将仓库检出到`/srv/lmstest`，切到 `codex/workflow-pipeline` 或合并后的受保护分支。
+2. 复制 [weekly-feedback.env.example](../deploy/weekly-feedback.env.example) 为服务器私有环境文件，并填入公网域名；文件权限为 `0600`。不要把任何 Token、Cookie 或 API Key 写回仓库。
+3. 把 [nginx-weekly-feedback.conf.example](../deploy/nginx-weekly-feedback.conf.example) 的域名替换为实际域名，放入现有 Nginx `conf.d`，然后执行：
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+4. 由运行账户确认 `python3`、`lark-cli`、Chrome/Chromium 均可执行，且已登录被授权的 Lark profile。使用 `lark-cli auth status --profile <profile>` 检查身份，不输出凭据。
+
+## 单学生单周运行顺序
+
+在课程结束、课程内容已确认后运行。示例中的值均需替换；这四个命令不会自行改变业务事实。
+
+```bash
+cd /srv/lmstest
+source /etc/lmstest/weekly-feedback.env
+
+python3 pipeline/collect_weekly_feedback_base_facts.py \
+  --base-token <BaseToken> --student-term-record-id <学生学期RecordID> \
+  --student-name '<学生姓名>' --week '第1周' --week-start YYYY-MM-DD --week-end YYYY-MM-DD \
+  --as-of YYYY-MM-DD --term '<学期>' --educator '<智育师>' \
+  --output-dir var/weeks/<学生学期RecordID>-1/input --as "$LARK_IDENTITY" --profile "$LARK_PROFILE"
+
+python3 pipeline/run_student_ops.py --workflow all \
+  --fixture var/weeks/<学生学期RecordID>-1/input/weekly_feedback_input.json \
+  --output-dir var/weeks/<学生学期RecordID>-1/run --ai-mode live
+
+# 默认 dry-run：先生成确切 Base 写入计划；核对后才加 --apply。
+python3 pipeline/sync_weekly_feedback_base.py --result var/weeks/<学生学期RecordID>-1/run/all_result.json \
+  --base-token <BaseToken> --student-term-record-id <学生学期RecordID> --as "$LARK_IDENTITY" --profile "$LARK_PROFILE"
+```
+
+老师在`学生周反馈`记录中修改草稿字段后，生成内部预览：
+
+```bash
+python3 pipeline/render_weekly_feedback_preview.py --result var/weeks/<学生学期RecordID>-1/run/all_result.json \
+  --base-token <BaseToken> --feedback-record-id <周反馈RecordID> \
+  --output-dir var/weeks/<学生学期RecordID>-1/preview --as "$LARK_IDENTITY" --profile "$LARK_PROFILE"
+```
+
+老师将`反馈状态`设为`已确认`后，使用上述预览快照冻结发布。`publish_weekly_feedback.py`会拒绝未确认快照；随后回写只会更新该条周反馈的发布字段。
+
+```bash
+python3 pipeline/publish_weekly_feedback.py --result var/weeks/<学生学期RecordID>-1/run/all_result.json \
+  --drafts-file var/weeks/<学生学期RecordID>-1/preview/weekly_feedback_preview_snapshot.json \
+  --approved-at 'YYYY-MM-DD HH:mm' --version v1 \
+  --storage-dir "$WEEKLY_FEEDBACK_PUBLIC_DIR" --public-base-url "$WEEKLY_FEEDBACK_PUBLIC_BASE_URL"
+
+python3 pipeline/apply_weekly_publication.py --manifest <上一步输出的weekly_feedback_snapshot.json> \
+  --base-token <BaseToken> --record-id <周反馈RecordID> --as "$LARK_IDENTITY" --profile "$LARK_PROFILE"
+```
+
+前两个 Base 写入/回写命令均先默认 dry-run；只有核对 record ID、反馈唯一键、状态和 URL 后才加`--apply`。发布后不修改冻结文件；更新必须创建新版本和新 token。
