@@ -20,9 +20,11 @@
 
 同日运行`preflight_weekly_feedback_v1.py`：86 名学生的`Schoology学生UID`已填数为 0；14 条课程任务的`SchoologySectionNID`和`Schoology作业NID`已填数均为 0；截至检查日期，已结束且内容已确认的学期场次为 0。该命令可在每次上线前重复运行，只输出配置状态和计数，不输出凭据。
 
+已从真实 Base 导出人工映射模板：86 行学生和 14 行课程任务。模板带不可变的 Base `record_id`，由运营按 Schoology 后台的稳定 ID 填写；回写脚本会拒绝非数字、缺少 Section 或作业 ID、重复 UID、重复 Section+作业组合，且默认仅输出写入计划。它绝不按学生姓名、课程名或作业标题自动猜测匹配。
+
 ## 下一次可执行验收
 
-1. 在`学生主档`逐人补核`Schoology学生UID`，在`学期课程任务`补`SchoologySectionNID`和`Schoology作业NID`；不允许按姓名自动匹配。
+1. 运行`export_schoology_mapping_template.py`导出映射 CSV；在`学生主档`逐人补核`Schoology学生UID`，在`学期课程任务`补`SchoologySectionNID`和`Schoology作业NID`。先运行`apply_schoology_mapping.py`核对 dry-run，再由有权限的运营人员加`--apply`回写；不允许按姓名自动匹配。
 2. 选一个已结束的教学周，扫描对应课程群并由课程老师/运营补充纪要的`实际上课日期`；运行严格匹配，得到待写入的场次内容来源。
 3. 配置线上 AI 环境变量后生成候选，老师在`学期场次.课程内容总结`和`学生场次记录.互动情况/互动内容`确认或修改。
 4. 读取同一学生同一教学周的场次、已确认内容、任务和成绩，生成周反馈草稿；老师在`学生周反馈`修改 AI 草稿及下周行动/学校支持。

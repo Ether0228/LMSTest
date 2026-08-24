@@ -28,6 +28,27 @@ sudo systemctl reload nginx
 
 4. 由运行账户确认 `python3`、`lark-cli`、Chrome/Chromium 均可执行，且已登录被授权的 Lark profile。使用 `lark-cli auth status --profile <profile>` 检查身份，不输出凭据。
 
+## Schoology 稳定 ID 的一次性补录
+
+在首次同步前，以实际 Schoology 后台显示的数字 ID 人工填写模板；不要用姓名或标题做自动匹配。导出和首次核对均不写 Base：
+
+```bash
+cd /srv/lmstest
+source /etc/lmstest/weekly-feedback.env
+
+python3 pipeline/export_schoology_mapping_template.py \
+  --base-token <BaseToken> --output-dir var/schoology-mapping \
+  --as "$LARK_IDENTITY" --profile "$LARK_PROFILE"
+
+# 在 CSV 中仅填写 Schoology学生UID、SchoologySectionNID、Schoology作业NID 三列。
+python3 pipeline/apply_schoology_mapping.py \
+  --students var/schoology-mapping/schoology_students_mapping.csv \
+  --course-tasks var/schoology-mapping/schoology_course_tasks_mapping.csv \
+  --base-token <BaseToken> --as "$LARK_IDENTITY" --profile "$LARK_PROFILE"
+```
+
+确认 dry-run 的更新数和异常为空后，才由授权人员在最后一条命令添加`--apply`。脚本会拒绝格式错误或重复映射，并且只写入这三个稳定 ID 字段。
+
 ## 单学生单周运行顺序
 
 在课程结束、课程内容已确认后运行。示例中的值均需替换；这四个命令不会自行改变业务事实。
