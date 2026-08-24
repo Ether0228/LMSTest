@@ -58,6 +58,9 @@ def render_attendance(attendance: dict[str, Any]) -> str:
                 else:
                     status = "待确认"
                     detail = "校区出勤口径待确认"
+                if not item.get("display_text"):
+                    camera = item.get("摄像头开启状态")
+                    detail += f" · 摄像头：{camera}" if camera else " · 摄像头状态暂无记录"
                 state_class = {
                     "出勤": "online" if scope == "线上" else "present",
                     "迟到": "attention", "早退": "attention", "请假": "attention",
@@ -206,7 +209,7 @@ def render_actions(actions: list[dict[str, Any]]) -> str:
 
 def render_weekly_report(payload: dict[str, Any], drafts: dict[str, Any]) -> str:
     meta=payload.get("report",{}); att=payload.get("attendance",{}); tasks=payload.get("task_records",[])
-    camera_note = "<p class='privacy-note'>关于线上画面：只呈现已有记录，用于帮助老师了解线上学习条件并及时提供支持；字段为空表示暂无记录，不等于未开启。这项信息不作为监视工具，也不用于评价学生的态度、品格或动机。</p>" if attendance_scope(att) == "线上" else ""
+    camera_note = "<p class='privacy-note'>关于学习参与画面：只呈现已有记录，用于帮助老师了解学习条件并及时提供支持；字段为空表示暂无记录，不等于未开启。这项信息不作为监视工具，也不用于评价学生的态度、品格或动机。</p>"
     if att.get("应参加场次") in (None, "") and att.get("学生场次关系数") not in (None, ""):
         attendance_fact = f"{e(att.get('出勤已记录场次'))} 场已记录；{e(att.get('未来场次'))} 场未来"
     else:

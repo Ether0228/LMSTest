@@ -74,14 +74,12 @@ def _display_text(scope: str, status: str | None, camera: str | None, classroom:
     if fact_status == "future":
         return "未来场次 · 出勤尚未发生"
     if fact_status == "unrecorded":
-        if scope == "线上" and camera:
-            return f"线上出勤：暂无记录 · 摄像头：{camera}"
-        return f"{scope}出勤：暂无记录"
-    if scope == "线上":
-        text = f"线上出勤：{status}"
-        return text + (f" · 摄像头：{camera}" if camera else " · 摄像头状态暂无记录")
-    text = f"线下出勤：{status}"
-    return text + (f" · {classroom}" if classroom else "")
+        text = f"{scope}出勤：暂无记录"
+    else:
+        text = f"{scope}出勤：{status}"
+        if scope == "线下" and classroom:
+            text += f" · {classroom}"
+    return text + (f" · 摄像头：{camera}" if camera else " · 摄像头状态暂无记录")
 
 
 def _missing_support_slot_diagnostics(
@@ -224,7 +222,8 @@ def build_weekly_attendance_payload(
     ):
         status_field = "线上出勤情况" if scope == "线上" else "线下出勤情况"
         status = _scalar(record.get(status_field))
-        camera = _scalar(record.get("摄像头开启状态")) if scope == "线上" else None
+        # 校区决定读取哪一种出勤事实，不决定是否保留已有摄像头事实。
+        camera = _scalar(record.get("摄像头开启状态"))
         classroom = _scalar(record.get("线下出勤教室")) if scope == "线下" else None
         if session_date > cutoff:
             fact_status = "future"
@@ -262,10 +261,10 @@ def build_weekly_attendance_payload(
         }
         if scope == "线上":
             session["线上出勤情况"] = effective_status
-            session["摄像头开启状态"] = camera
         else:
             session["线下出勤情况"] = effective_status
             session["线下出勤教室"] = classroom
+        session["摄像头开启状态"] = camera
         sessions.append(session)
         audit.append({
             "base_record_id": session["source_record_id"],

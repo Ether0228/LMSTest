@@ -185,8 +185,8 @@ class StudentOpsWorkflowTests(unittest.TestCase):
         html = render_weekly_report(payload, {})
         self.assertIn("线下出勤：出勤 · A201", html)
         self.assertNotIn("线上出勤：", html)
-        self.assertNotIn("摄像头：", html)
-        self.assertNotIn("关于线上画面", html)
+        self.assertIn("摄像头：全程开启", html)
+        self.assertIn("关于学习参与画面", html)
 
     @staticmethod
     def base_session(record_id, term_id, student_term_id="student-term-1", date_value="2026-09-02", time="8:30-10:00", course="ENG4U", category="外教课", campus="线上", online=None, offline=None, camera=None, classroom=None):
@@ -234,7 +234,7 @@ class StudentOpsWorkflowTests(unittest.TestCase):
         self.assertIn("ESLDO", html)
         self.assertEqual(len(payload["audit"]), 4)
 
-    def test_base_adapter_offline_ignores_online_camera_and_preserves_empty(self):
+    def test_base_adapter_offline_keeps_camera_fact_and_preserves_empty_attendance(self):
         record = self.base_session(
             "ss-offline", "ts-offline", campus="上海", online="出勤", offline="未记录",
             camera="全程开启", classroom="A201",
@@ -247,11 +247,11 @@ class StudentOpsWorkflowTests(unittest.TestCase):
         self.assertEqual(payload["出勤口径"], "线下")
         self.assertEqual(session["fact_status"], "unrecorded")
         self.assertNotIn("线上出勤情况", session)
-        self.assertNotIn("摄像头开启状态", session)
+        self.assertEqual(session["摄像头开启状态"], "全程开启")
         html = render_weekly_report({"student": {}, "week": {}, "report": {}, "attendance": payload}, {})
         self.assertIn("线下出勤：暂无记录", html)
         self.assertNotIn("A201", html)
-        self.assertNotIn("摄像头", html)
+        self.assertIn("摄像头：全程开启", html)
 
     def test_base_adapter_surfaces_unassigned_1230_support_slot_without_fabricating_cell(self):
         student = self.base_session(
