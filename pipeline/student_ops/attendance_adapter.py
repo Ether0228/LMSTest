@@ -1,7 +1,9 @@
 """Deterministic Base records -> weekly attendance payload adapter.
 
-This module only organizes Base facts.  It does not decide formal attendance,
-excused/unexcused status, cancellations, rescheduling, or an attendance rate.
+This module only organizes Base facts.  In V1, a generated student-session
+row is the calendar-derived ``应参加`` fact.  It does not decide formal
+attendance, excused/unexcused status, cancellations, rescheduling, or an
+attendance rate.
 """
 from __future__ import annotations
 
@@ -157,9 +159,11 @@ def build_weekly_attendance_payload(
 ) -> dict[str, Any]:
     """Build one anonymous student's weekly pivot and cell-level audit trail.
 
-    A Base row proves a student-session relationship, but the current schema has
-    no explicit should-attend, cancellation, or reschedule field.  Therefore the
-    adapter reports relationship counts and leaves the formal denominator unset.
+    Each generated student-session row is the V1 calendar-derived should-attend
+    fact: the roster is built from the academic calendar and normal timetable.
+    Until explicit cancellation/reschedule fields exist, all such rows remain in
+    the weekly denominator.  The adapter never guesses exclusions or calculates
+    a formal attendance rate.
     """
     start = date.fromisoformat(week_start) if isinstance(week_start, str) else week_start
     end = date.fromisoformat(week_end) if isinstance(week_end, str) else week_end
@@ -294,9 +298,11 @@ def build_weekly_attendance_payload(
         "出勤已记录场次": recorded_count,
         "观察到参与场次": observed_count,
         "出勤待记录场次": unrecorded_count,
-        "应参加场次": None,
-        "应参加分母状态": "待业务确认：当前Base缺少是否应参加、取消和调课状态字段",
-        "状态": "学生场次事实，不计算正式Attendance%",
+        "应参加场次": len(selected),
+        "已发生应参加场次": elapsed_count,
+        "未来应参加场次": future_count,
+        "应参加分母状态": "V1：学生场次记录为校历与课表生成的应参加场次；取消、调课和无需出勤尚未有字段时不自动排除",
+        "状态": "学生场次事实；正式Attendance%待取消、调课和无需出勤口径确认",
         "diagnostics": diagnostics,
         "days": days,
         "slots": slot_values,

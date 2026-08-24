@@ -95,7 +95,9 @@ def render_attendance_summary(attendance: dict[str, Any]) -> str:
         f"<span>出勤口径：<strong>{e(scope + '参与' if scope in ('线上','线下') else scope)}</strong></span>",
     ]
     if expected not in (None, ""):
-        parts.append(f"<span>已记录参与：<strong>{e(observed)} / {e(expected)}</strong></span>")
+        parts.append(f"<span>本周应参加：<strong>{e(expected)}</strong></span>")
+        parts.append(f"<span>已发生 / 未来：<strong>{e(attendance.get('已发生应参加场次', attendance.get('已发生场次')))} / {e(attendance.get('未来应参加场次', attendance.get('未来场次')))}</strong></span>")
+        parts.append(f"<span>出勤已记录：<strong>{e(attendance.get('出勤已记录场次', observed))}</strong></span>")
     else:
         parts.append(f"<span>学生场次关系：<strong>{e(attendance.get('学生场次关系数'))}</strong></span>")
         parts.append(f"<span>已发生 / 未来：<strong>{e(attendance.get('已发生场次'))} / {e(attendance.get('未来场次'))}</strong></span>")
@@ -213,7 +215,7 @@ def render_weekly_report(payload: dict[str, Any], drafts: dict[str, Any]) -> str
     if att.get("应参加场次") in (None, "") and att.get("学生场次关系数") not in (None, ""):
         attendance_fact = f"{e(att.get('出勤已记录场次'))} 场已记录；{e(att.get('未来场次'))} 场未来"
     else:
-        attendance_fact = f"{e(att.get('已记录出勤场次', att.get('观察到参与场次')))} / {e(att.get('应参加场次'))}"
+        attendance_fact = f"本周 {e(att.get('应参加场次'))} 场应参加；{e(att.get('出勤已记录场次', att.get('已记录出勤场次', att.get('观察到参与场次'))))} 场已记录"
     return f"""<!doctype html><html lang='zh-CN'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>{e(meta.get('title','学生周度学习反馈'))}</title><style>{CSS}</style></head><body class='show-annotations'>
 <div class='toolbar' aria-label='网页工具栏'><div class='toolbar__title'>学生周度学习反馈</div><div class='toolbar__actions'><label class='switch'><input id='annotationToggle' type='checkbox' checked>显示数据来源标注</label><button class='button' onclick='window.print()'><svg viewBox='0 0 24 24' aria-hidden='true'><path d='M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6z'/></svg>打印</button><button class='button button--primary' onclick='window.print()'><svg viewBox='0 0 24 24' aria-hidden='true'><path d='M12 3v12m0 0 4-4m-4 4-4-4M5 21h14'/></svg>导出 PDF</button></div></div>
 <main class='report' data-template='student-weekly-feedback-v1'><header class='report-header'><div><p class='school'>STUDENT LEARNING WEEKLY FEEDBACK</p><h1><span class='student-name'>{e(payload.get('student',{}).get('name'))}</span>的第 {e(payload.get('week',{}).get('number'))} 周学习反馈</h1><p class='report-subtitle'>{e(meta.get('subtitle','我们一起回看这一周发生了什么，也一起确定下一步怎样更顺利。'))}</p></div><div class='report-meta'><span class='meta-label'>学期</span><span class='meta-value'>{e(meta.get('term'))}</span><span class='meta-label'>周期</span><span class='meta-value'>{e(payload.get('week',{}).get('start'))}–{e(payload.get('week',{}).get('end'))}</span><span class='meta-label'>智育师</span><span class='meta-value'>{e(meta.get('educator'))}</span><span class='meta-label'>版本</span><span class='meta-value'>{e(meta.get('version_label'))}</span></div></header>

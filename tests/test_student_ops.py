@@ -218,7 +218,9 @@ class StudentOpsWorkflowTests(unittest.TestCase):
             student_term_id="student-term-1", week_start="2026-09-02", week_end="2026-09-08", as_of="2026-09-02",
         )
         self.assertEqual(payload["出勤口径"], "线上")
-        self.assertIsNone(payload["应参加场次"])
+        self.assertEqual(payload["应参加场次"], 4)
+        self.assertEqual(payload["已发生应参加场次"], 3)
+        self.assertEqual(payload["未来应参加场次"], 1)
         self.assertEqual(payload["出勤已记录场次"], 2)
         self.assertEqual(payload["出勤待记录场次"], 1)
         self.assertEqual(payload["未来场次"], 1)
