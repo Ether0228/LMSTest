@@ -47,6 +47,12 @@ stage/evidence, and confirmed next-week actions. Screen controls and source
 annotations remain interactive; print CSS hides those tools and controls A4
 page breaks. There is no separate PDF-only or simplified HTML template.
 
+The fixed visible blocks and confirmation boundaries are documented in
+`docs/student-weekly-feedback-report-contract.md`. The contract also separates
+a missing template binding from a sparse weekly fixture: missing data keeps its
+section visible with a neutral missing/pending-confirmation state and is never
+filled with planned teaching or AI inference.
+
 The course minutes candidate and its human confirmation are separate fixture
 inputs. `publication.approved_at` and `publication.version` are mandatory for
 a stable, idempotent publication snapshot; no runtime timestamp becomes a

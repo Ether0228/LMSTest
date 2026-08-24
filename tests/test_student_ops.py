@@ -12,6 +12,7 @@ from student_ops.ai import AIAdapterError, OpenAICompatibleAdapter
 from student_ops.engine import write_artifacts
 from student_ops.publishing import PDFRenderError, render_pdf
 from student_ops.prompts import SESSION_COURSE_MINUTES_PROMPT_V1
+from student_ops.report_template import render_weekly_report
 
 
 class StudentOpsWorkflowTests(unittest.TestCase):
@@ -116,7 +117,7 @@ class StudentOpsWorkflowTests(unittest.TestCase):
 
     def test_full_report_binds_confirmed_data_and_filters_unconfirmed_facts(self):
         html = run_workflow("publish", self.data)["publish"]["payload"]["html"]
-        for marker in ("data-template='student-weekly-feedback-v1'", "学生一周出勤透视表", "任务明细", "近期作业分数", "事实性成绩说明与学校支持", "校园节能倡议", "研究问题文档", "继续完成期望值练习"):
+        for marker in ("data-template='student-weekly-feedback-v1'", "学生一周出勤透视表", "任务明细", "近期作业分数", "事实性成绩说明与学校支持", "校园节能倡议", "研究问题文档", "完成IELTS阅读练习与错题归因"):
             self.assertIn(marker, html)
         self.assertNotIn("计划课程（不展示）", html)
         self.assertNotIn("计划教学内容不得展示", html)
@@ -128,6 +129,43 @@ class StudentOpsWorkflowTests(unittest.TestCase):
         self.assertIn("不作为监视工具", html)
         self.assertIn("@media print", html)
         self.assertIn(".toolbar,.prototype-note,.annotation{display:none!important}", html)
+
+    def test_complete_demo_covers_fixed_weekly_report_contract(self):
+        html = run_workflow("publish", self.data)["publish"]["payload"]["html"]
+        for day in ("周一", "周二", "周三", "周四", "周五"):
+            self.assertIn(day, html)
+        for marker in (
+            "本周3场已确认课程", "本周2场已确认课程", "课程问题与学校支持",
+            "Backlog视图", "缺交", "返工", "待审", "Academic 6.5", "2 / 4",
+            "错题归因记录", "证据收集", "利益相关者清单", "AI review候选",
+            "值得肯定（确认事实）", "需要关注（确认事实）",
+            "完成IELTS阅读练习与错题归因", "修订ENG4U引用分析段落", "补齐PBL证据来源链接",
+        ):
+            self.assertIn(marker, html)
+        self.assertGreaterEqual(html.count("<polyline"), 2)
+        self.assertNotIn("计划教学内容不得展示", html)
+
+    def test_fixed_sections_render_neutral_states_when_payload_is_sparse(self):
+        html = render_weekly_report({"student": {}, "week": {}, "report": {}}, {})
+        for marker in (
+            "本周学习节奏", "本周场次级出勤事实缺失或待确认",
+            "课堂里发生了什么", "实际课程内容尚未完成老师确认",
+            "任务与学业进展", "本周任务事实缺失或待同步",
+            "近期作业分数", "暂无可展示的已评分任务序列",
+            "IELTS 目标与周计划", "目标待确认", "PBL · 待确认项目",
+            "下周，我们一起这样推进", "下周行动尚未由师生确认",
+        ):
+            self.assertIn(marker, html)
+
+    def test_unconfirmed_grade_explanations_do_not_publish(self):
+        sample = json.loads(json.dumps(self.data))
+        sample["grade_series"][0]["attention_reason"] = "未经确认的低分原因"
+        sample["grade_series"][0]["attention_reason_confirmation_status"] = "待确认"
+        sample["grade_series"][0]["positive_note"] = "未经确认的鼓励文字"
+        sample["grade_series"][0]["positive_confirmation_status"] = "待确认"
+        html = run_workflow("publish", sample)["publish"]["payload"]["html"]
+        self.assertNotIn("未经确认的低分原因", html)
+        self.assertNotIn("未经确认的鼓励文字", html)
 
     def test_unconfirmed_course_interaction_and_support_do_not_publish(self):
         sample = json.loads(json.dumps(self.data))
