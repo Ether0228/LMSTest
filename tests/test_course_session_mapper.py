@@ -15,6 +15,7 @@ class CourseSessionMapperTests(unittest.TestCase):
         plan = build_course_source_write_plan([source], sessions)
         self.assertEqual(plan["session_updates"][0]["record_id"], "session1")
         self.assertEqual(plan["session_updates"][0]["fields"]["内容生成状态"], ["待生成"])
+        self.assertEqual(plan["session_updates"][0]["fields"]["内容来源链接"], "https://x/docx/doc1")
         self.assertFalse(plan["exceptions"])
 
     def test_refuses_message_time_as_lesson_date(self):
@@ -31,6 +32,13 @@ class CourseSessionMapperTests(unittest.TestCase):
         ]
         plan = build_course_source_write_plan([source], sessions)
         self.assertEqual(plan["exceptions"][0]["类型"], "学期场次无法唯一匹配")
+
+    def test_refuses_to_overwrite_a_different_existing_source(self):
+        source = {"学期": "S6", "课程编码": "MHF4U", "上课日期": "2026-09-02", "文档token": "doc1", "智能纪要URL": "https://x/docx/doc1"}
+        sessions = [{"record_id": "session1", "学期": "S6", "课程编码": "MHF4U", "上课日期": "2026-09-02", "内容来源链接": "https://x/docx/old"}]
+        plan = build_course_source_write_plan([source], sessions)
+        self.assertEqual(plan["session_updates"], [])
+        self.assertEqual(plan["exceptions"][0]["类型"], "场次已有不同内容来源")
 
 
 if __name__ == "__main__":

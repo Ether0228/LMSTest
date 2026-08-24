@@ -65,9 +65,18 @@ def build_course_source_write_plan(
             })
             continue
         session = matches[0]
+        existing_url = _text(session.get("内容来源链接"))
+        source_url = _text(source.get("智能纪要URL"))
+        if existing_url and existing_url != source_url:
+            plan["exceptions"].append({
+                "类型": "场次已有不同内容来源", "文档token": token, "学期场次record_id": str(session["record_id"]),
+                "已有来源": existing_url, "待写入来源": source_url,
+            })
+            continue
         fields = {
             "内容来源类型": ["智能纪要"],
-            "内容来源链接": {"link": source.get("智能纪要URL"), "text": "智能纪要"},
+            # 当前 Base 字段是文本，不能写入富文本 URL 对象。
+            "内容来源链接": source_url,
             "内容来源文本": source.get("正文"),
             "内容生成状态": ["待生成"],
             "内容生成异常": None,
