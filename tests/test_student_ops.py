@@ -190,6 +190,20 @@ class StudentOpsWorkflowTests(unittest.TestCase):
             self.assertEqual(html_path.read_text(encoding="utf-8"), source_html)
             self.assertTrue(pdf_path.read_bytes().startswith(b"%PDF-"))
 
+    def test_print_css_restores_a4_grids_after_mobile_media_query(self):
+        html = run_workflow("publish", self.data)["publish"]["payload"]["html"]
+        for rule in (
+            ".report-header{grid-template-columns:minmax(0,1fr) 230px",
+            ".story-grid{grid-template-columns:1.1fr 1fr 1fr",
+            ".backlog-grid{grid-template-columns:repeat(3,minmax(0,1fr))",
+            ".progress-layout{grid-template-columns:1.15fr .85fr",
+            ".dual-module{grid-template-columns:.9fr 1.25fr",
+            ".evidence{grid-template-columns:repeat(3,minmax(0,1fr))",
+            ".next-week{grid-template-columns:1fr 1.4fr",
+            ".privacy-note{margin:8px 0 0",
+        ):
+            self.assertIn(rule, html)
+
     def test_publish_is_idempotent_and_requires_key_fact_modules(self):
         first = run_workflow("publish", self.data)["publish"]["payload"]["snapshot"]
         second = run_workflow("publish", self.data)["publish"]["payload"]["snapshot"]
