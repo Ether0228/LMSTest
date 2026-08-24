@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from student_ops.publishing import render_pdf, render_weekly_html
+from student_ops.weekly_feedback_drafts import apply_feedback_record
 from student_ops.weekly_feedback_base import build_publication_fields
 
 
@@ -30,11 +31,20 @@ def main() -> int:
     parser.add_argument("--storage-dir", type=Path, required=True)
     parser.add_argument("--public-base-url", required=True, help="e.g. https://zy.queenscanada.com")
     parser.add_argument("--token", help="optional pre-generated publication token")
+    parser.add_argument("--drafts-file", type=Path, help="teacher-preview snapshot or JSON text overrides; freezes these current drafts")
     args = parser.parse_args()
     raw = json.loads(args.result.read_text(encoding="utf-8"))
     result = raw.get("result", raw)
     payload = result["weekly_payload"]["payload"]
     drafts = result["weekly_drafts"]["payload"]["drafts"]
+    if args.drafts_file:
+        override = json.loads(args.drafts_file.read_text(encoding="utf-8"))
+        if "payload" in override and "drafts" in override:
+            payload, drafts = override["payload"], override["drafts"]
+            if payload.get("反馈状态") not in ("已确认", "已发布"):
+                raise SystemExit("preview_drafts_not_confirmed")
+        else:
+            payload, drafts = apply_feedback_record(payload, drafts, override)
     blocked = [name for name, status in payload.get("data_integrity", {}).items() if status == "blocked"]
     if blocked:
         raise SystemExit(f"critical_modules_blocked:{','.join(blocked)}")
