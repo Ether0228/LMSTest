@@ -10,14 +10,27 @@ from collections.abc import Mapping
 from typing import Any
 
 
+# The Schoology course title is an official source label, but it is not the
+# teaching-system course code.  Keep this tiny, explicit normalization list
+# here as well so historic snapshots can be used after the scraper improves.
+COURSE_CODE_ALIASES = {
+    "G12 Ontario Secondary School Literacy": "OLC4O",
+}
+
+
 def _text(value: Any) -> str:
     return str(value or "").strip()
+
+
+def _course_code(value: Any) -> str:
+    text = _text(value)
+    return COURSE_CODE_ALIASES.get(text, text)
 
 
 def build_snapshot_references(snapshot: Mapping[str, Any]) -> dict[str, list[dict[str, str]]]:
     """Return sorted enrollment and grade-item reference rows without writes."""
     sections = {
-        _text(row.get("section_nid")): _text(row.get("course_code"))
+        _text(row.get("section_nid")): _course_code(row.get("course_code"))
         for row in snapshot.get("course_sections", [])
         if _text(row.get("section_nid"))
     }
@@ -34,7 +47,7 @@ def build_snapshot_references(snapshot: Mapping[str, Any]) -> dict[str, list[dic
         enrollments.append({
             "Schoology学生UID": uid,
             "Schoology学生姓名（仅供人工核对）": _text(row.get("student_name")),
-            "课程代码": _text(row.get("course_code")) or sections.get(section, ""),
+            "课程代码": _course_code(row.get("course_code")) or sections.get(section, ""),
             "SchoologySectionNID": section,
             "角色": _text(row.get("role")),
         })
