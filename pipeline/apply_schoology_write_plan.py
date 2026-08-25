@@ -17,7 +17,7 @@ from typing import Any, Iterable, Mapping
 
 
 TASK_FIELDS = frozenset({"当前提交状态", "首次提交时间", "最近提交时间"})
-GRADE_FIELDS = frozenset({"学生UID", "SectionNID", "作业NID", "所属课程任务", "学生学期任务", "得分", "满分", "老师评语", "更新时间"})
+GRADE_FIELDS = frozenset({"学生UID", "SectionNID", "作业NID", "所属课程任务", "学生学期任务", "得分", "满分", "老师评语", "更新时间", "分数变化日志"})
 
 
 def run_cli(command: list[str]) -> dict[str, Any]:

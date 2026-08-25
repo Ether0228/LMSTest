@@ -48,7 +48,7 @@ def rows_from_matrix(response: Mapping[str, Any]) -> list[dict[str, Any]]:
     return [{"record_id": record_id, **dict(zip(data["fields"], row))} for record_id, row in zip(data["record_id_list"], data["data"])]
 
 
-def list_records(*, base_token: str, table_id: str, fields: Iterable[str], identity: str, profile: str | None) -> list[dict[str, Any]]:
+def list_records(*, base_token: str, table_id: str, fields: Iterable[str], identity: str, profile: str | None, filter_json: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
     all_rows: list[dict[str, Any]] = []
     offset = 0
     # The installed CLI uses offset pagination (not ``--page-all``).  Keep
@@ -57,6 +57,8 @@ def list_records(*, base_token: str, table_id: str, fields: Iterable[str], ident
         command = ["lark-cli", "base", "+record-list", "--base-token", base_token, "--table-id", table_id, "--offset", str(offset), "--limit", "200", "--as", identity, "--format", "json"]
         for field in fields:
             command.extend(("--field-id", field))
+        if filter_json:
+            command.extend(("--filter-json", json.dumps(filter_json, ensure_ascii=False)))
         if profile:
             command.extend(("--profile", profile))
         response = run_cli(command)

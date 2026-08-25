@@ -23,6 +23,7 @@ class SchoologyAdapterTests(unittest.TestCase):
         self.assertEqual(plan["grade_updates"][0]["fields"]["得分"], 80)
         self.assertEqual(plan["grade_updates"][0]["fields"]["学生学期任务"], [{"id": "student_task_1"}])
         self.assertNotIn("分数%", plan["grade_updates"][0]["fields"])
+        self.assertIn("首次同步", plan["grade_updates"][0]["fields"]["分数变化日志"])
         self.assertEqual(plan["course_grade_observations"][0]["overall"], 82)
         self.assertFalse(plan["exceptions"])
 
@@ -40,6 +41,20 @@ class SchoologyAdapterTests(unittest.TestCase):
         plan = build_schoology_write_plan(snapshot, student_uid="u1", student_term_id="term_1", course_task_records=[], student_task_records=[], grade_records=[])
         self.assertEqual(plan["grade_updates"], [])
         self.assertEqual(plan["exceptions"][0]["类型"], "成绩未匹配课程任务")
+
+    def test_appends_log_only_when_grade_fact_changes(self):
+        snapshot = {
+            "grade_items": [{"grade_item_key": "s1:a1", "grade_item_nid": "a1"}],
+            "grade_records": [{"student_uid": "u1", "section_nid": "s1", "grade_item_key": "s1:a1", "score": 85, "max_points": 100, "comment_text": "订正完成", "observed_at": "2026-09-05T12:00:00+08:00"}],
+        }
+        course_tasks = [{"record_id": "course_task_1", "SchoologySectionNID": "s1", "Schoology作业NID": "a1"}]
+        student_tasks = [{"record_id": "student_task_1", "任务归属学生": [{"id": "term_1"}], "所属课程任务": [{"id": "course_task_1"}]}]
+        existing = [{"record_id": "grade_1", "学生UID": "u1", "SectionNID": "s1", "作业NID": "a1", "得分": 80, "满分": 100, "老师评语": "初评", "分数变化日志": "2026-09-01｜首次同步｜得分 80/100"}]
+        changed = build_schoology_write_plan(snapshot, student_uid="u1", student_term_id="term_1", course_task_records=course_tasks, student_task_records=student_tasks, grade_records=existing)
+        self.assertEqual(len(changed["grade_updates"]), 1)
+        self.assertIn("分数更新", changed["grade_updates"][0]["fields"]["分数变化日志"])
+        unchanged = build_schoology_write_plan({**snapshot, "grade_records": [{**snapshot["grade_records"][0], "score": 80, "comment_text": "初评"}]}, student_uid="u1", student_term_id="term_1", course_task_records=course_tasks, student_task_records=student_tasks, grade_records=existing)
+        self.assertEqual(unchanged["grade_updates"], [])
 
 
 if __name__ == "__main__":
