@@ -2,6 +2,7 @@
 interactive_web/.env
 schoology数据转飞书/.env
 .env
+pipeline/.env.weekly_feedback
 
 # 磁盘缓存（由 pipeline 写入，不纳入版本管理）
 interactive_web/cache/

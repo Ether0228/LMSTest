@@ -28,6 +28,32 @@ sudo systemctl reload nginx
 
 4. 由运行账户确认 `python3`、`lark-cli`、Chrome/Chromium 均可执行，且已登录被授权的 Lark profile。使用 `lark-cli auth status --profile <profile>` 检查身份，不输出凭据。
 
+## DeepSeek AI 配置
+
+周反馈的 AI 适配器是 OpenAI-compatible Chat Completions 客户端，因此无需为 DeepSeek 新增 SDK 或改动工作流。服务器私有环境文件填写：
+
+```bash
+AI_API_KEY=<在此粘贴 DeepSeek API Key>
+AI_BASE_URL=https://api.deepseek.com
+AI_MODEL=deepseek-v4-flash
+```
+
+本机已准备`pipeline/.env.weekly_feedback`（被 Git 忽略）。填写 Key 后，以如下方式仅对当前 shell 导入，再运行 live 模式：
+
+```bash
+set -a
+source pipeline/.env.weekly_feedback
+set +a
+python3 pipeline/run_student_ops.py --workflow session_content \
+  --fixture <真实周输入JSON> --output-dir var/ai-smoke-test --ai-mode live
+```
+
+该 smoke test 只生成本地候选工件，不写 Base；通过后才按“单学生单周运行顺序”写入草稿。DeepSeek 的 OpenAI-compatible base URL 和当前模型名以其官方文档为准。
+
+## Schoology 只读探测
+
+仓库已有`Schoology Master Pipeline`，其按计划运行时会写入旧的学业运营 Base；不要用它测试周反馈来源。新建的`Schoology Read-only Process Probe`只读取 GitHub Secrets 中的`SCHOOLOGY_COOKIES`和`SCHOOLOGY_SECTION_NIDS`，不传递飞书或 PostgreSQL 凭据，不会写入外部系统。它会打印匿名化的课程与计数摘要，并上传仅保留 1 天的私有原始快照供稳定 ID/任务映射审核。
+
 ## Schoology 稳定 ID 的一次性补录
 
 在首次同步前，以实际 Schoology 后台显示的数字 ID 人工填写模板；不要用姓名或标题做自动匹配。导出和首次核对均不写 Base：
