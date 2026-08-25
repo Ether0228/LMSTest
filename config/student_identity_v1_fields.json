@@ -1,0 +1,7 @@
+[
+  {
+    "type": "text",
+    "name": "Schoology学生UID",
+    "description": "【自动化身份字段】Schoology学生UID的稳定映射；由经核对的学生身份同步写入，不按姓名猜测。"
+  }
+]

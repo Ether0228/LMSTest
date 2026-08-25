@@ -1,0 +1,93 @@
+name: Student Learning Operations Fixtures
+
+on:
+  push:
+    branches:
+      - codex/workflow-pipeline
+  workflow_dispatch:
+    inputs:
+      workflow:
+        description: "要运行的离线workflow"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - session_content
+          - course_weekly
+          - participation
+          - tasks
+          - grades
+          - ielts
+          - pbl
+          - weekly_payload
+          - weekly_drafts
+          - publish
+
+permissions:
+  contents: read
+
+jobs:
+  fixture-matrix:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        workflow: [session_content, course_weekly, participation, tasks, grades, ielts, pbl, weekly_payload, weekly_drafts, publish, all]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - uses: browser-actions/setup-chrome@v1
+      - name: Install Chinese fonts for PDF rendering
+        run: sudo apt-get update && sudo apt-get install -y fonts-noto-cjk
+      - name: Run offline unit tests
+        run: python -m unittest discover -s tests -v
+      - name: Run fixture workflow in dry-run mode
+        run: >-
+          python pipeline/run_student_ops.py
+          --workflow "${{ matrix.workflow }}"
+          --fixture tests/fixtures/student_ops/week_v1.json
+          --output-dir artifacts/student_ops
+          --ai-mode fixture
+          --dry-run
+      - name: Upload auditable artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: student-ops-${{ matrix.workflow }}-${{ github.run_id }}
+          path: artifacts/student_ops
+          if-no-files-found: warn
+
+  fixture-manual:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - uses: browser-actions/setup-chrome@v1
+      - name: Install Chinese fonts for PDF rendering
+        run: sudo apt-get update && sudo apt-get install -y fonts-noto-cjk
+      - name: Run offline unit tests
+        run: python -m unittest discover -s tests -v
+      - name: Run selected fixture workflow in dry-run mode
+        run: >-
+          python pipeline/run_student_ops.py
+          --workflow "${{ inputs.workflow }}"
+          --fixture tests/fixtures/student_ops/week_v1.json
+          --output-dir artifacts/student_ops
+          --ai-mode fixture
+          --dry-run
+      - name: Upload auditable artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: student-ops-${{ inputs.workflow }}-${{ github.run_id }}
+          path: artifacts/student_ops
+          if-no-files-found: warn

@@ -1,0 +1,48 @@
+name: Schoology Read-only Process Probe
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Install read-only probe dependencies
+        run: pip install requests
+      - name: Crawl current Schoology sections without external writes
+        env:
+          SCHOOLOGY_COOKIES: ${{ secrets.SCHOOLOGY_COOKIES }}
+          SCHOOLOGY_SECTION_NIDS: ${{ secrets.SCHOOLOGY_SECTION_NIDS }}
+          CACHE_TENANT_KEY: schoology-probe
+          # Deliberately do not pass FEISHU_* or DATABASE_URL.
+        run: python pipeline/schoology_process_pipeline.py
+      - name: Print non-identifying source summary
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('outputs/schoology_process/latest.json').read_text(encoding='utf-8'))
+          print(json.dumps({
+              'metrics': data.get('metrics', {}),
+              'sections': [
+                  {'course_code': x.get('course_code'), 'section_nid': x.get('section_nid')}
+                  for x in data.get('course_sections', [])
+              ],
+          }, ensure_ascii=False, indent=2))
+          PY
+      - name: Upload private raw snapshot for mapping review
+        uses: actions/upload-artifact@v4
+        with:
+          name: schoology-process-probe-${{ github.run_id }}
+          path: outputs/schoology_process/latest.json
+          retention-days: 1
+          if-no-files-found: error

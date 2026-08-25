@@ -1,0 +1,85 @@
+[
+  {
+    "type": "select",
+    "name": "当前提交状态",
+    "multiple": false,
+    "options": [
+      { "name": "未提交", "hue": "Red", "lightness": "Light" },
+      { "name": "已提交", "hue": "Blue", "lightness": "Lighter" },
+      { "name": "已重新提交", "hue": "Turquoise", "lightness": "Lighter" }
+    ],
+    "description": "【自动化事实字段】来自Schoology或已关联学生提交记录；提交不等于任务已通过。"
+  },
+  {
+    "type": "datetime",
+    "name": "首次提交时间",
+    "style": { "format": "yyyy/MM/dd HH:mm" },
+    "description": "【自动化事实字段】首次观察到该学生提交本任务的时间。"
+  },
+  {
+    "type": "datetime",
+    "name": "最近提交时间",
+    "style": { "format": "yyyy/MM/dd HH:mm" },
+    "description": "【自动化事实字段】最近一次提交或重交的时间。"
+  },
+  {
+    "type": "select",
+    "name": "检查状态",
+    "multiple": false,
+    "options": [
+      { "name": "待确认", "hue": "Orange", "lightness": "Lighter" },
+      { "name": "已通过", "hue": "Green", "lightness": "Lighter" },
+      { "name": "需返工", "hue": "Red", "lightness": "Light" },
+      { "name": "已返工待确认", "hue": "Wathet", "lightness": "Lighter" }
+    ],
+    "description": "【老师确认事实】老师检查结果；AI、学生自报或提交本身不得写成已通过。"
+  },
+  {
+    "type": "datetime",
+    "name": "补做Deadline",
+    "style": { "format": "yyyy/MM/dd HH:mm" },
+    "description": "【老师确认事实】个体补做安排；不覆盖原始截止日期。"
+  },
+  {
+    "type": "datetime",
+    "name": "返工Deadline",
+    "style": { "format": "yyyy/MM/dd HH:mm" },
+    "description": "【老师确认事实】返工安排；仅在检查状态为需返工时参与当前有效Deadline计算。"
+  },
+  {
+    "type": "datetime",
+    "name": "当前有效Deadline",
+    "style": { "format": "yyyy/MM/dd HH:mm" },
+    "description": "【自动化计算字段】按返工Deadline→补做Deadline→原始截止日期生成；服务器可重算，不覆盖原始截止日期。"
+  },
+  {
+    "type": "select",
+    "name": "Backlog状态",
+    "multiple": false,
+    "options": [
+      { "name": "正常", "hue": "Green", "lightness": "Lighter" },
+      { "name": "未提交", "hue": "Orange", "lightness": "Lighter" },
+      { "name": "缺交积压", "hue": "Red", "lightness": "Light" },
+      { "name": "返工积压", "hue": "Carmine", "lightness": "Lighter" }
+    ],
+    "description": "【自动化计算字段】根据有效Deadline、提交状态和检查状态计算；不是对学生的评价。"
+  },
+  {
+    "type": "number",
+    "name": "积压天数",
+    "style": { "type": "plain", "precision": 0, "percentage": false, "thousands_separator": false },
+    "description": "【自动化计算字段】仅在缺交积压或返工积压时计算，其他情况为0。"
+  },
+  {
+    "type": "select",
+    "name": "当前任务状态",
+    "multiple": false,
+    "options": [
+      { "name": "未完成", "hue": "Orange", "lightness": "Lighter" },
+      { "name": "待确认", "hue": "Wathet", "lightness": "Lighter" },
+      { "name": "需返工", "hue": "Red", "lightness": "Light" },
+      { "name": "已完成", "hue": "Green", "lightness": "Lighter" }
+    ],
+    "description": "【自动化展示字段】根据提交与检查事实计算；正式完成仍以老师确认的检查状态为准。"
+  }
+]
