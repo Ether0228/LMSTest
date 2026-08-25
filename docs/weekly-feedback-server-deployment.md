@@ -54,6 +54,17 @@ python3 pipeline/run_student_ops.py --workflow session_content \
 
 仓库已有`Schoology Master Pipeline`，其按计划运行时会写入旧的学业运营 Base；不要用它测试周反馈来源。新建的`Schoology Read-only Process Probe`只读取 GitHub Secrets 中的`SCHOOLOGY_COOKIES`和`SCHOOLOGY_SECTION_NIDS`，不传递飞书或 PostgreSQL 凭据，不会写入外部系统。它会打印匿名化的课程与计数摘要，并上传仅保留 1 天的私有原始快照供稳定 ID/任务映射审核。
 
+下载 Probe 的`latest.json`后，生成两类私有核对表：`schoology_enrollment_reference.csv`含 UID、课程和 Schoology 姓名供人工查阅；`schoology_course_task_candidates.csv`含本学期真实的 SectionNID、作业 NID 与标题。它们不会自动按姓名配对，也不会写 Base：
+
+```bash
+python3 pipeline/export_schoology_mapping_template.py \
+  --base-token <BaseToken> --output-dir var/schoology-mapping \
+  --schoology-snapshot <probe下载的latest.json> \
+  --as "$LARK_IDENTITY" --profile "$LARK_PROFILE"
+```
+
+运营人员在核对后，才将 UID 填到`schoology_students_mapping.csv`，并将已确认要纳入周反馈的真实任务建立/映射到`学期课程任务`；模拟任务不可直接当作真实 Schoology 任务写入。
+
 ## Schoology 稳定 ID 的一次性补录
 
 在首次同步前，以实际 Schoology 后台显示的数字 ID 人工填写模板；不要用姓名或标题做自动匹配。导出和首次核对均不写 Base：
