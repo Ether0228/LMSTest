@@ -38,6 +38,39 @@ def _course_task_key(record: Mapping[str, Any]) -> tuple[str, str] | None:
     return (section, assignment) if section and assignment else None
 
 
+def _same(left: Any, right: Any) -> bool:
+    """Compare Base scalars without treating ``80`` and ``80.0`` as a change."""
+    left, right = _scalar(left), _scalar(right)
+    if left is None or right is None:
+        return left is right
+    try:
+        return float(left) == float(right)
+    except (TypeError, ValueError):
+        return str(left).strip() == str(right).strip()
+
+
+def _change_log(existing: Mapping[str, Any] | None, grade: Mapping[str, Any]) -> tuple[str, str] | None:
+    """Return an append-only, human-readable grade observation when facts changed."""
+    score, maximum, comment = grade.get("score"), grade.get("max_points"), grade.get("comment_text")
+    observed = str(grade.get("observed_at") or "未知同步时间")
+    if not existing:
+        kind = "首次同步"
+    else:
+        changed_score = not _same(existing.get("得分"), score) or not _same(existing.get("满分"), maximum)
+        changed_comment = not _same(existing.get("老师评语"), comment)
+        if not changed_score and not changed_comment:
+            return None
+        kind = "分数更新" if changed_score else "老师评语更新"
+    score_text = "得分未提供" if score is None else f"得分 {score}/{maximum if maximum is not None else '满分未提供'}"
+    comment_text = f"；评语：{str(comment).strip()}" if comment not in (None, "") else ""
+    return kind, f"{observed}｜{kind}｜{score_text}{comment_text}"
+
+
+def _append_log(existing: Mapping[str, Any] | None, line: str) -> str:
+    before = str(_scalar((existing or {}).get("分数变化日志")) or "").strip()
+    return f"{before}\n{line}" if before else line
+
+
 def build_schoology_write_plan(
     snapshot: Mapping[str, Any],
     *,
@@ -110,6 +143,13 @@ def build_schoology_write_plan(
             plan["exceptions"].append({"类型": "成绩未匹配学生任务", "student_term_id": student_term_id, "课程任务record_id": course_task["record_id"], "SectionNID": section, "作业NID": assignment})
             continue
         key = (student_uid, section, assignment)
+        old = existing_grades.get(key)
+        change = _change_log(old, grade)
+        # Re-reading the same Schoology fact is intentionally a no-op.  This
+        # preserves a factual change history instead of turning every crawl
+        # into a fake score change.
+        if not change:
+            continue
         fields = {
             "学生UID": student_uid,
             "SectionNID": section,
@@ -120,11 +160,10 @@ def build_schoology_write_plan(
             "满分": grade.get("max_points"),
             "老师评语": grade.get("comment_text"),
             "更新时间": grade.get("observed_at"),
+            "分数变化日志": _append_log(old, change[1]),
         }
-        old = existing_grades.get(key)
         plan["grade_updates"].append({"record_id": old.get("record_id") if old else None, "fields": {name: value for name, value in fields.items() if value is not None}})
-        if not old or _scalar(old.get("得分")) != grade.get("score") or _scalar(old.get("老师评语")) != grade.get("comment_text"):
-            plan["grade_events"].append({"student_uid": student_uid, "SectionNID": section, "作业NID": assignment, "类型": "首次评分" if not old else "成绩或评语变化", "observed_at": grade.get("observed_at")})
+        plan["grade_events"].append({"student_uid": student_uid, "SectionNID": section, "作业NID": assignment, "类型": change[0], "observed_at": grade.get("observed_at")})
         if grade.get("overall_course_grade") is not None:
             plan["course_grade_observations"].append({"student_term_id": student_term_id, "SectionNID": section, "overall": grade["overall_course_grade"], "observed_at": grade.get("observed_at")})
     return plan
