@@ -20,6 +20,12 @@ class WeeklyFeedbackReadinessTests(unittest.TestCase):
         result = assess_readiness(env=env, students=[{"Schoology学生UID": "u1"}], course_tasks=[{"SchoologySectionNID": "s1", "Schoology作业NID": "a1"}], term_sessions=[{"上课日期": "2026-09-02", "内容确认状态": ["已确认"]}], as_of="2026-09-03")
         self.assertTrue(result["ready_for_real_e2e"])
 
+    def test_accepts_verified_snapshot_when_local_schoology_cookie_is_absent(self):
+        env = {name: True for name in ("AI_API_KEY", "AI_BASE_URL", "AI_MODEL", "SCHOOLOGY_SNAPSHOT")}
+        result = assess_readiness(env=env, students=[{"Schoology学生UID": "u1"}], course_tasks=[{"SchoologySectionNID": "s1", "Schoology作业NID": "a1"}], term_sessions=[{"上课日期": "2026-09-02", "内容确认状态": ["已确认"]}], as_of="2026-09-03")
+        self.assertTrue(result["gates"]["schoology_runtime"])
+        self.assertTrue(result["ready_for_real_e2e"])
+
 
 if __name__ == "__main__":
     unittest.main()

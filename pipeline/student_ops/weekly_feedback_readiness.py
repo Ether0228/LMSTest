@@ -23,7 +23,10 @@ def assess_readiness(*, env: Mapping[str, bool], students: Iterable[Mapping[str,
     confirmed = sum(_text(row, "内容确认状态") == "已确认" for row in ended)
     gates = {
         "live_ai": all(env.get(name, False) for name in ("AI_API_KEY", "AI_BASE_URL", "AI_MODEL")),
-        "schoology_runtime": bool(env.get("SCHOOLOGY_COOKIES")) and bool(env.get("SCHOOLOGY_SECTION_NIDS") or env.get("SCHOOLOGY_SECTION_NID")),
+        "schoology_runtime": (
+            bool(env.get("SCHOOLOGY_COOKIES"))
+            and bool(env.get("SCHOOLOGY_SECTION_NIDS") or env.get("SCHOOLOGY_SECTION_NID"))
+        ) or bool(env.get("SCHOOLOGY_SNAPSHOT")),
         "schoology_student_uid": student_uid > 0,
         "schoology_course_mapping": section_ids > 0 and assignment_ids > 0,
         "ended_confirmed_course_content": confirmed > 0,

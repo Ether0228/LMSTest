@@ -49,6 +49,7 @@ DEFAULT_COURSE_MAPPING = {
     "grade 12 canadian and world issues": "CGW4U",
     "grade 12 business leadership": "BOH4M",
     "g12 analysing current economic issues": "CIA4U",
+    "g12 ontario secondary school literacy": "OLC4O",
     "g12 international business fundamentals": "BBB4M",
     "grade 12 simplified chinese": "LKBDU",
     "grade 11 biology": "SBI3U",
