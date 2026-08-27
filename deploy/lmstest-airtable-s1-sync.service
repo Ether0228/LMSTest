@@ -1,0 +1,7 @@
+[Unit]
+Description=LMSTest Airtable S1 enrolment sync
+
+[Service]
+Type=oneshot
+User=lmstest
+ExecStart=/srv/lmstest/deploy/run-airtable-s1-sync.sh
