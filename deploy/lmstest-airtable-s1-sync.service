@@ -3,5 +3,8 @@ Description=LMSTest Airtable S1 enrolment sync
 
 [Service]
 Type=oneshot
-User=lmstest
+# V1 uses the authorized Lark user profile created from the BT root terminal.
+# Keep the environment explicit so the timer uses the same profile location.
+User=root
+Environment=HOME=/root
 ExecStart=/srv/lmstest/deploy/run-airtable-s1-sync.sh
