@@ -168,9 +168,8 @@ class LarkBaseClient:
         return deleted
 
 
-def build_source_enrolment(*, airtable_students: list[dict[str, Any]], s1_rows: list[dict[str, Any]], name_field: str, oen_field: str, campus_field: str, s1_name_field: str, s1_students_field: str, period_field: str) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]]]:
+def build_roster_profiles(*, airtable_students: list[dict[str, Any]], name_field: str, oen_field: str, campus_field: str) -> dict[str, dict[str, Any]]:
     students = {}
-    exceptions: list[dict[str, Any]] = []
     for row in airtable_students:
         fields = row.get("fields", {})
         oen = scalar(fields.get(oen_field))
@@ -184,6 +183,13 @@ def build_source_enrolment(*, airtable_students: list[dict[str, Any]], s1_rows: 
                 "email": scalar(fields.get("Email")),
                 "start_date": start_date_value(fields.get("Starting Date")),
             }
+    return {profile["oen"]: profile for profile in students.values()}
+
+
+def build_source_enrolment(*, airtable_students: list[dict[str, Any]], s1_rows: list[dict[str, Any]], name_field: str, oen_field: str, campus_field: str, s1_name_field: str, s1_students_field: str, period_field: str) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]]]:
+    students_by_oen = build_roster_profiles(airtable_students=airtable_students, name_field=name_field, oen_field=oen_field, campus_field=campus_field)
+    students = {row["id"]: students_by_oen.get(scalar(row.get("fields", {}).get(oen_field))) for row in airtable_students}
+    exceptions: list[dict[str, Any]] = []
     enrolment: dict[str, dict[str, Any]] = {}
     for row in s1_rows:
         fields = row.get("fields", {})
@@ -243,6 +249,7 @@ def main() -> int:
     airtable_students = source.list_records(args.airtable_student_table_id, (name_field, oen_field, campus_field, "Email", "Starting Date"))
     print("[预演] 正在读取 Airtable S1 选课…", file=sys.stderr, flush=True)
     s1_rows = source.list_records(args.airtable_s1_table_id, (s1_name, s1_students, s1_period))
+    roster_profiles = build_roster_profiles(airtable_students=airtable_students, name_field=name_field, oen_field=oen_field, campus_field=campus_field)
     enrolment, exceptions = build_source_enrolment(
         airtable_students=airtable_students,
         s1_rows=s1_rows,
@@ -266,7 +273,7 @@ def main() -> int:
             masters_by_oen = {scalar(row.get("OEN")): row for row in masters if scalar(row.get("OEN"))}
 
     profile_updates = []
-    for oen, person in enrolment.items():
+    for oen, person in roster_profiles.items():
         master = masters_by_oen.get(oen)
         if not master:
             continue
@@ -393,6 +400,7 @@ def main() -> int:
     plan = {
         "dry_run": not args.apply,
         "来源选课学生": len(enrolment),
+        "来源学生主档资料": len(roster_profiles),
         "待建学生主档": [{"OEN": oen, "学生姓名": enrolment[oen]["name"], "校区": enrolment[oen].get("campus")} for oen in new_oens],
         "新增学生主档": len(new_oens),
         "待补全学生主档资料": len(profile_updates),
