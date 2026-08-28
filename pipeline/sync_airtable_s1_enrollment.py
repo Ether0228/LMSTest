@@ -256,7 +256,7 @@ def main() -> int:
             term_by_master[link_id(term["学生姓名"])] = term
     term_creates, term_updates, retirements = [], [], []
     pending_terms_after_master_create: list[dict[str, Any]] = []
-    today = date.today().isoformat()
+    today = date.today()
     for oen, person in enrolment.items():
         master = masters_by_oen.get(oen)
         if not master:
@@ -280,7 +280,7 @@ def main() -> int:
             continue
         changes = {key: value for key, value in desired.items() if (scalar(current.get(key)) != scalar(value))}
         if changes:
-            changes["追踪日志"] = append_log(current.get("追踪日志"), f"{today}｜Airtable S1选课同步｜校区/T1/T2按来源更新")
+            changes["追踪日志"] = append_log(current.get("追踪日志"), f"{today.isoformat()}｜Airtable S1选课同步｜校区/T1/T2按来源更新")
             term_updates.append({
                 "OEN": oen,
                 "record_id": current["record_id"],
