@@ -207,12 +207,17 @@ def main() -> int:
     lark = LarkBaseClient(args.base_token, args.profile, args.identity)
     name_field, oen_field, campus_field = "Names ONLY", "OEN", "Campus"
     s1_name, s1_students, s1_period = "Name", "Student Name", "Period (bejing)"
+    print("[预演] 正在读取 Airtable 学生名册…", file=sys.stderr, flush=True)
+    airtable_students = source.list_records(args.airtable_student_table_id, (name_field, oen_field, campus_field))
+    print("[预演] 正在读取 Airtable S1 选课…", file=sys.stderr, flush=True)
+    s1_rows = source.list_records(args.airtable_s1_table_id, (s1_name, s1_students, s1_period))
     enrolment, exceptions = build_source_enrolment(
-        airtable_students=source.list_records(args.airtable_student_table_id, (name_field, oen_field, campus_field)),
-        s1_rows=source.list_records(args.airtable_s1_table_id, (s1_name, s1_students, s1_period)),
+        airtable_students=airtable_students,
+        s1_rows=s1_rows,
         name_field=name_field, oen_field=oen_field, campus_field=campus_field,
         s1_name_field=s1_name, s1_students_field=s1_students, period_field=s1_period,
     )
+    print("[预演] 正在读取飞书学生主档…", file=sys.stderr, flush=True)
     masters = lark.list_records(BASE_TABLES["学生主档"], ["学生姓名", "OEN"])
     masters_by_oen = {scalar(row.get("OEN")): row for row in masters if scalar(row.get("OEN"))}
     new_oens = sorted(set(enrolment) - set(masters_by_oen))
@@ -224,6 +229,7 @@ def main() -> int:
             masters = lark.list_records(BASE_TABLES["学生主档"], ["学生姓名", "OEN"])
             masters_by_oen = {scalar(row.get("OEN")): row for row in masters if scalar(row.get("OEN"))}
 
+    print("[预演] 正在读取飞书学生学期…", file=sys.stderr, flush=True)
     terms = lark.list_records(BASE_TABLES["学生学期"], ["学生姓名", "学年学期", "校区", "T1", "T2", "T1分组", "T2分组", "追踪日志"])
     term_by_master = {}
     for term in terms:
