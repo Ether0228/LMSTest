@@ -236,10 +236,17 @@ def main() -> int:
         if link_id(term.get("学年学期")) == args.semester_record_id and link_id(term.get("学生姓名")):
             term_by_master[link_id(term["学生姓名"])] = term
     term_creates, term_updates, retirements = [], [], []
+    pending_terms_after_master_create: list[dict[str, Any]] = []
     today = date.today().isoformat()
     for oen, person in enrolment.items():
         master = masters_by_oen.get(oen)
         if not master:
+            # In a dry run, a source-only OEN is expected: --apply first
+            # creates the master and then creates its term record.  Report it
+            # as a planned chain, not an error.
+            if not args.apply and oen in new_oens:
+                pending_terms_after_master_create.append({"OEN": oen, "学生姓名": person["name"]})
+                continue
             exceptions.append({"类型": "主档创建后仍无法定位", "OEN": oen})
             continue
         current = term_by_master.get(master["record_id"])
@@ -292,7 +299,17 @@ def main() -> int:
     else:
         created_sessions = 0
 
-    plan = {"dry_run": not args.apply, "来源选课学生": len(enrolment), "新增学生主档": len(new_oens), "新增学生学期": len(term_creates), "更新学生学期": len(term_updates), "新增学生场次": created_sessions if args.apply else "apply后计算", "退课候选": retirements, "异常": exceptions}
+    plan = {
+        "dry_run": not args.apply,
+        "来源选课学生": len(enrolment),
+        "待建学生主档": [{"OEN": oen, "学生姓名": enrolment[oen]["name"], "校区": enrolment[oen].get("campus")} for oen in new_oens],
+        "新增学生主档": len(new_oens),
+        "新增学生学期": len(term_creates) + len(pending_terms_after_master_create),
+        "更新学生学期": len(term_updates),
+        "新增学生场次": created_sessions if args.apply else "apply后按新增或变更的学生学期计算",
+        "退课候选": retirements,
+        "异常": exceptions,
+    }
     print(json.dumps(plan, ensure_ascii=False))
     return 0
 
