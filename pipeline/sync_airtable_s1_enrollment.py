@@ -70,6 +70,16 @@ def append_log(existing: Any, line: str) -> str:
     return f"{prior}\n{line}" if prior else line
 
 
+def local_date(value: Any) -> date | None:
+    text = scalar(value)
+    if not text:
+        return None
+    try:
+        return date.fromisoformat(text[:10])
+    except ValueError:
+        return None
+
+
 class AirtableClient:
     def __init__(self, token: str, base_id: str):
         self.token, self.base_id = token, base_id
@@ -142,6 +152,15 @@ class LarkBaseClient:
                 raise RuntimeError(f"unexpected_batch_create_count:{count}:{len(chunk)}")
             created += count
         return created
+
+    def delete(self, table_id: str, record_ids: list[str]) -> int:
+        deleted = 0
+        for index in range(0, len(record_ids), 200):
+            chunk = record_ids[index:index + 200]
+            self._run(["+record-delete", "--base-token", self.base_token, "--table-id", table_id,
+                       "--json", json.dumps({"record_id_list": chunk}), "--yes"])
+            deleted += len(chunk)
+        return deleted
 
 
 def build_source_enrolment(*, airtable_students: list[dict[str, Any]], s1_rows: list[dict[str, Any]], name_field: str, oen_field: str, campus_field: str, s1_name_field: str, s1_students_field: str, period_field: str) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]]]:
@@ -262,7 +281,12 @@ def main() -> int:
         changes = {key: value for key, value in desired.items() if (scalar(current.get(key)) != scalar(value))}
         if changes:
             changes["追踪日志"] = append_log(current.get("追踪日志"), f"{today}｜Airtable S1选课同步｜校区/T1/T2按来源更新")
-            term_updates.append({"OEN": oen, "record_id": current["record_id"], "fields": changes})
+            term_updates.append({
+                "OEN": oen,
+                "record_id": current["record_id"],
+                "fields": changes,
+                "旧课程": {course for course in (scalar(current.get("T1")), scalar(current.get("T2"))) if course},
+            })
     active_master_ids = {row["record_id"] for row in masters_by_oen.values()}
     source_oens = set(enrolment)
     for term in terms:
@@ -279,24 +303,49 @@ def main() -> int:
         terms = lark.list_records(BASE_TABLES["学生学期"], ["学生姓名", "学年学期", "校区", "T1", "T2", "T1分组", "T2分组"])
         term_by_master = {link_id(term.get("学生姓名")): term for term in terms if link_id(term.get("学年学期")) == args.semester_record_id}
 
+    # Reconcile only student records whose S1 selection changed.  Existing
+    # sessions are never inferred away: only links to a previous course, with
+    # a verified future date, are eligible for removal.
     session_creates: list[dict[str, Any]] = []
+    future_session_deletes: list[str] = []
     session_target_oens = {item["OEN"] for item in term_creates + term_updates}
-    if args.apply and session_target_oens:
-        term_sessions = lark.list_records(BASE_TABLES["学期场次"], ["学期", "课程编码", "教学覆盖学生"])
+    if session_target_oens and (args.apply or term_updates):
+        print("[预演] 正在核对受影响学生的未来场次…", file=sys.stderr, flush=True)
+        term_sessions = lark.list_records(BASE_TABLES["学期场次"], ["学期", "课程编码", "教学覆盖学生", "上课日期"])
+        session_by_id = {row["record_id"]: row for row in term_sessions}
+        old_courses_by_oen = {item["OEN"]: item.get("旧课程", set()) for item in term_updates}
         for oen in session_target_oens:
             master = masters_by_oen.get(oen)
             term = term_by_master.get(master["record_id"]) if master else None
             if not term:
+                # Dry runs cannot get a record ID for a master that will only
+                # exist after apply. Its sessions are reported as post-create.
                 continue
             planned = session_candidates({"semester_id": args.semester_record_id, "T1": scalar(term.get("T1")), "T2": scalar(term.get("T2")), "T1分组": scalar(term.get("T1分组")), "T2分组": scalar(term.get("T2分组"))}, term_sessions)
-            existing = lark.list_records(BASE_TABLES["学生场次"], ["学生学期", "学期场次"], {"logic": "and", "conditions": [["学生学期", "intersects", [{"id": term["record_id"]}]]]})
-            existing_pairs = {(link_id(row.get("学生学期")), link_id(row.get("学期场次"))) for row in existing}
+            planned_ids = {row["record_id"] for row in planned}
+            existing = lark.list_records(BASE_TABLES["学生场次"], ["学生学期", "学期场次", "上课日期"], {"logic": "and", "conditions": [["学生学期", "intersects", [{"id": term["record_id"]}]]]})
+            existing_ids = {link_id(row.get("学期场次")) for row in existing}
             for session in planned:
-                pair = (term["record_id"], session["record_id"])
-                if pair not in existing_pairs:
-                    session_creates.append({"学生场次唯一键": f"{pair[0]}|{pair[1]}", "学生学期": [{"id": pair[0]}], "学期场次": [{"id": pair[1]}]})
-        created_sessions = lark.batch_create(BASE_TABLES["学生场次"], session_creates) if session_creates else 0
+                if session["record_id"] not in existing_ids:
+                    session_creates.append({"学生场次唯一键": f"{term['record_id']}|{session['record_id']}", "学生学期": [{"id": term["record_id"]}], "学期场次": [{"id": session["record_id"]}]})
+            for student_session in existing:
+                linked_id = link_id(student_session.get("学期场次"))
+                upstream = session_by_id.get(linked_id or "")
+                course = scalar(upstream.get("课程编码")) if upstream else None
+                occurs_on = local_date(student_session.get("上课日期")) or (local_date(upstream.get("上课日期")) if upstream else None)
+                if (linked_id not in planned_ids and course in old_courses_by_oen.get(oen, set())
+                        and occurs_on and occurs_on > today):
+                    future_session_deletes.append(student_session["record_id"])
+        if args.apply:
+            # Deleting only the precomputed future links first avoids a student
+            # appearing in both old and new courses after a schedule change.
+            deleted_sessions = lark.delete(BASE_TABLES["学生场次"], future_session_deletes) if future_session_deletes else 0
+            created_sessions = lark.batch_create(BASE_TABLES["学生场次"], session_creates) if session_creates else 0
+        else:
+            deleted_sessions = 0
+            created_sessions = 0
     else:
+        deleted_sessions = 0
         created_sessions = 0
 
     plan = {
@@ -306,7 +355,8 @@ def main() -> int:
         "新增学生主档": len(new_oens),
         "新增学生学期": len(term_creates) + len(pending_terms_after_master_create),
         "更新学生学期": len(term_updates),
-        "新增学生场次": created_sessions if args.apply else "apply后按新增或变更的学生学期计算",
+        "待删除未来学生场次": deleted_sessions if args.apply else len(future_session_deletes),
+        "待新增未来学生场次": created_sessions if args.apply else len(session_creates),
         "退课候选": retirements,
         "异常": exceptions,
     }
