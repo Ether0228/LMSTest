@@ -314,6 +314,7 @@ def main() -> int:
         term_sessions = lark.list_records(BASE_TABLES["学期场次"], ["学期", "课程编码", "教学覆盖学生", "上课日期"])
         session_by_id = {row["record_id"]: row for row in term_sessions}
         old_courses_by_oen = {item["OEN"]: item.get("旧课程", set()) for item in term_updates}
+        updates_by_oen = {item["OEN"]: item for item in term_updates}
         for oen in session_target_oens:
             master = masters_by_oen.get(oen)
             term = term_by_master.get(master["record_id"]) if master else None
@@ -321,7 +322,13 @@ def main() -> int:
                 # Dry runs cannot get a record ID for a master that will only
                 # exist after apply. Its sessions are reported as post-create.
                 continue
-            planned = session_candidates({"semester_id": args.semester_record_id, "T1": scalar(term.get("T1")), "T2": scalar(term.get("T2")), "T1分组": scalar(term.get("T1分组")), "T2分组": scalar(term.get("T2分组"))}, term_sessions)
+            effective_term = dict(term)
+            # --apply has already re-read the updated record.  During dry-run,
+            # merge the planned T1/T2/campus update so session reconciliation
+            # previews the destination schedule rather than the old one.
+            if not args.apply and oen in updates_by_oen:
+                effective_term.update(updates_by_oen[oen]["fields"])
+            planned = session_candidates({"semester_id": args.semester_record_id, "T1": scalar(effective_term.get("T1")), "T2": scalar(effective_term.get("T2")), "T1分组": scalar(effective_term.get("T1分组")), "T2分组": scalar(effective_term.get("T2分组"))}, term_sessions)
             planned_ids = {row["record_id"] for row in planned}
             existing = lark.list_records(BASE_TABLES["学生场次"], ["学生学期", "学期场次", "上课日期"], {"logic": "and", "conditions": [["学生学期", "intersects", [{"id": term["record_id"]}]]]})
             existing_ids = {link_id(row.get("学期场次")) for row in existing}
