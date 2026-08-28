@@ -21,7 +21,7 @@ class AirtableS1EnrolmentSyncTests(unittest.TestCase):
             s1_name_field="Name", s1_students_field="Student Name", period_field="Period (bejing)",
         )
         self.assertEqual(exceptions, [])
-        self.assertEqual(enrolment["111"], {"name": "Student A", "oen": "111", "campus": "上海", "T1": "ENG4U", "T2": "MHF4U"})
+        self.assertEqual(enrolment["111"], {"name": "Student A", "pinyin": "Student A", "oen": "111", "campus": "上海", "email": None, "start_date": None, "T1": "ENG4U", "T2": "MHF4U"})
 
     def test_refuses_two_courses_in_one_slot(self):
         students = [{"id": "at-student", "fields": {"Names ONLY": "Student A", "OEN": "111", "Campus": ["北京"]}}]

@@ -74,6 +74,11 @@ def local_date(value: Any) -> date | None:
     text = scalar(value)
     if not text:
         return None
+
+
+def start_date_value(value: Any) -> str | None:
+    parsed = local_date(value)
+    return f"{parsed.isoformat()} 00:00" if parsed else None
     try:
         return date.fromisoformat(text[:10])
     except ValueError:
@@ -170,7 +175,15 @@ def build_source_enrolment(*, airtable_students: list[dict[str, Any]], s1_rows: 
         fields = row.get("fields", {})
         oen = scalar(fields.get(oen_field))
         if oen:
-            students[row["id"]] = {"name": scalar(fields.get(name_field)) or "", "oen": oen, "campus": canonical_campus(fields.get(campus_field))}
+            name = scalar(fields.get(name_field)) or ""
+            students[row["id"]] = {
+                "name": name,
+                "pinyin": name,
+                "oen": oen,
+                "campus": canonical_campus(fields.get(campus_field)),
+                "email": scalar(fields.get("Email")),
+                "start_date": start_date_value(fields.get("Starting Date")),
+            }
     enrolment: dict[str, dict[str, Any]] = {}
     for row in s1_rows:
         fields = row.get("fields", {})
@@ -227,7 +240,7 @@ def main() -> int:
     name_field, oen_field, campus_field = "Names ONLY", "OEN", "Campus"
     s1_name, s1_students, s1_period = "Name", "Student Name", "Period (bejing)"
     print("[预演] 正在读取 Airtable 学生名册…", file=sys.stderr, flush=True)
-    airtable_students = source.list_records(args.airtable_student_table_id, (name_field, oen_field, campus_field))
+    airtable_students = source.list_records(args.airtable_student_table_id, (name_field, oen_field, campus_field, "Email", "Starting Date"))
     print("[预演] 正在读取 Airtable S1 选课…", file=sys.stderr, flush=True)
     s1_rows = source.list_records(args.airtable_s1_table_id, (s1_name, s1_students, s1_period))
     enrolment, exceptions = build_source_enrolment(
@@ -237,16 +250,38 @@ def main() -> int:
         s1_name_field=s1_name, s1_students_field=s1_students, period_field=s1_period,
     )
     print("[预演] 正在读取飞书学生主档…", file=sys.stderr, flush=True)
-    masters = lark.list_records(BASE_TABLES["学生主档"], ["学生姓名", "OEN"])
+    masters = lark.list_records(BASE_TABLES["学生主档"], ["学生姓名", "OEN", "拼音", "邮箱", "开始日期"])
     masters_by_oen = {scalar(row.get("OEN")): row for row in masters if scalar(row.get("OEN"))}
     new_oens = sorted(set(enrolment) - set(masters_by_oen))
     if args.apply:
         for oen in new_oens:
             person = enrolment[oen]
-            lark.upsert(BASE_TABLES["学生主档"], {"学生姓名": person["name"], "OEN": oen})
+            fields = {"学生姓名": person["name"], "OEN": oen}
+            for source_key, target_key in (("pinyin", "拼音"), ("email", "邮箱"), ("start_date", "开始日期")):
+                if person.get(source_key):
+                    fields[target_key] = person[source_key]
+            lark.upsert(BASE_TABLES["学生主档"], fields)
         if new_oens:
-            masters = lark.list_records(BASE_TABLES["学生主档"], ["学生姓名", "OEN"])
+            masters = lark.list_records(BASE_TABLES["学生主档"], ["学生姓名", "OEN", "拼音", "邮箱", "开始日期"])
             masters_by_oen = {scalar(row.get("OEN")): row for row in masters if scalar(row.get("OEN"))}
+
+    profile_updates = []
+    for oen, person in enrolment.items():
+        master = masters_by_oen.get(oen)
+        if not master:
+            continue
+        fields = {}
+        for source_key, target_key in (("pinyin", "拼音"), ("email", "邮箱"), ("start_date", "开始日期")):
+            # Profile details may have manual corrections in Feishu.  This
+            # workflow backfills blank values only; it never clears or replaces
+            # an existing Feishu value from the Airtable roster.
+            if person.get(source_key) and not scalar(master.get(target_key)):
+                fields[target_key] = person[source_key]
+        if fields:
+            profile_updates.append({"record_id": master["record_id"], "fields": fields})
+    if args.apply:
+        for item in profile_updates:
+            lark.upsert(BASE_TABLES["学生主档"], item["fields"], item["record_id"])
 
     print("[预演] 正在读取飞书学生学期…", file=sys.stderr, flush=True)
     terms = lark.list_records(BASE_TABLES["学生学期"], ["学生姓名", "学年学期", "校区", "T1", "T2", "T1分组", "T2分组", "追踪日志"])
@@ -360,6 +395,7 @@ def main() -> int:
         "来源选课学生": len(enrolment),
         "待建学生主档": [{"OEN": oen, "学生姓名": enrolment[oen]["name"], "校区": enrolment[oen].get("campus")} for oen in new_oens],
         "新增学生主档": len(new_oens),
+        "待补全学生主档资料": len(profile_updates),
         "新增学生学期": len(term_creates) + len(pending_terms_after_master_create),
         "更新学生学期": len(term_updates),
         "待删除未来学生场次": deleted_sessions if args.apply else len(future_session_deletes),
