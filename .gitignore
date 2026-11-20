@@ -15,5 +15,19 @@ outputs/schoology_process/
 # Python
 __pycache__/
 *.pyc
+
+# Runtime credentials and private operational exports (never stage these).
+.env.*
+!.env.example
+!**/.env.example
+*.pem
+*.key
+*cookies*.json
+outputs/
+output/
+backups/
+*.log
+*.tar.gz
+*.tgz
 repository-secrets-handoff.env
 .venv-local/
